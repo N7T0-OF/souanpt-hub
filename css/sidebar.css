@@ -1,0 +1,61 @@
+/* === SIDEBAR (always fixed, never moves) === */
+.sb{width:var(--sb-w);min-width:var(--sb-w);height:100vh;background:var(--s1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;position:relative;z-index:10}
+
+.sb-brand{padding:14px 13px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;cursor:pointer;transition:opacity .15s}
+.sb-brand:hover{opacity:.85}
+.sb-logo2{width:26px;height:26px;background:var(--gold);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-logo2 i{font-size:13px;color:#080808}
+.sb-name{font-size:13px;font-weight:700;color:var(--text)}
+.sb-v{font-size:8px;color:var(--muted);background:var(--s3);padding:2px 5px;border-radius:3px;margin-left:auto}
+
+.sb-search{padding:7px 9px;flex-shrink:0}
+.ss{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:6px 9px}
+.ss i{font-size:12px;color:var(--muted)}
+.ss input{background:none;border:none;outline:none;color:var(--text);font-size:11px;flex:1;font-family:inherit}
+.ss input::placeholder{color:var(--muted)}
+.ss-kbd{font-size:8px;color:var(--muted);background:var(--s3);padding:2px 4px;border-radius:3px}
+
+.sb-nav{flex:1;padding:4px 7px;overflow-y:auto;overflow-x:hidden}
+.sb-nav::-webkit-scrollbar{display:none}
+.sb-lbl{font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;padding:9px 7px 3px;display:block}
+
+.ni{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:8px;color:var(--muted2);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:12px;font-family:inherit;transition:all .15s;position:relative}
+.ni:hover{background:var(--s2);color:var(--text)}
+.ni.active{background:var(--gold-dim2);color:var(--gold-l);font-weight:600}
+.ni.active::before{content:'';position:absolute;left:0;top:22%;bottom:22%;width:2px;background:var(--gold);border-radius:0 2px 2px 0}
+.ni i{font-size:14px;flex-shrink:0}
+.nbadge{margin-left:auto;font-size:8px;font-weight:700;padding:2px 6px;border-radius:10px;background:var(--gold-dim);color:var(--gold-l)}
+.nbadge.g{background:var(--green-dim);color:var(--green)}
+.nbadge.r{background:var(--red-dim);color:var(--red)}
+
+/* XP block */
+.sb-xp{padding:10px 9px;flex-shrink:0}
+.xp-card{background:var(--gold-dim2);border:1px solid var(--gold-border);border-radius:var(--r2);padding:10px 12px}
+.xp-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.xp-av{width:28px;height:28px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#080808;flex-shrink:0}
+.xp-name{font-size:11px;font-weight:700;color:var(--text)}
+.xp-level{font-size:9px;color:var(--gold-l);font-weight:600}
+.xp-bar-wrap{background:var(--s3);border-radius:4px;height:4px;margin-bottom:4px}
+.xp-bar{height:4px;border-radius:4px;background:linear-gradient(90deg,var(--gold),var(--gold-l));transition:width .5s ease}
+.xp-nums{display:flex;justify-content:space-between;font-size:8px;color:var(--muted2)}
+
+/* bottom upgrade card */
+.sb-bottom-actions{padding:8px 9px 10px;border-top:1px solid var(--border);flex-shrink:0}
+.sb-up-mini{background:var(--gold-dim2);border:1px solid var(--gold-border);border-radius:var(--r);padding:10px}
+.sb-up-title{font-size:10px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.sb-up-sub{font-size:9px;color:var(--muted3);line-height:1.4;margin-bottom:7px}
+.btn-up{width:100%;padding:6px;background:var(--gold);border:none;border-radius:6px;color:#080808;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s}
+.btn-up:hover{opacity:.85}
+
+/* responsive collapse */
+@media(max-width:900px){
+  .sb-name,.sb-v,.sb-search,.sb-bottom-actions,.xp-name,.xp-level,.xp-bar-wrap,.xp-nums,.sb-lbl,.ni .ni-label{display:none}
+  .sb-xp{padding:6px}
+  .xp-card{padding:8px;display:flex;align-items:center;justify-content:center}
+  .xp-top{margin-bottom:0}
+  .ni{justify-content:center;padding:9px}
+  .ni i{font-size:17px}
+  .ni.active::before{display:none}
+  .nbadge{display:none}
+}
+@media(max-width:600px){.sb{display:none}}
