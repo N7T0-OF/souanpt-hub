@@ -524,18 +524,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 /* ── XP BAR ── */
 .xp-bar-w{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin:5px 0 2px}
 .xp-bar{height:100%;background:var(--accent);border-radius:2px;transition:width .5s}
-
-/* ── PROJECT CARD ACTIONS ── */
-.pc-act{background:rgba(0,0,0,.6);border:1px solid var(--border2);border-radius:5px;cursor:pointer;color:var(--text);font-size:10px;padding:3px 8px;opacity:0;transition:opacity .15s;font-family:inherit}
-.proj-card:hover .pc-act{opacity:1}
-.pc-link-badge{position:absolute;bottom:8px;right:8px;background:rgba(200,255,0,.12);color:var(--accent);font-size:8px;font-weight:700;padding:2px 8px;border-radius:10px}
-
-/* ── INFO BOXES ── */
-.infobox{background:rgba(200,255,0,.04);border:1px solid rgba(200,255,0,.15);border-radius:var(--r);padding:12px 14px;font-size:10px;color:var(--muted3);line-height:1.8;margin-bottom:14px}
-.infobox strong{color:var(--accent)}
-.hintbox{background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:9px;color:var(--muted2);line-height:1.7;margin-top:8px}
-.file-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);font-size:11px;cursor:pointer;background:transparent;color:var(--muted2);border:1px solid var(--border2);transition:all .15s}
-.file-btn:hover{color:var(--text);background:var(--s2)}
 </style>
 </head>
 <body>
@@ -745,19 +733,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div><div class="prop-label">Titre</div><input class="prop-input" id="np-title" placeholder="Nom du projet"></div>
           <div><div class="prop-label">Tags (virgule)</div><input class="prop-input" id="np-tags" placeholder="branding, motion"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-          <div><div class="prop-label">Lien du projet (Behance, Dribbble…)</div><input class="prop-input" id="np-url" placeholder="https://www.behance.net/gallery/…"></div>
-          <div><div class="prop-label">Couverture — URL image (optionnel)</div><input class="prop-input" id="np-cover-url" placeholder="https://…/image.jpg"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-          <label class="file-btn">📷 Importer une couverture<input type="file" accept="image/*" style="display:none" onchange="npCoverFile(event)"></label>
-          <img id="np-cover-prev" style="display:none;height:40px;border-radius:6px;border:1px solid var(--border2)" alt="">
-          <button id="np-cover-clear" class="btn btn-ghost" style="display:none;font-size:9px;padding:4px 8px" onclick="npClearCover()">✕ retirer</button>
-        </div>
-        <div class="hintbox">💡 Le <strong style="color:var(--text)">lien</strong> rend le folio cliquable sur ton site public. Astuce : l'import <strong style="color:var(--text)">Behance Sync</strong> récupère lien + couverture automatiquement.</div>
         <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-accent" id="np-submit" onclick="addProject()">Ajouter</button>
-          <button class="btn btn-ghost" onclick="resetProjectForm()">Annuler</button>
+          <button class="btn btn-accent" onclick="addProject()">Ajouter</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('add-project-form').classList.remove('visible')">Annuler</button>
         </div>
       </div>
       <div class="filter-row">
@@ -929,11 +907,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
     <!-- ══ PAGE: AVIS ══ -->
     <div class="page" id="page-avis">
-      <div class="section-header"><div class="section-title">Avis clients</div><div class="section-line"></div>
-        <button class="btn btn-accent" style="font-size:10px" id="avis-check-btn" onclick="checkAvis()">📥 Relever les avis</button>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="document.getElementById('add-review-form').classList.toggle('visible')">+ Manuel</button>
-      </div>
-      <div class="infobox">⭐ <strong>Comment ça marche :</strong> les visiteurs laissent leur avis <strong>directement sur ton site publié</strong> (bouton « ✎ Laisser un avis »). Ils arrivent ici automatiquement — toi tu <strong>approuves ou refuses</strong>, c'est tout. Les avis approuvés s'affichent sur le site au prochain déploiement 🚀. Relève auto toutes les 5 min · <span id="avis-last-check" style="color:var(--muted2)">jamais relevé</span></div>
+      <div class="section-header"><div class="section-title">Avis clients</div><div class="section-line"></div><button class="btn btn-ghost" style="font-size:10px" onclick="document.getElementById('add-review-form').classList.toggle('visible')">+ Avis</button></div>
       <div class="form-box" id="add-review-form">
         <div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:8px">
           <div><div class="prop-label">Auteur</div><input class="prop-input" id="rv-author" placeholder="Prénom NOM"></div>
@@ -993,21 +967,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     <div class="page" id="page-behance">
       <div class="section-header"><div class="section-title">Behance Sync</div><div class="section-line"></div></div>
       <div style="max-width:600px">
-        <div class="infobox">✨ <strong>Zéro clé API nécessaire</strong> — l'API Behance a été fermée par Adobe. La sync utilise le <strong>flux RSS public</strong> de ton profil : ton pseudo suffit. Chaque projet importé arrive avec son <strong>lien cliquable</strong> et sa <strong>couverture</strong>, prêt à publier.</div>
         <div class="behance-connect">
           <div style="width:36px;height:36px;background:#1769FF;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:white;flex-shrink:0">Be</div>
           <div style="flex:1">
             <div style="font-size:12px;font-weight:700">Behance</div>
-            <div class="behance-connected" id="behance-status">Entre ton pseudo pour synchroniser</div>
+            <div class="behance-connected" id="behance-status">Configure dans Paramètres</div>
           </div>
+          <button class="btn btn-ghost" onclick="showPage('settings')">Configurer</button>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px">
-          <input class="prop-input" id="be-user" placeholder="tonpseudo (ex: souanpt)" style="flex:1" onkeydown="if(event.key==='Enter')beImport()">
-          <button class="btn btn-accent" id="be-import-btn" onclick="beImport()" style="white-space:nowrap">↻ Importer / Synchroniser</button>
-        </div>
-        <div class="hintbox">🔄 Sync <strong style="color:var(--text)">automatique toutes les 30 min</strong> quand le hub est ouvert. Les nouveaux projets Behance apparaissent dans ton Portfolio, dédupliqués par lien.</div>
-        <div class="gc" style="padding:16px;margin-top:14px">
-          <div style="font-size:11px;font-weight:700;margin-bottom:10px">Projets Behance importés</div>
+        <div class="gc" style="padding:16px">
+          <div style="font-size:11px;font-weight:700;margin-bottom:10px">Projets importés</div>
           <div id="behance-imported-list" style="font-size:10px;color:var(--muted2)">Aucun projet importé</div>
         </div>
       </div>
@@ -1053,11 +1022,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div class="gc" style="padding:16px">
             <div style="font-size:11px;font-weight:700;margin-bottom:10px">Repo de déploiement</div>
             <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:8px;align-items:center">
-              <input class="prop-input" id="gh-repo-inp" placeholder="username/souanpt-folio" style="font-size:11px">
+              <input class="prop-input" id="gh-repo-inp" placeholder="username/souanpt-hub" style="font-size:11px">
               <button class="btn btn-ghost" onclick="ghCheckRepo()" style="font-size:10px;white-space:nowrap">Vérifier</button>
               <button class="btn btn-ghost" onclick="ghCreateRepo()" style="font-size:10px;white-space:nowrap">+ Créer</button>
             </div>
-            <div class="hintbox" style="margin-bottom:8px">⚠ Utilise un repo <strong style="color:var(--text)">dédié au site public</strong> (ex : <code style="color:var(--accent)">souanpt-folio</code>). Jamais <code>souanpt-hub</code> — c'est le repo de ce dashboard, il serait écrasé (protection auto activée).</div>
             <div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--s2);border-radius:6px;font-size:10px">
               <div id="gh-repo-dot" style="width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0"></div>
               <div id="gh-repo-label" style="flex:1;color:var(--muted2)">—</div>
@@ -1096,8 +1064,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
               <button class="btn btn-ghost" onclick="ghRefreshRuns()" style="font-size:9px;padding:3px 9px">↻</button>
             </div>
             <div class="workflow-list">
-              <div class="workflow-item"><div class="workflow-status ws-active"></div><div class="workflow-name">pages build and deployment — automatique</div><div class="workflow-trigger">à chaque déploiement</div></div>
-              <div class="workflow-item"><div class="workflow-status ws-idle"></div><div class="workflow-name">Sync Behance RSS (côté hub)</div><div class="workflow-trigger">toutes les 30 min</div></div>
+              <div class="workflow-item"><div class="workflow-status ws-active"></div><div class="workflow-name">deploy.yml — GitHub Pages</div><div class="workflow-trigger">on: push main</div></div>
+              <div class="workflow-item"><div class="workflow-status ws-idle"></div><div class="workflow-name">behance-sync.yml</div><div class="workflow-trigger">cron: */30</div></div>
             </div>
             <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
               <div style="font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;font-weight:700">Derniers runs</div>
@@ -1130,9 +1098,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div id="set-tab-behance" class="set-tab" style="display:none">
             <div class="setting-group">
               <div class="setting-group-title">Connexion Behance</div>
-              <div style="font-size:10px;color:var(--muted2);margin-bottom:10px;line-height:1.6">✨ <strong style="color:var(--text)">Plus besoin de clé API</strong> — Adobe a fermé l'API Behance. La sync passe par le flux RSS public de ton profil : ton pseudo suffit.</div>
-              <div class="prop-row"><div class="prop-label">Behance Username</div><input class="prop-input" id="set-behance-user" placeholder="tonpseudo (ex: souanpt)"></div>
-              <div class="hintbox">Gère l'import complet dans la page <strong style="color:var(--accent)" onclick="showPage('behance')" role="button">Behance Sync →</strong></div>
+              <div style="font-size:10px;color:var(--muted2);margin-bottom:10px;line-height:1.6">API key sur <a href="https://www.behance.net/dev/register" target="_blank" style="color:var(--accent3)">behance.net/dev/register →</a></div>
+              <div class="prop-row"><div class="prop-label">Behance Username</div><input class="prop-input" id="set-behance-user" placeholder="@tonpseudo"></div>
+              <div style="margin-top:8px;padding:10px 12px;background:var(--s2);border-radius:6px;border:1px solid var(--border);font-size:9px;color:var(--muted2);line-height:1.7">Ajouter dans <strong style="color:var(--text)">GitHub → Secrets → Actions</strong> :<br><code style="color:var(--accent3)">BEHANCE_API_KEY</code> et <code style="color:var(--accent3)">BEHANCE_USERNAME</code></div>
               <button class="btn btn-ghost" style="font-size:10px;margin-top:10px" onclick="settingsSaveBehance()">Sauvegarder</button>
             </div>
           </div>
@@ -1182,9 +1150,10 @@ function settingsSaveGeneral() {
   showToast('Sauvegardé ✓','#2e9a63');
 }
 function settingsSaveBehance() {
-  const user = (document.getElementById('set-behance-user')?.value.trim() || '').replace('@','');
+  const user = document.getElementById('set-behance-user')?.value.trim();
   if (user) SiteConfig.set('behance', user);
-  renderBehancePage();
+  const bs = document.getElementById('behance-status');
+  if (bs) bs.textContent = '✓ @' + user + ' configuré';
   showToast('Behance @' + user + ' sauvegardé','#2e9a63');
 }
 function settingsSaveDomain() {
@@ -1204,141 +1173,39 @@ function importDataFull() {
   inp.click();
 }
 
-/* ═══ PROJETS — lien cliquable + couverture + édition ═══ */
-let _npCover = '', _editingId = null;
-
-function fileToDataURL(file, cb) {
-  const rd = new FileReader();
-  rd.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      const MAX = 900; let w = img.width, h = img.height;
-      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-      cv.getContext('2d').drawImage(img, 0, 0, w, h);
-      cb(cv.toDataURL('image/jpeg', .82));
-    };
-    img.src = e.target.result;
-  };
-  rd.readAsDataURL(file);
-}
-function npCoverFile(ev) {
-  const f = ev.target.files[0]; if (!f) return;
-  fileToDataURL(f, d => {
-    _npCover = d;
-    const pv = document.getElementById('np-cover-prev');
-    if (pv) { pv.src = d; pv.style.display = ''; }
-    const cl = document.getElementById('np-cover-clear'); if (cl) cl.style.display = '';
-  });
-  ev.target.value = '';
-}
-function npClearCover() {
-  _npCover = '';
-  const pv = document.getElementById('np-cover-prev'); if (pv) { pv.src=''; pv.style.display='none'; }
-  const cl = document.getElementById('np-cover-clear'); if (cl) cl.style.display='none';
-}
-function resetProjectForm() {
-  _editingId = null; npClearCover();
-  ['np-title','np-tags','np-url','np-cover-url'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  const sb = document.getElementById('np-submit'); if (sb) sb.textContent = 'Ajouter';
-  document.getElementById('add-project-form').classList.remove('visible');
-}
+/* ═══ SIMPLE DATA ACTIONS ═══ */
 function addProject() {
-  const title = document.getElementById('np-title')?.value.trim(); if (!title) { showToast('Titre requis','#c0392b',1500); return; }
+  const title = document.getElementById('np-title')?.value.trim(); if (!title) return;
   const tags  = (document.getElementById('np-tags')?.value || '').split(',').map(t=>t.trim()).filter(Boolean);
-  const url   = document.getElementById('np-url')?.value.trim() || '';
-  const cover = _npCover || document.getElementById('np-cover-url')?.value.trim() || '';
-  const projs = getProjects();
-  const wasEdit = !!_editingId;
-  if (wasEdit) {
-    const p = projs.find(x => x.id === _editingId);
-    if (p) { p.title = title; p.tags = tags; p.url = url; if (cover) p.cover = cover; }
-  } else {
-    projs.unshift({ id: Date.now().toString(), title, tags, url, cover, views:0, createdAt:Date.now() });
-  }
-  try { localStorage.setItem('hub_projects', JSON.stringify(projs)); }
-  catch { showToast('⚠ Image trop lourde — utilise une URL d\'image à la place','#c0392b',3500); return; }
-  resetProjectForm(); renderProjects(); syncKPIs();
-  showToast(wasEdit ? 'Projet mis à jour ✓' : 'Projet ajouté ✓','#2e9a63');
-}
-function editProject(id) {
-  const p = getProjects().find(x => x.id === id); if (!p) return;
-  _editingId = id;
-  const set = (i,v) => { const el=document.getElementById(i); if(el) el.value=v||''; };
-  set('np-title', p.title); set('np-tags', (p.tags||[]).join(', ')); set('np-url', p.url); set('np-cover-url','');
-  if (p.cover) { _npCover = p.cover; const pv=document.getElementById('np-cover-prev'); if(pv){pv.src=p.cover;pv.style.display='';} const cl=document.getElementById('np-cover-clear'); if(cl)cl.style.display=''; }
-  const sb = document.getElementById('np-submit'); if (sb) sb.textContent = 'Mettre à jour';
-  document.getElementById('add-project-form').classList.add('visible');
-  document.querySelector('.scroll-area')?.scrollTo({ top: 0, behavior: 'smooth' });
+  const projs = JSON.parse(localStorage.getItem('hub_projects')||'[]');
+  projs.push({ id: Date.now().toString(), title, tags, views:0, createdAt:Date.now() });
+  localStorage.setItem('hub_projects', JSON.stringify(projs));
+  renderProjects();
+  document.getElementById('add-project-form').classList.remove('visible');
+  ['np-title','np-tags'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  showToast('Projet ajouté ✓','#2e9a63');
 }
 function deleteProject(id) {
-  localStorage.setItem('hub_projects', JSON.stringify(getProjects().filter(p=>p.id!==id)));
-  renderProjects(); syncKPIs();
+  const projs = JSON.parse(localStorage.getItem('hub_projects')||'[]').filter(p=>p.id!==id);
+  localStorage.setItem('hub_projects', JSON.stringify(projs));
+  renderProjects();
 }
 function renderProjects() {
-  const projs = getProjects();
+  const projs = JSON.parse(localStorage.getItem('hub_projects')||'[]');
   const ct = document.getElementById('projects-list'); if (!ct) return;
   const badge = document.getElementById('portfolio-badge'); if (badge) badge.textContent = projs.length;
   const cols = ['pt1','pt2','pt3','pt4','pt5','pt6'];
   const emojis = ['🎨','🏎️','🌍','🖥️','✏️','📸'];
-  if (!projs.length) { ct.innerHTML = '<div style="grid-column:span 3;text-align:center;color:var(--muted2);padding:40px;font-size:12px">Aucun projet — importe depuis <strong style="color:var(--accent);cursor:pointer" onclick="showPage(\'behance\')">Behance Sync</strong> ou ajoute manuellement</div>'; return; }
-  ct.innerHTML = projs.map((p,i) => `<div class="proj-card gc" style="animation-delay:${i*.05}s"${p.url?` onclick="if(!event.target.closest('button'))window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"`:''}>
-    <div class="pthumb ${cols[i%6]}">${p.cover?`<img src="${esc(p.cover)}" style="width:100%;height:100%;object-fit:cover" alt="">`:emojis[i%6]}${p.url?'<span class="pc-link-badge">lien ✓</span>':''}</div>
+  if (!projs.length) { ct.innerHTML = '<div style="grid-column:span 3;text-align:center;color:var(--muted2);padding:40px;font-size:12px">Aucun projet — synchronise Behance ou ajoute manuellement</div>'; return; }
+  ct.innerHTML = projs.map((p,i) => `<div class="proj-card gc" style="animation-delay:${i*.05}s">
+    <div class="pthumb ${cols[i%6]}">${p.cover?`<img src="${p.cover}" style="width:100%;height:100%;object-fit:cover">`:emojis[i%6]}</div>
     <div class="pbody">
-      <div class="ptitle">${esc(p.title)}${p.url?' <span style="color:var(--accent3);font-size:10px">↗</span>':''}</div>
-      <div class="ptags">${(p.tags||[]).slice(0,3).map(t=>`<span class="ptag${p.behance?' gold':''}">${esc(t)}</span>`).join('')}</div>
-      <div class="pmeta">${p.behance?'Behance · ':''}${p.url?'':'<span style="color:var(--gold-l)">⚠ pas de lien — ajoute-le via ✎</span>'}${p.url&&p.views?`👁 ${p.views}`:''}</div>
+      <div class="ptitle">${p.title}</div>
+      <div class="ptags">${(p.tags||[]).slice(0,3).map(t=>`<span class="ptag${p.behance?' gold':''}">${t}</span>`).join('')}</div>
+      <div class="pmeta">👁 ${p.views||0}${p.behance?' · Behance':''}</div>
     </div>
-    <div style="position:absolute;top:5px;right:5px;display:flex;gap:4px">
-      <button class="pc-act" onclick="editProject('${p.id}')" title="Modifier">✎</button>
-      <button class="pc-act" onclick="deleteProject('${p.id}')" title="Supprimer" style="color:var(--red)">✕</button>
-    </div>
-  </div>`).join('') + `<div class="proj-card gc" style="border-style:dashed;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;cursor:pointer;color:var(--muted2);min-height:140px" onclick="document.getElementById('add-project-form').classList.toggle('visible')"><div style="font-size:20px">+</div><div style="font-size:10px">Ajouter</div></div>`;
-}
-
-/* ═══ BEHANCE PAGE ═══ */
-async function beImport() {
-  const u = document.getElementById('be-user')?.value.trim().replace('@','');
-  if (!u) { showToast('Entre ton pseudo Behance','#e4b24a'); return; }
-  SiteConfig.set('behance', u);
-  const btn = document.getElementById('be-import-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⟳ Import en cours…'; }
-  try { await behanceSyncNow(false); renderBehancePage(); }
-  catch(e) { showToast('✗ ' + e.message, '#c0392b', 3500); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '↻ Importer / Synchroniser'; } }
-}
-function renderBehancePage() {
-  const cfg = SiteConfig.get();
-  const be = document.getElementById('be-user'); if (be && !be.value) be.value = cfg.behance || '';
-  const st = document.getElementById('behance-status');
-  const last = parseInt(localStorage.getItem('souanpt_last_behance_sync')||'0');
-  if (st) st.textContent = cfg.behance ? `✓ @${cfg.behance} · dernière sync : ${last?timeAgo(last):'jamais'}` : 'Entre ton pseudo pour synchroniser';
-  const list = document.getElementById('behance-imported-list'); if (!list) return;
-  const bp = getProjects().filter(p => p.behance);
-  if (!bp.length) { list.innerHTML = 'Aucun projet importé pour le moment'; return; }
-  list.innerHTML = bp.map(p => `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
-    <div style="width:44px;height:30px;border-radius:4px;overflow:hidden;background:var(--s3);flex-shrink:0">${p.cover?`<img src="${esc(p.cover)}" style="width:100%;height:100%;object-fit:cover" alt="">`:''}</div>
-    <div style="flex:1;font-size:10px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
-    <a href="${esc(p.url)}" target="_blank" style="font-size:9px;color:var(--accent3);text-decoration:none">Voir ↗</a>
-  </div>`).join('');
-}
-
-/* ═══ AVIS — relève GitHub ═══ */
-async function checkAvis() {
-  if (!Auth.ok()) { showToast('Connecte GitHub d\'abord','#e4b24a'); showPage('github'); return; }
-  const btn = document.getElementById('avis-check-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⟳ Relève…'; }
-  try { await fetchVisitorReviews(false); renderReviews(); }
-  catch(e) { showToast('✗ ' + e.message, '#c0392b'); }
-  finally {
-    if (btn) { btn.disabled = false; btn.textContent = '📥 Relever les avis'; }
-    updateAvisCheckTime();
-  }
-}
-function updateAvisCheckTime() {
-  const el = document.getElementById('avis-last-check'); if (!el) return;
-  const ts = parseInt(localStorage.getItem('souanpt_last_avis_check')||'0');
-  el.textContent = ts ? 'dernier relevé : ' + timeAgo(ts) : 'jamais relevé';
+    <button onclick="deleteProject('${p.id}')" style="position:absolute;top:5px;left:5px;background:var(--red-dim);border:none;border-radius:3px;cursor:pointer;color:var(--red);font-size:9px;padding:2px 6px;opacity:0;transition:opacity .15s" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">✕</button>
+  </div>`).join('') + `<div class="proj-card gc" style="border-style:dashed;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;cursor:pointer;color:var(--muted2)" onclick="document.getElementById('add-project-form').classList.toggle('visible')"><div style="font-size:20px">+</div><div style="font-size:10px">Ajouter</div></div>`;
 }
 
 function addLink() {
@@ -1416,7 +1283,6 @@ function reviewAction(id, action) {
   if(action==='delete'){localStorage.setItem('hub_reviews',JSON.stringify(rv.filter(r=>r.id!==id)));}
   else{const r=rv.find(r=>r.id===id);if(r)r.status=action;localStorage.setItem('hub_reviews',JSON.stringify(rv));}
   renderReviews();
-  if(action==='approved') showToast('Approuvé ✓ — clique 🚀 Publier pour l\'afficher sur le site','#2e9a63',3500);
 }
 function renderReviews() {
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
@@ -1425,7 +1291,7 @@ function renderReviews() {
   const badge=document.getElementById('avis-badge');
   if(badge){badge.textContent=wt||'';badge.style.display=wt?'':'none';}
   if(!rv.length){ct.innerHTML='<div class="empty" style="grid-column:span 2"><div class="empty-title">Aucun avis</div></div>';return;}
-  ct.innerHTML=rv.map(r=>`<div class="gc rcard"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${r.ghIssue?' <span style="font-size:8px;color:var(--accent3)">via le site</span>':''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${esc(r.text)}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
+  ct.innerHTML=rv.map(r=>`<div class="gc rcard"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${(r.author||'?')[0].toUpperCase()}</div><div><div class="rname">${r.author}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${r.text}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
 }
 
 function generateQR() {
@@ -1499,9 +1365,10 @@ function syncKPIs() {
   if(Auth.ok())BubbleWidget.refresh();
 }
 
+function syncBehance() { showToast('↻ Sync Behance…','#666',1500); setTimeout(()=>{renderProjects();showToast('✓ Behance à jour','#2e9a63');},2000); }
+
 document.addEventListener('DOMContentLoaded', () => {
   renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
-  renderBehancePage(); updateAvisCheckTime();
   syncKPIs();
   if (Auth.ok()) { BubbleWidget.init(); document.getElementById('gh-disconnect-btn') && (document.getElementById('gh-disconnect-btn').style.display=''); }
   else { const p=document.getElementById('gh-connect-prompt'); if(p) p.style.display='block'; }
@@ -1511,12 +1378,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const el=document.getElementById(id);
     if(el)el.value=id==='set-site-name'?(cfg.siteName||''):(cfg.bio||'');
   });
-  const bu=document.getElementById('set-behance-user'); if(bu) bu.value=cfg.behance||'';
-  // Sync Behance auto (30 min max) — silencieuse
-  const lastSync=parseInt(localStorage.getItem('souanpt_last_behance_sync')||'0');
-  if (cfg.behance && Date.now()-lastSync > 30*60*1000) {
-    behanceSyncNow(true).then(n=>{ if(n) renderBehancePage(); }).catch(()=>{});
-  }
 });
 </script>
 </body>

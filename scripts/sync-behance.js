@@ -1,53 +1,52 @@
 /**
  * scripts/sync-behance.js
- * Syncs Behance projects to assets/behance-projects.json
- * Called by GitHub Actions behance-sync.yml
+ * Sync des projets Behance vers assets/behance-projects.json
+ * via le flux RSS PUBLIC (l'API Behance est fermée — aucune clé nécessaire).
+ * Utilisable par GitHub Actions ou en local : node scripts/sync-behance.js
  */
 const https = require('https');
 const fs    = require('fs');
 const path  = require('path');
 
-const API_KEY  = process.env.BEHANCE_API_KEY;
-const USERNAME = process.env.BEHANCE_USERNAME || 'eolienneolienn';
+const USERNAME = process.env.BEHANCE_USERNAME || 'souanpt';
 const OUT      = path.join(__dirname, '..', 'assets', 'behance-projects.json');
-
-if (!API_KEY) {
-  console.log('[behance-sync] No BEHANCE_API_KEY — skipping.');
-  process.exit(0);
-}
 
 function get(url) {
   return new Promise((res, rej) => {
-    https.get(url, r => {
+    https.get(url, { headers: { 'User-Agent': 'souanpt-hub' } }, r => {
+      if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) {
+        return get(r.headers.location).then(res, rej);
+      }
       let d = '';
       r.on('data', c => d += c);
-      r.on('end', () => { try { res(JSON.parse(d)); } catch(e) { rej(e); } });
+      r.on('end', () => res(d));
     }).on('error', rej);
   });
 }
 
+function pick(block, tag) {
+  const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
+  return m ? m[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim() : '';
+}
+
 async function main() {
-  const url = `https://api.behance.net/v2/users/${USERNAME}/projects?api_key=${API_KEY}&per_page=20`;
-  const resp = await get(url);
-  if (!resp.projects) throw new Error('Unexpected response: ' + JSON.stringify(resp).slice(0,200));
+  const xml = await get(`https://www.behance.net/feeds/user?username=${encodeURIComponent(USERNAME)}`);
+  const items = xml.split('<item>').slice(1).map(b => b.split('</item>')[0]);
+  if (!items.length) throw new Error('Aucun projet dans le flux RSS de @' + USERNAME);
 
-  const projects = resp.projects.map(p => ({
-    id: p.id, name: p.name, url: p.url,
-    covers: p.covers,
-    published: p.published_on,
-    fields: p.fields || [],
-    stats: { views: p.stats?.views || 0, appreciations: p.stats?.appreciations || 0 },
-    tags: p.tags || []
-  }));
-
-  let existing = [];
-  if (fs.existsSync(OUT)) try { existing = JSON.parse(fs.readFileSync(OUT, 'utf8')); } catch {}
-  const newOnes = projects.filter(p => !existing.find(e => e.id === p.id));
-  if (newOnes.length) console.log(`[behance-sync] ${newOnes.length} new: ${newOnes.map(p=>p.name).join(', ')}`);
-  else console.log('[behance-sync] No new projects.');
+  const projects = items.map(b => {
+    const desc = pick(b, 'description');
+    return {
+      name:  pick(b, 'title'),
+      url:   pick(b, 'link'),
+      cover: (desc.match(/src="([^"]+)"/) || [])[1] || '',
+      published: pick(b, 'pubDate'),
+      tags:  [...b.matchAll(/<category[^>]*>([\s\S]*?)<\/category>/g)].map(m => m[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim()),
+    };
+  });
 
   fs.writeFileSync(OUT, JSON.stringify(projects, null, 2));
-  console.log(`[behance-sync] Wrote ${projects.length} projects.`);
+  console.log(`[behance-sync] ${projects.length} projet(s) écrits pour @${USERNAME}.`);
 }
 
 main().catch(e => { console.error('[behance-sync]', e.message); process.exit(1); });

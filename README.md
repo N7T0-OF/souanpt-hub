@@ -1,36 +1,48 @@
 # souanpt.hub — Creator OS
 
-Portfolio · Links · Analytics · Facturation · QR · Backup GitHub
+Dashboard tout-en-un : Portfolio · Behance Sync · Éditeur de site · Avis visiteurs · Facturation · Clients · QR · Backup GitHub — 100% gratuit, zéro serveur.
 
-## Déploiement
+## Architecture (2 repos)
 
-```bash
-git clone https://github.com/Sankaiii/souanpt-hub repo
-cd repo
-# Copier les fichiers du ZIP ici
-git add . && git commit -m "init" && git push origin main
-```
-
-## Connexion GitHub (Device Flow)
-
-1. Ouvre le hub sur GitHub Pages
-2. Va dans **GitHub & Déploiement**
-3. Clique **Se connecter avec GitHub**
-4. Un code apparaît — il s'ouvre automatiquement sur github.com/login/device
-5. Colle le code → Autoriser → retour automatique ✓
-
-## Architecture
+| Repo | Rôle |
+|---|---|
+| `souanpt-hub` | **Ce dashboard** (ne jamais déployer le site dessus — protection intégrée) |
+| `souanpt-folio` (ou autre) | **Le site public généré**, déployé par le pipeline |
+| `{user}-hub-data` | Backup privé automatique de tes données |
 
 ```
 hub/
-├── index.html      # SPA complète
+├── index.html      # SPA complète du dashboard
 ├── js/
-│   ├── core.js     # GitHub API, DeviceFlow, Auth, SiteConfig, Generator, Deploy
+│   ├── core.js     # GitHub API, Auth PAT, SiteConfig, Générateur, Deploy, Behance RSS, Avis
 │   └── ui.js       # GHPage, Éditeur, BubbleWidget, navigation
-├── css/            # Styles (depuis ZIP original)
-├── scripts/
-│   └── sync-behance.js
-└── .github/workflows/
-    ├── deploy.yml
-    └── behance-sync.yml
+├── scripts/sync-behance.js   # sync RSS optionnelle (Node, sans clé API)
+└── _legacy/        # anciens fichiers non chargés (archive)
 ```
+
+## Connexion GitHub (PAT)
+
+1. Génère un token sur [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo,workflow&description=souanpt.hub) — scope `repo`
+2. **GitHub & Deploy** → colle le token → Se connecter
+3. Le repo privé `{user}-hub-data` (backup) est créé automatiquement
+
+## Pipeline de déploiement
+
+1 clic 🚀 Publier :
+1. Récupère projets + avis approuvés
+2. Génère le site (navbar flottante, folios cliquables, section avis)
+3. **1 seul commit atomique** (index.html + config + .nojekyll) — évite les builds Pages concurrents
+4. Active GitHub Pages puis **vérifie le build** (retry auto si erreur)
+
+## Behance — sans clé API
+
+L'API Behance est fermée (Adobe). La sync passe par le **flux RSS public** :
+- Page **Behance Sync** → pseudo → Importer
+- Chaque projet arrive avec **titre + lien cliquable + couverture + tags**
+- Sync auto toutes les 30 min quand le hub est ouvert
+
+## Avis visiteurs
+
+- Sur le site publié : bouton « ✎ Laisser un avis » (nom, étoiles, texte) → crée une issue GitHub `[AVIS]` sur le repo du site
+- Dans le hub : page **Avis** → 📥 Relever les avis (auto toutes les 5 min) → **Approuver / Refuser**
+- Les avis approuvés apparaissent sur le site au prochain déploiement

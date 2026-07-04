@@ -17,7 +17,8 @@ const GHPage = {
     if (ri) {
       const cfg = SiteConfig.get();
       const u   = Auth.owner();
-      ri.value  = cfg.repo || (u ? u + '/souanpt-hub' : 'Sankaiii/souanpt-hub');
+      ri.value  = cfg.repo || (u ? u + '/' + SITE_REPO_NAME : '');
+      ri.placeholder = 'username/' + SITE_REPO_NAME;
     }
   },
 
@@ -46,6 +47,9 @@ const GHPage = {
     // Auto-backup
     setTimeout(autoBackup, 3000);
     setInterval(autoBackup, 5*60*1000);
+    // Relève automatique des avis visiteurs (issues GitHub du site)
+    setTimeout(() => fetchVisitorReviews(true), 4000);
+    setInterval(() => fetchVisitorReviews(true), 5*60*1000);
     // Bubble
     BubbleWidget?.init?.();
   },
@@ -66,7 +70,7 @@ const GHPage = {
 
   async loadRepo() {
     const token = Auth.token(); const cfg = SiteConfig.get(); const user = Auth.user();
-    const repo = cfg.repo || (user?.login ? user.login+'/souanpt-hub' : '');
+    const repo = cfg.repo || (user?.login ? user.login+'/'+SITE_REPO_NAME : '');
     if (!token || !repo) return;
     const [owner, r] = repo.split('/');
     const dot = document.getElementById('gh-repo-dot');
@@ -90,7 +94,7 @@ const GHPage = {
 
   async loadRuns() {
     const token = Auth.token(); const cfg = SiteConfig.get(); const user = Auth.user();
-    const repo = cfg.repo || (user?.login ? user.login+'/souanpt-hub' : '');
+    const repo = cfg.repo || (user?.login ? user.login+'/'+SITE_REPO_NAME : '');
     if (!token || !repo) return;
     const [owner, r] = repo.split('/');
     const list = document.getElementById('gh-runs-list');
@@ -232,7 +236,7 @@ async function ghRefreshRuns() { await GHPage.loadRuns(); showToast('Actualisé'
 
 function ghDisconnect() {
   if (!confirm('Déconnecter GitHub ?')) return;
-  Auth.clear(); DeviceFlow.stop();
+  Auth.clear();
   GHPage.showDisconnected();
   showToast('Déconnecté','#666');
 }
@@ -293,10 +297,10 @@ function edRefreshPreview() {
   frame.onload = ()=>{ if(loading)loading.style.display='none'; };
   frame.src = _edBlobUrl;
   setTimeout(()=>{ if(loading)loading.style.display='none'; },2000);
-  const u=Auth.owner()||'sankaiii'; const repo=cfg.repo||(u+'/souanpt-hub');
+  const u=Auth.owner()||'souanpt'; const repo=cfg.repo||(u+'/'+SITE_REPO_NAME);
   const [owner,r]=repo.split('/');
   const urlEl=document.getElementById('ed-preview-url');
-  if (urlEl) urlEl.textContent=owner.toLowerCase()+'.github.io/'+(r||'souanpt-hub');
+  if (urlEl) urlEl.textContent=owner.toLowerCase()+'.github.io/'+(r||SITE_REPO_NAME);
 }
 
 function edSaveConfig() {
@@ -361,7 +365,7 @@ const BubbleWidget = {
   refresh() {
     const user=Auth.user(); const cfg=SiteConfig.get();
     const username=user?.login||'souanpt'; const initials=username.slice(0,2).toUpperCase();
-    const url=cfg.lastDeploy?.url||(user?`https://${user.login}.github.io/souanpt-hub`:'sankaiii.github.io/souanpt-hub');
+    const url=cfg.lastDeploy?.url||(user?`https://${user.login.toLowerCase()}.github.io/${SITE_REPO_NAME}`:'—');
     const short=url.replace('https://','');
     ['sp-bub-av','sp-hd-av2'].forEach(id=>{
       const el=document.getElementById(id); if(!el)return;
@@ -388,7 +392,7 @@ const BubbleWidget = {
     if(btn)btn.classList.add('active');
     if(name==='profile')this.loadProfileTab();
   },
-  siteUrl(){ const cfg=SiteConfig.get(); return cfg.lastDeploy?.url||(Auth.owner()?`https://${Auth.owner()}.github.io/souanpt-hub`:'https://sankaiii.github.io/souanpt-hub'); },
+  siteUrl(){ const cfg=SiteConfig.get(); return cfg.lastDeploy?.url||(Auth.owner()?`https://${Auth.owner().toLowerCase()}.github.io/${SITE_REPO_NAME}`:''); },
   copyUrl()    { navigator.clipboard.writeText(this.siteUrl()).then(()=>showToast('URL copiée ✓','#2e9a63',1500)); },
   openSite()   { window.open(this.siteUrl(),'_blank'); },
   copyHandle() { const u='@'+(Auth.user()?.login||'souanpt'); navigator.clipboard.writeText(u).then(()=>showToast(u+' copié','#2e9a63',1500)); },
@@ -455,7 +459,11 @@ function showPage(id) {
   if(id==='editor') { edLoad(); setTimeout(edRefreshPreview,100); }
 }
 
-function syncBehance(){ showToast('↻ Sync Behance…','#666',1500); setTimeout(()=>showToast('✓ Behance à jour','#2e9a63'),2000); }
+async function syncBehance(){
+  showToast('↻ Sync Behance…','#666',1500);
+  try { await behanceSyncNow(false); }
+  catch(e) { showToast('✗ ' + e.message, '#c0392b', 3000); }
+}
 
 document.addEventListener('DOMContentLoaded',()=>{
   if(document.getElementById('page-github')?.classList.contains('active')) GHPage.init();
