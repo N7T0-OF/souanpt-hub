@@ -358,7 +358,17 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 .rev{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
 .rev.in{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){.rev{opacity:1;transform:none;transition:none}.mqtrack{animation:none}}
-@media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}}
+/* ── MENU MOBILE ── */
+.burger{display:none;flex-direction:column;gap:4px;background:none;border:none;cursor:pointer;padding:8px;margin-left:4px}
+.burger span{width:20px;height:2px;background:var(--t);border-radius:2px;transition:.25s}
+.burger.open span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.burger.open span:nth-child(2){opacity:0}
+.burger.open span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.mobmenu{position:fixed;top:70px;left:16px;right:16px;z-index:99;display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:18px;background:${navBg};border:1px solid var(--b);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 20px 50px rgba(0,0,0,.5);opacity:0;transform:translateY(-12px);pointer-events:none;transition:.25s}
+.mobmenu.open{opacity:1;transform:none;pointer-events:auto}
+.mobmenu a{padding:13px 16px;border-radius:12px;font-size:14px;font-weight:600;color:var(--m)}
+.mobmenu a:hover{color:var(--t);background:rgba(128,128,128,.12)}
+@media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}.navcta{display:none}.burger{display:flex}}
 </style></head><body>
 <div class="navwrap"><nav>
   <a href="#" class="logo"><span class="ic">✳</span>${esc(cfg.siteName)}<span class="d">.</span></a>
@@ -366,8 +376,14 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
     ${navLinks}
     ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
   </div>
-  <a class="ncta" href="${cfg.email?`mailto:${esc(cfg.email)}`:(sec.contact?'#contact':'#')}">Me contacter</a>
+  <a class="ncta navcta" href="${cfg.email?`mailto:${esc(cfg.email)}`:(sec.contact?'#contact':'#')}">Me contacter</a>
+  <button class="burger" aria-label="Menu" onclick="var m=document.getElementById('mm');m.classList.toggle('open');this.classList.toggle('open')"><span></span><span></span><span></span></button>
 </nav></div>
+<div class="mobmenu" id="mm" onclick="this.classList.remove('open');document.querySelector('.burger').classList.remove('open')">
+  ${order.filter(k=>sec[k]).map(k=>`<a href="#${k}">${SEC_LABELS[k]}</a>`).join('')}
+  ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
+  ${cfg.email?`<a href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
+</div>
 <div class="hero"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
 <div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>
 ${bodySections}
@@ -474,7 +490,16 @@ async function deployPortfolio(onLog, onStep) {
 const CORS_PROXIES = [
   u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
   u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+  u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
 ];
+
+/* fetch avec timeout (évite qu'un proxy bloqué fige la sync) */
+async function fetchTimeout(url, ms = 12000, opts) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
 
 /* ══════════════════════════════════════════════════════
    GOATCOUNTER — stats réelles remontées dans le dashboard
@@ -488,10 +513,10 @@ async function fetchGoatStats() {
   const url = `https://${code}.goatcounter.com/counter/TOTAL.json`;
   const parse = txt => { const j = JSON.parse(txt); const n = s => parseInt(String(s ?? '0').replace(/[^\d]/g, '')) || 0; return { views: n(j.count), visitors: n(j.count_unique) }; };
   // 1) direct (les endpoints counter envoient du CORS *)
-  try { const r = await fetch(url, { headers: { 'Accept': 'application/json' } }); if (r.ok) return parse(await r.text()); } catch {}
+  try { const r = await fetchTimeout(url, 10000, { headers: { 'Accept': 'application/json' } }); if (r.ok) return parse(await r.text()); } catch {}
   // 2) repli via proxy
   for (const wrap of CORS_PROXIES) {
-    try { const r = await fetch(wrap(url)); if (r.ok) { const t = await r.text(); if (t.includes('count')) return parse(t); } } catch {}
+    try { const r = await fetchTimeout(wrap(url), 10000); if (r.ok) { const t = await r.text(); if (t.includes('count')) return parse(t); } } catch {}
   }
   return null;
 }
@@ -507,17 +532,22 @@ const Behance = {
     const user = (username || '').trim().replace('@','');
     if (!user) throw new Error('Pseudo Behance requis');
     const feed = `https://www.behance.net/feeds/user?username=${encodeURIComponent(user)}`;
-    let xml = null, lastErr = null;
+    let xml = null, lastStatus = 0, timedOut = false;
     for (const wrap of this.PROXIES) {
       try {
-        const res = await fetch(wrap(feed));
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        xml = await res.text();
-        if (xml.includes('<item')) break;
-        xml = null;
-      } catch (e) { lastErr = e; }
+        const res = await fetchTimeout(wrap(feed), 12000);
+        if (!res.ok) { lastStatus = res.status; continue; }
+        const t = await res.text();
+        if (t.includes('<item')) { xml = t; break; }
+        // réponse vide/valide mais sans projet → on retient et on continue d'essayer
+      } catch (e) { if (e.name === 'AbortError') timedOut = true; }
     }
-    if (!xml) throw new Error('Flux Behance injoignable' + (lastErr ? ' (' + lastErr.message + ')' : ''));
+    if (!xml) {
+      if (lastStatus === 403 || lastStatus === 401) throw new Error('403 — Behance a bloqué la requête (proxy limité). Réessaie dans quelques minutes.');
+      if (lastStatus === 429) throw new Error('429 — trop de requêtes. Patiente une minute avant de relancer.');
+      if (timedOut) throw new Error('Délai dépassé — le service relais met trop de temps. Réessaie.');
+      throw new Error('Flux Behance injoignable — vérifie le pseudo (behance.net/@' + user + ') et réessaie.');
+    }
     const doc = new DOMParser().parseFromString(xml, 'text/xml');
     const items = [...doc.querySelectorAll('item')];
     if (!items.length) throw new Error('Aucun projet public trouvé pour @' + user);

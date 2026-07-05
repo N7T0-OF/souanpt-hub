@@ -131,7 +131,20 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
 @keyframes fu{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 .hero>*{animation:fu .5s ease both}
 .hero>*:nth-child(2){animation-delay:.08s}.hero>*:nth-child(3){animation-delay:.16s}.hero>*:nth-child(4){animation-delay:.24s}.hero>*:nth-child(5){animation-delay:.32s}
-@media(max-width:680px){.nl{display:none}.hero{padding:64px 18px 48px}}
+/* ── MENU MOBILE ── */
+.burger{display:none;flex-direction:column;gap:4px;background:none;border:none;cursor:pointer;padding:8px;margin-left:4px}
+.burger span{width:20px;height:2px;background:var(--t);border-radius:2px;transition:.25s}
+.burger.open span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.burger.open span:nth-child(2){opacity:0}
+.burger.open span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.mobmenu{position:fixed;top:74px;left:16px;right:16px;z-index:99;display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:18px;
+  background:rgba(12,12,12,.92);border:1px solid var(--b2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 20px 50px rgba(0,0,0,.55);
+  opacity:0;transform:translateY(-12px) scale(.98);pointer-events:none;transition:opacity .25s,transform .25s}
+.mobmenu.open{opacity:1;transform:none;pointer-events:auto}
+.mobmenu a{padding:13px 16px;border-radius:12px;font-size:14px;font-weight:600;color:var(--m);transition:.15s}
+.mobmenu a:hover{color:var(--t);background:rgba(255,255,255,.05)}
+.mobmenu .mm-cta{background:var(--a);color:#060606;font-weight:800;text-align:center;margin-top:6px}
+@media(max-width:680px){.nl{display:none}.ncta{display:none}.burger{display:flex}.hero{padding:64px 18px 48px}}
 </style>
 </head>
 <body>
@@ -148,7 +161,16 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
     <a href="#faq">FAQ</a>
   </div>
   <a class="ncta" href="app.html" id="nav-dash-btn">Tableau de bord</a>
+  <button class="burger" id="burger" aria-label="Menu" onclick="toggleMenu()"><span></span><span></span><span></span></button>
 </nav>
+<div class="mobmenu" id="mobmenu">
+  <a href="#features" onclick="toggleMenu()">Fonctionnalités</a>
+  <a href="#steps" onclick="toggleMenu()">Comment ça marche</a>
+  <a href="#avis" onclick="toggleMenu()">Avis</a>
+  <a href="#roadmap" onclick="toggleMenu()">Roadmap</a>
+  <a href="#faq" onclick="toggleMenu()">FAQ</a>
+  <a href="app.html" class="mm-cta" id="mob-dash-btn">Tableau de bord →</a>
+</div>
 </div>
 
 <!-- ══ HERO ══ -->
@@ -286,6 +308,13 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
 'use strict';
 document.getElementById('yr').textContent = new Date().getFullYear();
 
+/* Menu mobile */
+function toggleMenu() {
+  document.getElementById('mobmenu')?.classList.toggle('open');
+  document.getElementById('burger')?.classList.toggle('open');
+}
+window.toggleMenu = toggleMenu;
+
 /* FAQ accordéon — hauteur mesurée, animation fluide sans saut */
 document.querySelectorAll('.fitem').forEach(f => f.addEventListener('click', () => {
   const fa = f.querySelector('.fa');
@@ -298,6 +327,7 @@ document.querySelectorAll('.fitem').forEach(f => f.addEventListener('click', () 
 try {
   const authed = !!localStorage.getItem('souanpt_auth_v2');
   document.getElementById('nav-dash-btn').textContent = authed ? 'Dashboard' : 'Connexion';
+  const mb = document.getElementById('mob-dash-btn'); if (mb) mb.textContent = (authed ? 'Dashboard' : 'Connexion') + ' →';
   const hb = document.getElementById('hero-dash-btn');
   if (hb) hb.innerHTML = (authed ? 'Ouvrir le tableau de bord' : 'Commencer gratuitement') + ' <span>→</span>';
 } catch {}

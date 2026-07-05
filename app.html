@@ -1093,7 +1093,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <span id="stor-used">0 Ko</span><span id="stor-free">Libre</span>
         </div>
         <div class="stor-bar-w"><div class="stor-bar" id="stor-bar" style="width:5%"></div></div>
-        <div style="font-size:9px;color:var(--muted2);text-align:center">localStorage · <span id="stor-username">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-top:8px">
+          <span>📁 Projets : <strong id="stor-projects" style="color:var(--text)">0 / 50</strong></span>
+          <span>localStorage · <span id="stor-username">—</span></span>
+        </div>
+        <div id="stor-warn" style="display:none;font-size:9px;color:var(--gold-l);margin-top:8px;line-height:1.6">⚠ Espace navigateur presque plein — clique « Optimiser les images » ci-dessous pour libérer de la place.</div>
       </div>
       <div class="gc" style="padding:16px;max-width:500px;margin-bottom:16px">
         <div style="font-size:11px;font-weight:700;margin-bottom:6px">🗜 Optimisation des images</div>
@@ -1241,6 +1245,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
               <div class="prop-row"><div class="prop-label">URL GitHub Pages</div><input class="prop-input" id="set-site-url" readonly style="color:var(--accent3)"></div>
               <button class="btn btn-ghost" style="font-size:10px" onclick="settingsSaveGeneral()">Sauvegarder</button>
             </div>
+            <div class="setting-group">
+              <div class="setting-group-title">Compression des images</div>
+              <div class="prop-row"><div class="prop-label">Qualité des couvertures</div>
+                <select class="prop-input prop-select" id="set-img-quality" onchange="saveImgQuality()">
+                  <option value="max">Maximum — 1600px, plus net (fichiers plus lourds)</option>
+                  <option value="balanced">Équilibré — 900px (recommandé)</option>
+                  <option value="eco">Économie stockage — 700px, plus léger</option>
+                </select>
+              </div>
+              <div class="hintbox">S'applique aux prochaines couvertures importées. Pour recompresser celles déjà en place avec ce réglage : <strong style="color:var(--accent);cursor:pointer" onclick="showPage('storage')">Stockage → Optimiser les images →</strong></div>
+            </div>
           </div>
           <div id="set-tab-behance" class="set-tab" style="display:none">
             <div class="setting-group">
@@ -1287,6 +1302,11 @@ function settingsTab(name, el) {
   if (tab) tab.style.display = '';
   if (el) el.classList.add('active');
 }
+function saveImgQuality() {
+  const v = document.getElementById('set-img-quality')?.value || 'balanced';
+  localStorage.setItem('hub_img_quality', v);
+  showToast('Qualité : ' + (v==='max'?'Maximum':v==='eco'?'Économie stockage':'Équilibré') + ' ✓', '#2e9a63', 2000);
+}
 function settingsSaveGeneral() {
   const cfg = SiteConfig.get();
   const name = document.getElementById('set-site-name')?.value.trim();
@@ -1322,17 +1342,22 @@ function importDataFull() {
 /* ═══ PROJETS — lien cliquable + couverture + édition ═══ */
 let _npCover = '', _editingId = null;
 
+/* Qualité de compression choisie dans Paramètres (défaut : équilibré) */
+function IMGQ() {
+  const m = { max:{MAX:1600,Q:.9}, balanced:{MAX:900,Q:.8}, eco:{MAX:700,Q:.66} };
+  return m[localStorage.getItem('hub_img_quality')] || m.balanced;
+}
 function fileToDataURL(file, cb) {
   const rd = new FileReader();
   rd.onload = e => {
     const img = new Image();
     img.onload = () => {
-      const MAX = 900; let w = img.width, h = img.height;
+      const { MAX, Q } = IMGQ(); let w = img.width, h = img.height;
       if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
       const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
       cv.getContext('2d').drawImage(img, 0, 0, w, h);
-      let out = cv.toDataURL('image/webp', .8); // WebP = ~3× plus léger
-      if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', .82);
+      let out = cv.toDataURL('image/webp', Q); // WebP = ~3× plus léger, EXIF supprimé au ré-encodage
+      if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', Q + .02);
       cb(out);
     };
     img.src = e.target.result;
@@ -1345,13 +1370,13 @@ function compressImageSrc(src, cb) {
   const img = new Image();
   img.onload = () => {
     try {
-      const MAX = 900; let w = img.naturalWidth, h = img.naturalHeight;
+      const { MAX, Q } = IMGQ(); let w = img.naturalWidth, h = img.naturalHeight;
       if (!w || !h) { cb(null); return; }
       if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
       const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
       cv.getContext('2d').drawImage(img, 0, 0, w, h);
-      let out = cv.toDataURL('image/webp', .8);
-      if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', .82);
+      let out = cv.toDataURL('image/webp', Q);
+      if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', Q + .02);
       cb(out.length < src.length ? out : src);  // ne garde que si plus léger
     } catch { cb(null); }
   };
@@ -1404,12 +1429,13 @@ function cropZoom(v) {
 function cropCancel() { document.getElementById('crop-modal').style.display = 'none'; _crop = null; }
 function cropApply() {
   if (!_crop) return;
-  const OH = Math.round(CROP_OW * CROP_FH / CROP_FW);
-  const cv = document.createElement('canvas'); cv.width = CROP_OW; cv.height = OH;
-  const r = CROP_OW / CROP_FW;
+  const { MAX, Q } = IMGQ();
+  const OW = MAX, OH = Math.round(OW * CROP_FH / CROP_FW);
+  const cv = document.createElement('canvas'); cv.width = OW; cv.height = OH;
+  const r = OW / CROP_FW;
   cv.getContext('2d').drawImage(_crop.img, _crop.X * r, _crop.Y * r, _crop.img.naturalWidth * _crop.S * r, _crop.img.naturalHeight * _crop.S * r);
-  let out = cv.toDataURL('image/webp', .8);
-  if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', .82);
+  let out = cv.toDataURL('image/webp', Q);
+  if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', Q + .02);
   _npCover = out;
   const pv = document.getElementById('np-cover-prev'); if (pv) { pv.src = out; pv.style.display = ''; }
   const cl = document.getElementById('np-cover-clear'); if (cl) cl.style.display = '';
@@ -1833,6 +1859,8 @@ function syncKPIs() {
   const ub=document.getElementById('stor-used');if(ub)ub.textContent=(used/1024).toFixed(0)+' Ko utilisés';
   const fb=document.getElementById('stor-free');if(fb)fb.textContent=((5242880-used)/1024/1024).toFixed(1)+' Mo libres';
   const su=document.getElementById('stor-username');if(su)su.textContent=Auth.user()?.login||'—';
+  const sp=document.getElementById('stor-projects');if(sp)sp.textContent=projs.length+' / 50';
+  const sw=document.getElementById('stor-warn');if(sw)sw.style.display=pct>80?'':'none';
   // Settings URL
   const url=document.getElementById('set-site-url');
   const u=Auth.owner();const cfg=SiteConfig.get();
@@ -1944,6 +1972,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(el)el.value=id==='set-site-name'?(cfg.siteName||''):(cfg.bio||'');
   });
   const bu=document.getElementById('set-behance-user'); if(bu) bu.value=cfg.behance||'';
+  const iq=document.getElementById('set-img-quality'); if(iq) iq.value=localStorage.getItem('hub_img_quality')||'balanced';
   // Sync Behance auto (30 min max) — silencieuse
   const lastSync=parseInt(localStorage.getItem('souanpt_last_behance_sync')||'0');
   if (cfg.behance && Date.now()-lastSync > 30*60*1000) {
