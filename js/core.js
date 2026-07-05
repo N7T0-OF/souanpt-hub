@@ -636,19 +636,55 @@ function portalRepo(cfg) {
   return repo;
 }
 
-/** Publie (ou met à jour) le portail sur le repo du site → renvoie l'URL */
-async function publishPortal(p) {
+/**
+ * Publie (ou met à jour) le portail sur le repo du site.
+ * Corrige le 404 : écrit .nojekyll, active Pages, commit atomique, PUIS
+ * attend que le build Pages soit terminé avant de déclarer le lien actif.
+ * onStatus(msg) : retour d'état facultatif pour l'UI.
+ * → { url, built }
+ */
+async function publishPortal(p, onStatus) {
   const token = Auth.token(); if (!token) throw new Error('Connecte GitHub d\'abord');
   const owner = Auth.owner(); if (!owner) throw new Error('Profil GitHub introuvable');
   const cfg = SiteConfig.get();
   const repo = portalRepo(cfg);
+  onStatus?.('Préparation du repo…');
   await GH.ensureRepo(token, owner, repo, false);
   await GH.enablePages(token, owner, repo);
-  const path = 'p/' + p.id + '/index.html';
+
   const html = p.active === false ? generatePortalDisabled(cfg) : generatePortal(p, cfg);
-  const sha = await GH.fileSha(token, owner, repo, path);
-  await GH.putFile(token, owner, repo, path, html, sha, 'portal: ' + (p.mission || p.id));
-  return `https://${owner.toLowerCase()}.github.io/${repo}/p/${p.id}/`;
+  const files = [{ path: 'p/' + p.id + '/index.html', content: html }];
+  // .nojekyll : sans ça, Jekyll peut ignorer/casser les dossiers → 404
+  const hasNojekyll = await GH.fileSha(token, owner, repo, '.nojekyll');
+  if (!hasNojekyll) files.push({ path: '.nojekyll', content: '' });
+  onStatus?.('Publication de la page…');
+  await GH.commitFiles(token, owner, repo, files, 'portal: ' + (p.mission || p.id));
+
+  const url = `https://${owner.toLowerCase()}.github.io/${repo}/p/${p.id}/`;
+  // Attend la fin du build Pages (le lien est 404 tant que ce n'est pas "built")
+  onStatus?.('Construction GitHub Pages…');
+  let built = false;
+  for (let i = 0; i < 18; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    const b = await GH.pagesLatestBuild(token, owner, repo);
+    if (b?.status === 'built') { built = true; break; }
+    if (b?.status === 'errored') { await GH.pagesRequestBuild(token, owner, repo); }
+    onStatus?.('Construction GitHub Pages… (' + ((i + 1) * 5) + 's)');
+  }
+  return { url, built };
+}
+
+/** Vérifie qu'un portail est réellement en ligne (fichier + build Pages) */
+async function verifyPortal(id) {
+  const token = Auth.token(); const owner = Auth.owner(); const cfg = SiteConfig.get();
+  if (!token || !owner) return { ok: false, reason: 'Non connecté' };
+  const repo = portalRepo(cfg);
+  const sha = await GH.fileSha(token, owner, repo, 'p/' + id + '/index.html');
+  if (!sha) return { ok: false, reason: 'Page introuvable — clique Publier' };
+  const b = await GH.pagesLatestBuild(token, owner, repo);
+  if (b?.status === 'built') return { ok: true };
+  if (b?.status === 'errored') return { ok: false, reason: 'Build Pages en erreur — republie' };
+  return { ok: false, reason: 'Build en cours — actif d\'ici ~1 min', pending: true };
 }
 
 function generatePortalDisabled(cfg) {

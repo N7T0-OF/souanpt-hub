@@ -732,10 +732,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
   <div class="nav-section">
     <div class="nav-label">Outils</div>
-    <button class="ni" data-page="qr" onclick="showPage('qr')">
-      <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="2" width="4" height="4" fill="currentColor" opacity=".4"/><rect x="9" y="1" width="6" height="6" stroke="currentColor" stroke-width="1.2"/><rect x="10" y="2" width="4" height="4" fill="currentColor" opacity=".4"/><rect x="1" y="9" width="6" height="6" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="10" width="4" height="4" fill="currentColor" opacity=".4"/><rect x="9" y="9" width="3" height="3" fill="currentColor"/><rect x="13" y="9" width="3" height="3" fill="currentColor"/><rect x="9" y="13" width="3" height="3" fill="currentColor"/></svg>
-      QR Builder
-    </button>
     <button class="ni" data-page="media" onclick="showPage('media')">
       <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.2"/><circle cx="5.5" cy="6.5" r="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1 11l4-3 3 2 3-3 4 4" stroke="currentColor" stroke-width="1.2"/></svg>
       Médias
@@ -819,6 +815,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <span style="font-size:9px;color:var(--muted2);white-space:nowrap">⋮⋮ glisse-dépose pour réorganiser</span>
         <div class="section-line"></div>
         <button class="btn btn-ghost" style="font-size:10px" onclick="document.getElementById('add-project-form').classList.toggle('visible')">+ Ajouter</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="shareSiteQR()" title="QR du site publié">⬡ QR du site</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="syncBehance()">↻ Behance</button>
       </div>
       <div class="form-box" id="add-project-form">
@@ -1106,26 +1103,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div id="portals-list" style="display:flex;flex-direction:column;gap:10px"></div>
     </div>
 
-    <!-- ══ PAGE: QR BUILDER ══ -->
-    <div class="page" id="page-qr">
-      <div class="section-header"><div class="section-title">QR Builder</div><div class="section-line"></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:600px">
-        <div>
-          <div class="prop-row"><div class="prop-label">URL</div><input class="prop-input" id="qr-input" placeholder="https://..."></div>
-          <div class="prop-row"><div class="prop-label">Couleur</div>
-            <div style="display:flex;gap:6px">
-              <div class="filter-chip active qr-swatch" data-color="#C8FF00" onclick="selectQRColor(this)" style="background:rgba(200,255,0,.15)">Vert</div>
-              <div class="filter-chip qr-swatch" data-color="#e4b24a" onclick="selectQRColor(this)" style="background:rgba(228,178,74,.15)">Or</div>
-              <div class="filter-chip qr-swatch" data-color="#ffffff" onclick="selectQRColor(this)" style="background:rgba(255,255,255,.15)">Blanc</div>
-            </div>
-          </div>
-          <button class="btn btn-accent" onclick="generateQR()">Générer</button>
-        </div>
-        <div style="text-align:center">
-          <div id="qr-preview-area" style="display:inline-block;border-radius:10px;overflow:hidden;background:#111;padding:10px"></div>
-        </div>
-      </div>
-    </div>
 
     <!-- ══ PAGE: MEDIA ══ -->
     <div class="page" id="page-media">
@@ -1849,26 +1826,34 @@ function renderReviews() {
   ct.innerHTML=rv.map(r=>`<div class="gc rcard"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${r.ghIssue?' <span style="font-size:8px;color:var(--accent3)">via le site</span>':''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${esc(r.text)}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
 }
 
-function generateQR() {
-  const val=document.getElementById('qr-input')?.value.trim()||SiteConfig.get().lastDeploy?.url||'https://sankaiii.github.io/souanpt-hub';
-  const color=document.querySelector('.qr-swatch.active')?.dataset.color||'#C8FF00';
-  const area=document.getElementById('qr-preview-area'); if(!area) return;
-  const S=160,C=21,cs=Math.floor(S/C);
-  function h(s){let v=0;for(let i=0;i<s.length;i++)v=(Math.imul(31,v)+s.charCodeAt(i))|0;return Math.abs(v);}
-  const canvas=document.createElement('canvas');canvas.width=S;canvas.height=S;canvas.style.display='block';
-  const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#111';ctx.fillRect(0,0,S,S);ctx.fillStyle=color;
-  for(let r=0;r<C;r++)for(let c=0;c<C;c++){
-    const f=(r<7&&c<7)||(r<7&&c>=C-7)||(r>=C-7&&c<7);
-    const inn=(r>=2&&r<=4&&c>=2&&c<=4)||(r>=2&&r<=4&&c>=C-5&&c<C)||(r>=C-5&&r<C&&c>=2&&c<=4);
-    if(f&&!inn)ctx.fillRect(c*cs,r*cs,cs,cs);
-    else if(!f&&h(val+r+','+c+h(val))%3===0){ctx.beginPath();ctx.roundRect(c*cs+1,r*cs+1,cs-2,cs-2,2);ctx.fill();}
-  }
-  area.innerHTML='';area.appendChild(canvas);
+/* Partage le site publié en QR (ou invite à déployer) */
+function shareSiteQR() {
+  const url = SiteConfig.get().lastDeploy?.url || (Auth.owner() ? `https://${Auth.owner().toLowerCase()}.github.io/${(SiteConfig.get().repo||'').split('/')[1]||SITE_REPO_NAME}/` : '');
+  if (!url) { showToast('Publie ton site d\'abord (Éditeur → 🚀)','#e4b24a',2500); return; }
+  showQR(url, 'Mon portfolio');
 }
-function selectQRColor(el) {
-  document.querySelectorAll('.qr-swatch').forEach(e=>e.classList.remove('active'));
-  el.classList.add('active');
+/* ═══ QR CONTEXTUEL — vrai QR scannable (partage portfolio / site / portail) ═══ */
+function showQR(url, title) {
+  if (!url) { showToast('Aucun lien à partager','#e4b24a',1500); return; }
+  const img = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=1&data=' + encodeURIComponent(url);
+  let m = document.getElementById('qr-modal');
+  if (!m) {
+    m = document.createElement('div'); m.id = 'qr-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:870;background:rgba(4,4,4,.75);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px';
+    m.onclick = e => { if (e.target === m) m.remove(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:18px;padding:24px;max-width:320px;text-align:center">
+    <div style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(title||'Partager')}</div>
+    <div style="font-size:9px;color:var(--muted2);margin-bottom:14px">Scanne pour ouvrir le lien</div>
+    <img src="${img}" alt="QR" style="width:220px;height:220px;background:#fff;border-radius:12px;padding:8px" onerror="this.parentElement.innerHTML='<div style=\\'color:var(--red);font-size:11px;padding:30px\\'>QR indisponible (hors ligne)</div>'">
+    <div style="font-size:9px;color:var(--muted2);margin:12px 0 4px;word-break:break-all">${esc(url)}</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <a class="btn btn-ghost" style="flex:1;justify-content:center;font-size:10px" href="${esc(img)}&download=1" download="qr.png" target="_blank">↓ PNG</a>
+      <button class="btn btn-accent" style="flex:1;justify-content:center;font-size:10px" onclick="navigator.clipboard.writeText('${esc(url)}').then(()=>showToast('Lien copié ✓','#2e9a63',1200))">Copier le lien</button>
+    </div>
+    <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:10px;margin-top:8px" onclick="document.getElementById('qr-modal').remove()">Fermer</button>
+  </div>`;
 }
 
 function importMedia() {
@@ -2023,14 +2008,25 @@ async function portalToggleActive(id) {
 async function portalPublish(id) {
   if(!Auth.ok()){ showToast('Connecte GitHub d\'abord','#e4b24a'); showPage('github'); return; }
   const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
-  const btn=document.getElementById('pub-'+id); if(btn){btn.disabled=true;btn.textContent='⟳ Publication…';}
+  const btn=document.getElementById('pub-'+id);
+  const setBtn=t=>{if(btn)btn.textContent=t;};
+  if(btn)btn.disabled=true; setBtn('⟳ Publication…');
   try {
-    const url=await publishPortal(p);
+    const { url, built }=await publishPortal(p, setBtn);
     p.publishedAt=Date.now(); p.url=url; setPortals(portals);
     await navigator.clipboard.writeText(url).catch(()=>{});
     renderPortals();
-    showToast('✓ Portail publié — lien copié !','#2e9a63',3000);
-  } catch(e){ showToast('✗ '+e.message,'#c0392b',3500); if(btn){btn.disabled=false;btn.textContent='🚀 Publier';} }
+    if(built) showToast('✓ Portail en ligne — lien copié !','#2e9a63',3500);
+    else showToast('✓ Publié — lien copié. Le portail sera actif d\'ici ~1 min (bouton « Vérifier »).','#e4b24a',5000);
+  } catch(e){ showToast('✗ '+e.message,'#c0392b',4000); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
+}
+async function portalVerify(id) {
+  showToast('Vérification…','#666',1200);
+  try {
+    const r=await verifyPortal(id);
+    if(r.ok) showToast('✓ Portail en ligne et accessible','#2e9a63',3000);
+    else showToast((r.pending?'⏳ ':'✗ ')+r.reason, r.pending?'#e4b24a':'#c0392b', 4000);
+  } catch(e){ showToast('✗ '+e.message,'#c0392b',3000); }
 }
 function portalCopy(id){
   const p=getPortals().find(x=>x.id===id); if(!p||!p.url) return;
@@ -2063,10 +2059,12 @@ function renderPortals() {
       ${pub?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:7px 10px;background:var(--s2);border-radius:6px">
         <span style="flex:1;font-size:10px;color:var(--accent3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.url)}</span>
         <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="portalCopy('${p.id}')">Copier</button>
+        <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="showQR('${esc(p.url)}','${esc(p.mission)}')">⬡ QR</button>
         <a class="btn btn-ghost" style="font-size:9px;padding:3px 8px" href="${esc(p.url)}" target="_blank">Ouvrir ↗</a>
       </div>`:''}
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button class="btn btn-accent" id="pub-${p.id}" style="font-size:10px" onclick="portalPublish('${p.id}')">${pub?'↻ Republier':'🚀 Publier'}</button>
+        ${pub?`<button class="btn btn-ghost" style="font-size:10px" onclick="portalVerify('${p.id}')">✓ Vérifier</button>`:''}
         <button class="btn btn-ghost" style="font-size:10px" onclick="portalEdit('${p.id}')">✎ Modifier</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="portalToggleActive('${p.id}')">${p.active===false?'Réactiver':'Désactiver'}</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="portalRegen('${p.id}')" title="Nouveau lien">↺ Lien</button>
