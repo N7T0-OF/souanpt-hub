@@ -176,8 +176,10 @@ const SiteConfig = {
     accentColor: '#C8FF00', theme: '#060606', layout: '3',
     heroText: 'Créatif · Designer · Motion',
     behance: '', email: '', repo: '',
-    sections: { projects: true, avis: true, contact: true },
+    sections: { projects: true, avis: true, contact: true, about: true },
+    sectionOrder: ['about', 'projects', 'avis', 'contact'],
     avisMode: 'defile',
+    about: '', goatcounter: '',
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
   save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); },
@@ -202,7 +204,13 @@ function generateSite(cfg, projects, reviews) {
   if (!projects) projects = getProjects();
   if (!reviews)  reviews  = getReviews();
   const approved = reviews.filter(r => r.status === 'approved');
-  const sec      = { projects: true, avis: true, contact: true, ...(cfg.sections || {}) };
+  const aboutTxt = String(cfg.about || '').trim();
+  const sec      = { projects: true, avis: true, contact: true, about: true, ...(cfg.sections || {}) };
+  if (!aboutTxt) sec.about = false; // pas de texte → pas de section
+  const SEC_KEYS = ['about', 'projects', 'avis', 'contact'];
+  const order = (Array.isArray(cfg.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder.slice() : SEC_KEYS.slice())
+                .filter(k => SEC_KEYS.includes(k));
+  SEC_KEYS.forEach(k => { if (!order.includes(k)) order.push(k); });
   const avisMode = cfg.avisMode || 'defile';
   const cols   = parseInt(cfg.layout) || 3;
   const dark   = cfg.theme !== '#f8f8f8';
@@ -241,6 +249,31 @@ function generateSite(cfg, projects, reviews) {
   const avisDisplay = useMarquee
     ? `<div class="mq"><div class="mqtrack" style="animation-duration:${Math.max(20, approved.length*7)}s">${mqHalf}${mqHalf}</div></div>`
     : `<div class="rg">${reviewCards}</div>`;
+
+  // ── Sections modulaires : visibilité + ordre pilotés par l'éditeur ──
+  const SEC_LABELS = { about: 'À propos', projects: 'Projets', avis: 'Avis', contact: 'Contact' };
+  const secHtml = {
+    about: `<section id="about" class="rev" style="max-width:760px"><div class="sl">À propos</div><h2>Qui suis-je ?</h2><p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
+    projects: `<section id="projects" class="rev"><div class="sl">Portfolio</div><h2>Mes projets</h2><div class="pg">${cards}</div></section>`,
+    avis: `<section id="avis" class="rev"><div class="sl">Témoignages</div><h2>Avis clients</h2>
+  ${avisDisplay}
+  <div class="leave">
+    ${repoFull?`<button class="bg" onclick="document.getElementById('revform').classList.toggle('open')">✎ Laisser un avis</button>
+    <form id="revform" onsubmit="return revSend(event)">
+      <label>Ton nom</label><input id="rv-n" required maxlength="60" placeholder="Prénom Nom">
+      <label>Ta note</label><div id="rvstars"><span class="on">★</span><span class="on">★</span><span class="on">★</span><span class="on">★</span><span class="on">★</span></div>
+      <label>Ton avis</label><textarea id="rv-t" required maxlength="600" placeholder="Raconte ton expérience…"></textarea>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button type="submit" class="bp" style="flex:1">Envoyer l'avis</button>
+      </div>
+      <p class="rhint">L'avis s'envoie via GitHub (compte gratuit requis, 1 clic).${cfg.email?` Ou par email : <a href="#" onclick="return revMail()" style="color:var(--a)">${esc(cfg.email)}</a>`:''}<br>Chaque avis est vérifié avant publication ✓</p>
+    </form>`:''}
+  </div>
+</section>`,
+    contact: `<section id="contact" class="ci rev"><div class="sl">Contact</div><h2>Travaillons ensemble</h2><div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>`,
+  };
+  const bodySections = order.filter(k => sec[k]).map(k => secHtml[k]).join('\n');
+  const navLinks = order.filter(k => sec[k]).map(k => `<a href="#${k}">${SEC_LABELS[k]}</a>`).join('\n    ');
 
   return `<!DOCTYPE html>
 <html lang="fr"><head>
@@ -305,6 +338,8 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
 footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10px;color:var(--m)}
 @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .pc{animation:fu .4s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}
+/* ── À PROPOS ── */
+.about-p{font-size:14px;color:var(--m);line-height:1.95}
 /* ── AVIS DÉFILEMENT INFINI ── */
 .mq{overflow:hidden;margin-bottom:24px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
 .mqtrack{display:flex;width:max-content;animation:mqs 40s linear infinite}
@@ -321,32 +356,14 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 <div class="navwrap"><nav>
   <a href="#" class="logo"><span class="ic">✳</span>${esc(cfg.siteName)}<span class="d">.</span></a>
   <div class="nl">
-    ${sec.projects?'<a href="#projects">Projets</a>':''}
-    ${sec.avis?'<a href="#avis">Avis</a>':''}
-    ${sec.contact?'<a href="#contact">Contact</a>':''}
+    ${navLinks}
     ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
   </div>
   <a class="ncta" href="${cfg.email?`mailto:${esc(cfg.email)}`:(sec.contact?'#contact':'#')}">Me contacter</a>
 </nav></div>
 <div class="hero"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
 <div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>
-${sec.projects?`<section id="projects" class="rev"><div class="sl">Portfolio</div><h2>Mes projets</h2><div class="pg">${cards}</div></section>`:''}
-${sec.avis?`<section id="avis" class="rev"><div class="sl">Témoignages</div><h2>Avis clients</h2>
-  ${avisDisplay}
-  <div class="leave">
-    ${repoFull?`<button class="bg" onclick="document.getElementById('revform').classList.toggle('open')">✎ Laisser un avis</button>
-    <form id="revform" onsubmit="return revSend(event)">
-      <label>Ton nom</label><input id="rv-n" required maxlength="60" placeholder="Prénom Nom">
-      <label>Ta note</label><div id="rvstars"><span class="on">★</span><span class="on">★</span><span class="on">★</span><span class="on">★</span><span class="on">★</span></div>
-      <label>Ton avis</label><textarea id="rv-t" required maxlength="600" placeholder="Raconte ton expérience…"></textarea>
-      <div style="margin-top:14px;display:flex;gap:8px">
-        <button type="submit" class="bp" style="flex:1">Envoyer l'avis</button>
-      </div>
-      <p class="rhint">L'avis s'envoie via GitHub (compte gratuit requis, 1 clic).${cfg.email?` Ou par email : <a href="#" onclick="return revMail()" style="color:var(--a)">${esc(cfg.email)}</a>`:''}<br>Chaque avis est vérifié avant publication ✓</p>
-    </form>`:''}
-  </div>
-</section>`:''}
-${sec.contact?`<section id="contact" class="ci rev"><div class="sl">Contact</div><h2>Travaillons ensemble</h2><div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>`:''}
+${bodySections}
 <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
 <script>
 var _rvN=5;
@@ -376,6 +393,7 @@ if ('IntersectionObserver' in window) {
   document.querySelectorAll('.rev').forEach(function(el){el.classList.add('in');});
 }
 </script>
+${cfg.goatcounter?`<script data-goatcounter="https://${esc(String(cfg.goatcounter).trim())}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>`:''}
 </body></html>`;
 }
 

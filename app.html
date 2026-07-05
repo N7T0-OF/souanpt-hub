@@ -863,15 +863,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div style="width:180px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--s1);flex-shrink:0">
           <div style="padding:9px 12px;border-bottom:1px solid var(--border);font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1.5px;font-weight:700">Blocs</div>
           <div style="flex:1;overflow-y:auto;padding:7px" id="ed-blocks-list">
-            <div class="ed-block-item active" onclick="edSelectBlock('nav',this)"><span>☰</span> Navigation</div>
-            <div class="ed-block-item" onclick="edSelectBlock('hero',this)"><span>★</span> Hero</div>
-            <div class="ed-block-item" onclick="edSelectBlock('projects',this)"><span>⬡</span> Projets</div>
-            <div class="ed-block-item" onclick="edSelectBlock('contact',this)"><span>✉</span> Contact</div>
-            <div class="ed-block-item" onclick="edSelectBlock('footer',this)"><span>—</span> Footer</div>
+            <div style="font-size:9px;color:var(--muted2);padding:8px">Chargement…</div>
           </div>
-          <div style="padding:7px;border-top:1px solid var(--border)">
-            <button class="btn btn-ghost" style="font-size:9px;width:100%;justify-content:center" onclick="edAddBlock()">+ Bloc</button>
-          </div>
+          <div style="padding:8px 10px;border-top:1px solid var(--border);font-size:8px;color:var(--muted2);line-height:1.7">⋮⋮ glisser pour réordonner<br>👁 afficher / masquer</div>
         </div>
         <!-- Preview iframe -->
         <div style="flex:1;display:flex;flex-direction:column;background:#050505;position:relative">
@@ -904,11 +898,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <div class="prop-row"><div class="prop-label">Behance</div><input class="prop-input" id="ep-behance" placeholder="@pseudo" oninput="edUpdatePreview()"></div>
             <div class="prop-row"><div class="prop-label">Email</div><input class="prop-input" id="ep-email" placeholder="contact@..." oninput="edUpdatePreview()"></div>
             <div style="height:1px;background:var(--border);margin:8px 0"></div>
-            <div class="prop-label" style="margin-bottom:4px">Sections du site</div>
-            <label class="sec-tog"><input type="checkbox" id="ep-sec-projects" checked onchange="edUpdatePreview()"> Projets</label>
-            <label class="sec-tog"><input type="checkbox" id="ep-sec-avis" checked onchange="edUpdatePreview()"> Avis clients</label>
-            <label class="sec-tog"><input type="checkbox" id="ep-sec-contact" checked onchange="edUpdatePreview()"> Contact</label>
-            <div class="prop-row" style="margin-top:8px"><div class="prop-label">Affichage des avis</div><select class="prop-input prop-select" id="ep-avis-mode" onchange="edUpdatePreview()"><option value="defile">Défilement infini</option><option value="grille">Grille</option></select></div>
+            <div class="prop-row"><div class="prop-label">À propos (vide = section masquée)</div><textarea class="prop-input" id="ep-about" style="height:64px;resize:none" placeholder="Parle de toi, ton parcours, ton style…" oninput="edUpdatePreview()"></textarea></div>
+            <div class="prop-row"><div class="prop-label">Affichage des avis</div><select class="prop-input prop-select" id="ep-avis-mode" onchange="edUpdatePreview()"><option value="defile">Défilement infini</option><option value="grille">Grille</option></select></div>
+            <div style="font-size:8px;color:var(--muted2);margin-bottom:6px;line-height:1.6">Ordre & visibilité des sections : panneau <strong style="color:var(--text)">Blocs</strong> (à gauche) ⋮⋮ 👁</div>
             <div style="height:1px;background:var(--border);margin:8px 0"></div>
             <div id="ed-last-save" style="font-size:8px;color:var(--muted2);text-align:center;margin-bottom:6px">Non sauvegardé · auto-save 30 s</div>
             <button class="btn btn-ghost" style="font-size:10px;width:100%;justify-content:center;margin-bottom:6px" onclick="edSaveConfig()">Sauvegarder config</button>
@@ -928,7 +920,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div class="kpi-card k3"><div class="kpi-label">Clics</div><div class="kpi-val" id="an-clicks">—</div></div>
         <div class="kpi-card k4"><div class="kpi-label">Revenus</div><div class="kpi-val" id="an-revenue">0 €</div></div>
       </div>
-      <div class="chart-wrap"><div class="chart-hd"><div class="chart-title">Trafic — données Behance</div></div><div style="padding:20px;text-align:center;color:var(--muted2);font-size:11px">Connecte Behance + Google Analytics pour les statistiques réelles.</div></div>
+      <div class="gc" style="padding:16px;max-width:640px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:34px;height:34px;background:rgba(200,255,0,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">📊</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700">Statistiques réelles — GoatCounter</div>
+            <div style="font-size:9px;color:var(--muted2)" id="gc-status">Non configuré</div>
+          </div>
+          <a id="gc-open" href="#" target="_blank" class="btn btn-accent" style="display:none;font-size:10px">↗ Voir mes stats</a>
+        </div>
+        <div class="hintbox" style="margin-bottom:10px">Gratuit, sans cookie, compatible GitHub Pages : <strong style="color:var(--text)">1.</strong> crée un compte sur <a href="https://www.goatcounter.com" target="_blank" style="color:var(--accent3)">goatcounter.com →</a> · <strong style="color:var(--text)">2.</strong> choisis un code (ex : <code style="color:var(--accent)">souanpt</code>) · <strong style="color:var(--text)">3.</strong> colle-le ici · <strong style="color:var(--text)">4.</strong> 🚀 Publie ton site. Vues, visiteurs, pays, sources et appareils remontent en temps réel.</div>
+        <div style="display:flex;gap:8px">
+          <input class="prop-input" id="gc-code" placeholder="ton-code (→ ton-code.goatcounter.com)" style="flex:1" onkeydown="if(event.key==='Enter')saveGoat()">
+          <button class="btn btn-ghost" onclick="saveGoat()" style="white-space:nowrap">Sauvegarder</button>
+        </div>
+      </div>
     </div>
 
     <!-- ══ PAGE: CLIENTS ══ -->
@@ -1578,6 +1584,29 @@ function syncKPIs() {
   if(Auth.ok())BubbleWidget.refresh();
 }
 
+/* ═══ GOATCOUNTER — statistiques réelles gratuites ═══ */
+function saveGoat() {
+  const raw = document.getElementById('gc-code')?.value.trim() || '';
+  const code = raw.replace(/^https?:\/\//,'').replace('.goatcounter.com','').replace(/\/.*$/,'').replace(/[^a-zA-Z0-9-]/g,'');
+  SiteConfig.set('goatcounter', code);
+  const inp = document.getElementById('gc-code'); if (inp) inp.value = code;
+  renderGoat();
+  showToast(code ? '✓ GoatCounter configuré — 🚀 Publie pour activer le suivi' : 'GoatCounter désactivé', code ? '#2e9a63' : '#666', 3000);
+}
+function renderGoat() {
+  const cfg = SiteConfig.get();
+  const inp = document.getElementById('gc-code'); if (inp && !inp.value) inp.value = cfg.goatcounter || '';
+  const st = document.getElementById('gc-status');
+  const open = document.getElementById('gc-open');
+  if (st) st.textContent = cfg.goatcounter
+    ? '✓ ' + cfg.goatcounter + '.goatcounter.com — actif sur le site publié'
+    : 'Non configuré — 2 minutes, gratuit, sans cookie';
+  if (open) {
+    open.style.display = cfg.goatcounter ? '' : 'none';
+    if (cfg.goatcounter) open.href = 'https://' + cfg.goatcounter + '.goatcounter.com';
+  }
+}
+
 /* ═══ PORTE DE CONNEXION — dashboard verrouillé sans login ═══ */
 function gateShow() { document.getElementById('login-gate')?.classList.add('on'); }
 function gateHide() { document.getElementById('login-gate')?.classList.remove('on'); }
@@ -1613,7 +1642,7 @@ function renderLoginLog() {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!Auth.ok()) gateShow();   // pas connecté → dashboard verrouillé
-  renderLoginLog();
+  renderLoginLog(); renderGoat();
   renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
   renderBehancePage(); updateAvisCheckTime();
   syncKPIs();

@@ -265,8 +265,12 @@ function edLoad() {
   set('ep-theme',     cfg.theme);
   const ac=document.getElementById('ep-accent-color'); if(ac)ac.value=cfg.accentColor||'#C8FF00';
   const s=cfg.sections||{};
-  const setChk=(id,v)=>{ const el=document.getElementById(id); if(el) el.checked=v!==false; };
-  setChk('ep-sec-projects', s.projects); setChk('ep-sec-avis', s.avis); setChk('ep-sec-contact', s.contact);
+  _edVis = { projects: s.projects!==false, avis: s.avis!==false, contact: s.contact!==false, about: s.about!==false };
+  const SK=['about','projects','avis','contact'];
+  _edOrder = (Array.isArray(cfg.sectionOrder)&&cfg.sectionOrder.length?cfg.sectionOrder.slice():SK.slice()).filter(k=>SK.includes(k));
+  SK.forEach(k=>{ if(!_edOrder.includes(k)) _edOrder.push(k); });
+  edRenderBlocks();
+  set('ep-about', cfg.about||'');
   set('ep-avis-mode', cfg.avisMode||'defile');
   const dot=document.getElementById('ed-gh-dot'); const lbl=document.getElementById('ed-gh-label');
   if (Auth.ok()) { if(dot)dot.style.background='#2e9a63'; if(lbl)lbl.textContent='@'+(Auth.user()?.login||'?')+' · connecté'; }
@@ -284,13 +288,44 @@ function edGetConfig() {
     behance:     document.getElementById('ep-behance')?.value      || '',
     email:       document.getElementById('ep-email')?.value        || '',
     repo:        SiteConfig.get().repo || '',
-    sections: {
-      projects: document.getElementById('ep-sec-projects')?.checked !== false,
-      avis:     document.getElementById('ep-sec-avis')?.checked    !== false,
-      contact:  document.getElementById('ep-sec-contact')?.checked !== false,
-    },
+    sections: { ...(_edVis || { projects:true, avis:true, contact:true, about:true }) },
+    sectionOrder: (_edOrder || ['about','projects','avis','contact']).slice(),
+    about:    document.getElementById('ep-about')?.value || '',
     avisMode: document.getElementById('ep-avis-mode')?.value || 'defile',
   };
+}
+
+/* ══════════════════════════════════════════════════════
+   BLOCS — ordre + visibilité des sections du site
+══════════════════════════════════════════════════════ */
+const ED_SECTIONS = { about:'À propos', projects:'Projets', avis:'Avis clients', contact:'Contact' };
+let _edOrder=null, _edVis=null, _edBlockDrag=null;
+
+function edRenderBlocks() {
+  const list=document.getElementById('ed-blocks-list'); if(!list||!_edOrder) return;
+  const lockItem=(lbl,ic)=>`<div class="ed-block-item" style="opacity:.4;cursor:default"><span>${ic}</span> ${lbl}<span style="margin-left:auto;font-size:8px">fixe</span></div>`;
+  list.innerHTML =
+    lockItem('Hero','★') +
+    _edOrder.map((k,i)=>`<div class="ed-block-item" draggable="true" style="${_edVis[k]===false?'opacity:.4;':''}border-style:solid"
+      ondragstart="edBlockDragStart(event,${i})" ondragover="event.preventDefault();this.style.borderColor='rgba(200,255,0,.5)'"
+      ondragleave="this.style.borderColor=''" ondrop="edBlockDrop(event,${i})" ondragend="edRenderBlocks()">
+      <span style="cursor:grab;letter-spacing:-1px" title="Glisser pour réordonner">⋮⋮</span> ${ED_SECTIONS[k]}
+      <button onclick="edToggleBlock('${k}')" title="${_edVis[k]===false?'Afficher la section':'Masquer la section'}"
+        style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;color:${_edVis[k]===false?'var(--muted)':'var(--accent)'}">${_edVis[k]===false?'◌':'👁'}</button>
+    </div>`).join('') +
+    lockItem('Footer','—');
+}
+function edBlockDragStart(e,i){ _edBlockDrag=i; e.dataTransfer.effectAllowed='move'; }
+function edBlockDrop(e,i){
+  e.preventDefault();
+  if(_edBlockDrag===null||_edBlockDrag===i){ edRenderBlocks(); return; }
+  const [m]=_edOrder.splice(_edBlockDrag,1); _edOrder.splice(i,0,m); _edBlockDrag=null;
+  edRenderBlocks(); edUpdatePreview();
+  showToast('Ordre des sections mis à jour ✓','#2e9a63',1500);
+}
+function edToggleBlock(k){
+  _edVis[k] = _edVis[k]===false;
+  edRenderBlocks(); edUpdatePreview();
 }
 
 function edUpdatePreview() { clearTimeout(_edTimer); _edTimer=setTimeout(edRefreshPreview,600); }
