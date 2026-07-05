@@ -253,8 +253,37 @@ function ghOpenSite() {
 ══════════════════════════════════════════════════════ */
 let _edTimer=null, _edBlobUrl=null;
 
+/* ══════════════════════════════════════════════════════
+   TEMPLATES PAR MÉTIER — préréglages complets en 1 clic
+══════════════════════════════════════════════════════ */
+const SITE_TEMPLATES = [
+  { id:'designer',  name:'Designer',      accent:'#C8FF00', theme:'#060606', layout:'3', hero:'Créatif · Designer · Motion',       avisMode:'defile' },
+  { id:'photo',     name:'Photographe',   accent:'#E4B24A', theme:'#060606', layout:'2', hero:'Photographe · Lumière · Histoires', avisMode:'grille' },
+  { id:'minecraft', name:'Minecraft',     accent:'#4ADE80', theme:'#0a0a14', layout:'3', hero:'Builds · Textures · Mods',          avisMode:'defile' },
+  { id:'dev',       name:'Développeur',   accent:'#00D4FF', theme:'#060606', layout:'3', hero:'Code · Web · Apps',                 avisMode:'defile' },
+  { id:'illu',      name:'Illustrateur',  accent:'#FF6B9D', theme:'#0a0a14', layout:'4', hero:'Illustration · Character Design',   avisMode:'defile' },
+  { id:'clair',     name:'Clair minimal', accent:'#6B21A8', theme:'#f8f8f8', layout:'3', hero:'Portfolio · Minimal · Élégant',     avisMode:'grille' },
+];
+function renderTemplates() {
+  const box = document.getElementById('ed-templates'); if (!box) return;
+  box.innerHTML = SITE_TEMPLATES.map(t =>
+    `<div class="tpl-card" data-tpl="${t.id}" onclick="applyTemplate('${t.id}')" title="Appliquer le template ${t.name}">
+      <span class="tpl-dot" style="background:${t.accent}"></span><span class="tpl-dot" style="background:${t.theme};border:1px solid rgba(255,255,255,.2);margin-left:-4px"></span>${t.name}
+    </div>`).join('');
+}
+function applyTemplate(id) {
+  const t = SITE_TEMPLATES.find(x => x.id === id); if (!t) return;
+  const set = (i,v) => { const el = document.getElementById(i); if (el) el.value = v; };
+  set('ep-accent-color', t.accent); set('ep-theme', t.theme); set('ep-layout', t.layout);
+  set('ep-hero-text', t.hero); set('ep-avis-mode', t.avisMode);
+  document.querySelectorAll('.tpl-card').forEach(c => c.classList.toggle('active', c.dataset.tpl === id));
+  edRefreshPreview();
+  showToast('Template « ' + t.name + ' » appliqué — ↑ Sauver pour le garder', '#2e9a63', 3000);
+}
+
 function edLoad() {
   const cfg = SiteConfig.get();
+  renderTemplates();
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
   set('ep-site-name', cfg.siteName);
   set('ep-bio',       cfg.bio);
