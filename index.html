@@ -109,9 +109,13 @@ h2{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-1px;margin-bot
 .fitem:hover{border-color:var(--b2)}
 .fq{padding:16px 18px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .fq .ar{color:var(--a);transition:transform .25s;flex-shrink:0}
-.fa{max-height:0;overflow:hidden;transition:max-height .3s ease;font-size:12px;color:var(--m);line-height:1.75;padding:0 18px}
-.fitem.open .fa{max-height:200px;padding:0 18px 16px}
+.fa{max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1),padding-bottom .35s cubic-bezier(.4,0,.2,1);font-size:12px;color:var(--m);line-height:1.75;padding:0 18px}
 .fitem.open .ar{transform:rotate(90deg)}
+
+/* ── APPARITION AU SCROLL ── */
+.rev{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
+.rev.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.rev{opacity:1;transform:none;transition:none}}
 
 /* ── CTA FINAL ── */
 .final{text-align:center;padding:80px 24px;max-width:700px;margin:0 auto}
@@ -282,15 +286,32 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
 'use strict';
 document.getElementById('yr').textContent = new Date().getFullYear();
 
-/* FAQ accordéon */
-document.querySelectorAll('.fitem').forEach(f => f.addEventListener('click', () => f.classList.toggle('open')));
+/* FAQ accordéon — hauteur mesurée, animation fluide sans saut */
+document.querySelectorAll('.fitem').forEach(f => f.addEventListener('click', () => {
+  const fa = f.querySelector('.fa');
+  const open = f.classList.toggle('open');
+  fa.style.maxHeight = open ? fa.scrollHeight + 16 + 'px' : '0px';
+  fa.style.paddingBottom = open ? '16px' : '0px';
+}));
 
-/* Bouton dashboard : adapte le libellé si déjà connecté */
+/* Boutons selon l'état de connexion */
 try {
-  if (localStorage.getItem('souanpt_auth_v2')) {
-    document.getElementById('nav-dash-btn').textContent = 'Retour au dashboard';
-  }
+  const authed = !!localStorage.getItem('souanpt_auth_v2');
+  document.getElementById('nav-dash-btn').textContent = authed ? 'Dashboard' : 'Connexion';
+  const hb = document.getElementById('hero-dash-btn');
+  if (hb) hb.innerHTML = (authed ? 'Ouvrir le tableau de bord' : 'Commencer gratuitement') + ' <span>→</span>';
 } catch {}
+
+/* Apparition au scroll */
+document.querySelectorAll('.fcard,.step,.rc,.rcol,.fitem,.sl,h2,.ssub').forEach(el => el.classList.add('rev'));
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver(es => es.forEach(en => {
+    if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+  }), { threshold: .1 });
+  document.querySelectorAll('.rev').forEach(el => io.observe(el));
+} else {
+  document.querySelectorAll('.rev').forEach(el => el.classList.add('in'));
+}
 
 /* Avis approuvés du hub → affichés sur la landing */
 (function(){

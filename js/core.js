@@ -152,6 +152,12 @@ async function connectGitHub(token) {
   const dataRepo = user.login.toLowerCase() + REPO_DATA_SUFFIX;
   await GH.ensureRepo(t, user.login, dataRepo, true);
   Auth.set(t, { login: user.login, name: user.name, avatar_url: user.avatar_url });
+  // Journal des connexions (local)
+  try {
+    const log = JSON.parse(localStorage.getItem('souanpt_login_log') || '[]');
+    log.unshift({ ts: Date.now(), ua: (navigator.userAgent.match(/(Edg|Chrome|Firefox|Safari)\/[\d.]+/) || ['Navigateur'])[0] });
+    localStorage.setItem('souanpt_login_log', JSON.stringify(log.slice(0, 10)));
+  } catch {}
   const cfg = SiteConfig.get();
   if (!cfg.repo || cfg.repo.split('/')[1]?.toLowerCase() === HUB_REPO_NAME) {
     cfg.repo = user.login + '/' + SITE_REPO_NAME;
@@ -170,6 +176,8 @@ const SiteConfig = {
     accentColor: '#C8FF00', theme: '#060606', layout: '3',
     heroText: 'Créatif · Designer · Motion',
     behance: '', email: '', repo: '',
+    sections: { projects: true, avis: true, contact: true },
+    avisMode: 'defile',
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
   save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); },
@@ -194,6 +202,8 @@ function generateSite(cfg, projects, reviews) {
   if (!projects) projects = getProjects();
   if (!reviews)  reviews  = getReviews();
   const approved = reviews.filter(r => r.status === 'approved');
+  const sec      = { projects: true, avis: true, contact: true, ...(cfg.sections || {}) };
+  const avisMode = cfg.avisMode || 'defile';
   const cols   = parseInt(cfg.layout) || 3;
   const dark   = cfg.theme !== '#f8f8f8';
   const textC  = dark ? '#f0ece4' : '#111';
@@ -215,15 +225,22 @@ function generateSite(cfg, projects, reviews) {
       </div>
     </article>`).join('') || `<div style="grid-column:1/-1;text-align:center;color:${mutedC};padding:40px">Aucun projet pour le moment</div>`;
 
-  const reviewCards = approved.length ? approved.map(r => `
+  const rvCard = r => `
     <div class="rc">
       <div class="rh"><div class="rav">${esc((r.author||'?')[0].toUpperCase())}</div>
         <div><div class="rn">${esc(r.author)}</div><div class="rs">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div></div>
       </div>
       <p class="rt">${esc(r.text)}</p>
       ${r.project?`<div class="rp">· ${esc(r.project)}</div>`:''}
-    </div>`).join('')
+    </div>`;
+  const reviewCards = approved.length ? approved.map(rvCard).join('')
     : `<div style="grid-column:1/-1;text-align:center;color:${mutedC};padding:24px;font-size:13px">Sois le premier à laisser un avis ✨</div>`;
+  // Défilement infini si assez d'avis, sinon grille
+  const useMarquee = avisMode !== 'grille' && approved.length >= 3;
+  const mqHalf = `<div class="mqhalf">${approved.map(rvCard).join('')}</div>`;
+  const avisDisplay = useMarquee
+    ? `<div class="mq"><div class="mqtrack" style="animation-duration:${Math.max(20, approved.length*7)}s">${mqHalf}${mqHalf}</div></div>`
+    : `<div class="rg">${reviewCards}</div>`;
 
   return `<!DOCTYPE html>
 <html lang="fr"><head>
@@ -288,23 +305,34 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
 footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10px;color:var(--m)}
 @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .pc{animation:fu .4s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}
+/* ── AVIS DÉFILEMENT INFINI ── */
+.mq{overflow:hidden;margin-bottom:24px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
+.mqtrack{display:flex;width:max-content;animation:mqs 40s linear infinite}
+.mq:hover .mqtrack{animation-play-state:paused}
+.mqhalf{display:flex;gap:14px;padding-right:14px}
+.mq .rc{width:280px;flex-shrink:0}
+@keyframes mqs{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* ── APPARITION AU SCROLL ── */
+.rev{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+.rev.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.rev{opacity:1;transform:none;transition:none}.mqtrack{animation:none}}
 @media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}}
 </style></head><body>
 <div class="navwrap"><nav>
   <a href="#" class="logo"><span class="ic">✳</span>${esc(cfg.siteName)}<span class="d">.</span></a>
   <div class="nl">
-    <a href="#projects">Projets</a>
-    <a href="#avis">Avis</a>
-    <a href="#contact">Contact</a>
+    ${sec.projects?'<a href="#projects">Projets</a>':''}
+    ${sec.avis?'<a href="#avis">Avis</a>':''}
+    ${sec.contact?'<a href="#contact">Contact</a>':''}
     ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
   </div>
-  <a class="ncta" href="${cfg.email?`mailto:${esc(cfg.email)}`:'#contact'}">Me contacter</a>
+  <a class="ncta" href="${cfg.email?`mailto:${esc(cfg.email)}`:(sec.contact?'#contact':'#')}">Me contacter</a>
 </nav></div>
 <div class="hero"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
-<div class="ctas"><a href="#projects" class="bp">Voir les projets</a>${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>
-<section id="projects"><div class="sl">Portfolio</div><h2>Mes projets</h2><div class="pg">${cards}</div></section>
-<section id="avis"><div class="sl">Témoignages</div><h2>Avis clients</h2>
-  <div class="rg">${reviewCards}</div>
+<div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>
+${sec.projects?`<section id="projects" class="rev"><div class="sl">Portfolio</div><h2>Mes projets</h2><div class="pg">${cards}</div></section>`:''}
+${sec.avis?`<section id="avis" class="rev"><div class="sl">Témoignages</div><h2>Avis clients</h2>
+  ${avisDisplay}
   <div class="leave">
     ${repoFull?`<button class="bg" onclick="document.getElementById('revform').classList.toggle('open')">✎ Laisser un avis</button>
     <form id="revform" onsubmit="return revSend(event)">
@@ -317,8 +345,8 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
       <p class="rhint">L'avis s'envoie via GitHub (compte gratuit requis, 1 clic).${cfg.email?` Ou par email : <a href="#" onclick="return revMail()" style="color:var(--a)">${esc(cfg.email)}</a>`:''}<br>Chaque avis est vérifié avant publication ✓</p>
     </form>`:''}
   </div>
-</section>
-<section id="contact" class="ci"><div class="sl">Contact</div><h2>Travaillons ensemble</h2><div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>
+</section>`:''}
+${sec.contact?`<section id="contact" class="ci rev"><div class="sl">Contact</div><h2>Travaillons ensemble</h2><div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>`:''}
 <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
 <script>
 var _rvN=5;
@@ -339,6 +367,13 @@ function revMail(){
   var n=document.getElementById('rv-n').value.trim()||'', t=document.getElementById('rv-t').value.trim()||'';
   location.href='mailto:${esc(cfg.email||'')}?subject='+encodeURIComponent('[AVIS] '+_rvN+'/5 — '+n)+'&body='+encodeURIComponent(t);
   return false;
+}
+/* Apparition au scroll */
+if ('IntersectionObserver' in window) {
+  var _io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){en.target.classList.add('in');_io.unobserve(en.target);}});},{threshold:.12});
+  document.querySelectorAll('.rev').forEach(function(el){_io.observe(el);});
+} else {
+  document.querySelectorAll('.rev').forEach(function(el){el.classList.add('in');});
 }
 </script>
 </body></html>`;

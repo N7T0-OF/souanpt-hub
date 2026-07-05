@@ -540,10 +540,47 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .hintbox{background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:9px;color:var(--muted2);line-height:1.7;margin-top:8px}
 .file-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);font-size:11px;cursor:pointer;background:transparent;color:var(--muted2);border:1px solid var(--border2);transition:all .15s}
 .file-btn:hover{color:var(--text);background:var(--s2)}
+
+/* ── PORTE DE CONNEXION ── */
+#login-gate{position:fixed;inset:0;z-index:850;background:rgba(4,4,4,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px}
+#login-gate.on{display:flex}
+.gate-box{width:100%;max-width:400px;background:var(--s1);border:1px solid var(--border2);border-radius:20px;padding:32px;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:gateIn .32s cubic-bezier(.34,1.4,.64,1)}
+@keyframes gateIn{from{opacity:0;transform:scale(.92) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.gate-logo{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:10px}
+.gate-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;text-align:center;margin-bottom:6px}
+.gate-sub{font-size:10px;color:var(--muted2);text-align:center;margin-bottom:20px;line-height:1.7}
+.gate-input{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:11px 12px;color:var(--text);font-family:inherit;font-size:12px;outline:none;margin-bottom:10px}
+.gate-input:focus{border-color:rgba(200,255,0,.4)}
+.gate-btn{width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:800;font-family:'Syne',sans-serif;cursor:pointer;transition:.2s}
+.gate-btn:hover{opacity:.85}
+.gate-btn:disabled{opacity:.4;cursor:not-allowed}
+.gate-msg{font-size:10px;text-align:center;min-height:16px;margin-top:10px}
+.gate-links{display:flex;justify-content:space-between;margin-top:14px;font-size:10px}
+.gate-links a{color:var(--muted2);text-decoration:none;transition:.15s}
+.gate-links a:hover{color:var(--accent)}
+
+/* ── ÉDITEUR : appareils + toggles sections ── */
+.ed-dev-btn{background:none;border:1px solid transparent;border-radius:4px;color:var(--muted2);font-size:10px;cursor:pointer;padding:2px 7px;font-family:inherit;transition:all .15s}
+.ed-dev-btn.active{color:var(--accent);border-color:rgba(200,255,0,.25);background:rgba(200,255,0,.06)}
+.sec-tog{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text);padding:4px 0;cursor:pointer}
+.sec-tog input{accent-color:var(--accent);cursor:pointer}
 </style>
 </head>
 <body>
 <div id="sm2-toast"></div>
+
+<!-- ══ PORTE DE CONNEXION (dashboard verrouillé sans login) ══ -->
+<div id="login-gate">
+  <div class="gate-box">
+    <div class="gate-logo"><div class="logo-icon"><svg viewBox="0 0 16 16" fill="#000" width="15" height="15"><path d="M8 1L2 5v9h4V9h4v5h4V5L8 1z"/></svg></div><div class="logo-text">souanpt<span>.hub</span></div></div>
+    <div class="gate-title">Connexion</div>
+    <div class="gate-sub">Colle ton token GitHub pour déverrouiller ton dashboard.<br>Génère-le sur <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=souanpt.hub" target="_blank" style="color:var(--accent3)">github.com/settings/tokens →</a> · scope <code style="color:var(--text)">repo</code></div>
+    <input class="gate-input" id="gate-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" onkeydown="if(event.key==='Enter')gateConnect()">
+    <button class="gate-btn" id="gate-btn" onclick="gateConnect()">Se connecter avec GitHub</button>
+    <div class="gate-msg" id="gate-msg"></div>
+    <div class="gate-links"><a href="index.html">← Retour à l'accueil</a><a href="https://github.com/signup" target="_blank">Créer un compte GitHub</a></div>
+  </div>
+</div>
 
 <!-- ══ SHARE MODAL ══ -->
 <div id="sp-overlay2" onclick="BubbleWidget.closeOnBg(event)">
@@ -840,7 +877,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div style="flex:1;display:flex;flex-direction:column;background:#050505;position:relative">
           <div style="display:flex;align-items:center;gap:7px;padding:5px 10px;background:#030303;border-bottom:1px solid #111;flex-shrink:0">
             <div style="display:flex;gap:4px"><div style="width:8px;height:8px;border-radius:50%;background:#ff5f57"></div><div style="width:8px;height:8px;border-radius:50%;background:#ffbd2e"></div><div style="width:8px;height:8px;border-radius:50%;background:#28c840"></div></div>
-            <div style="flex:1;text-align:center;background:#0a0a0a;border-radius:4px;padding:2px 10px;font-size:9px;color:var(--muted2)" id="ed-preview-url">sankaiii.github.io/souanpt-hub</div>
+            <div style="flex:1;text-align:center;background:#0a0a0a;border-radius:4px;padding:2px 10px;font-size:9px;color:var(--muted2)" id="ed-preview-url">souanpt.github.io/souanpt-folio</div>
+            <div style="display:flex;gap:2px">
+              <button class="ed-dev-btn active" onclick="edDevice(0,this)" title="Aperçu PC">🖥 PC</button>
+              <button class="ed-dev-btn" onclick="edDevice(768,this)" title="Aperçu tablette">▯ Tablette</button>
+              <button class="ed-dev-btn" onclick="edDevice(390,this)" title="Aperçu mobile">▮ Mobile</button>
+            </div>
             <button onclick="edRefreshPreview()" style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:11px" title="Rafraîchir">↻</button>
           </div>
           <iframe id="ed-preview-frame" style="flex:1;border:none;width:100%;height:100%"></iframe>
@@ -862,7 +904,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <div class="prop-row"><div class="prop-label">Behance</div><input class="prop-input" id="ep-behance" placeholder="@pseudo" oninput="edUpdatePreview()"></div>
             <div class="prop-row"><div class="prop-label">Email</div><input class="prop-input" id="ep-email" placeholder="contact@..." oninput="edUpdatePreview()"></div>
             <div style="height:1px;background:var(--border);margin:8px 0"></div>
-            <div id="ed-last-save" style="font-size:8px;color:var(--muted2);text-align:center;margin-bottom:6px">Non sauvegardé</div>
+            <div class="prop-label" style="margin-bottom:4px">Sections du site</div>
+            <label class="sec-tog"><input type="checkbox" id="ep-sec-projects" checked onchange="edUpdatePreview()"> Projets</label>
+            <label class="sec-tog"><input type="checkbox" id="ep-sec-avis" checked onchange="edUpdatePreview()"> Avis clients</label>
+            <label class="sec-tog"><input type="checkbox" id="ep-sec-contact" checked onchange="edUpdatePreview()"> Contact</label>
+            <div class="prop-row" style="margin-top:8px"><div class="prop-label">Affichage des avis</div><select class="prop-input prop-select" id="ep-avis-mode" onchange="edUpdatePreview()"><option value="defile">Défilement infini</option><option value="grille">Grille</option></select></div>
+            <div style="height:1px;background:var(--border);margin:8px 0"></div>
+            <div id="ed-last-save" style="font-size:8px;color:var(--muted2);text-align:center;margin-bottom:6px">Non sauvegardé · auto-save 30 s</div>
             <button class="btn btn-ghost" style="font-size:10px;width:100%;justify-content:center;margin-bottom:6px" onclick="edSaveConfig()">Sauvegarder config</button>
             <button class="btn btn-accent" style="font-size:10px;width:100%;justify-content:center" id="ed-deploy-btn2" onclick="edDeploy()">🚀 Publier</button>
             <div id="ed-status" style="font-size:9px;color:var(--muted2);text-align:center;margin-top:6px;min-height:14px"></div>
@@ -1050,6 +1098,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <button class="btn btn-ghost" id="gh-disconnect-btn" onclick="ghDisconnect()" style="font-size:10px;color:var(--red);border-color:rgba(192,57,43,.25);display:none">Déconnecter</button>
           </div>
           <div id="gh-connect-msg" style="font-size:10px;min-height:16px;text-align:center"></div>
+          <div id="gh-login-log"></div>
         </div>
 
         <!-- Main section (hidden until connected) -->
@@ -1221,7 +1270,9 @@ function fileToDataURL(file, cb) {
       if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
       const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
       cv.getContext('2d').drawImage(img, 0, 0, w, h);
-      cb(cv.toDataURL('image/jpeg', .82));
+      let out = cv.toDataURL('image/webp', .8); // WebP = ~3× plus léger
+      if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', .82);
+      cb(out);
     };
     img.src = e.target.result;
   };
@@ -1527,7 +1578,42 @@ function syncKPIs() {
   if(Auth.ok())BubbleWidget.refresh();
 }
 
+/* ═══ PORTE DE CONNEXION — dashboard verrouillé sans login ═══ */
+function gateShow() { document.getElementById('login-gate')?.classList.add('on'); }
+function gateHide() { document.getElementById('login-gate')?.classList.remove('on'); }
+async function gateConnect() {
+  const inp = document.getElementById('gate-pat'), btn = document.getElementById('gate-btn'), msg = document.getElementById('gate-msg');
+  const val = inp?.value.trim();
+  if (!val) { if (msg) { msg.style.color='#c0392b'; msg.textContent='Colle ton token GitHub ci-dessus'; } inp?.focus(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Connexion…'; }
+  if (msg) { msg.style.color='var(--muted2)'; msg.textContent='Vérification du token…'; }
+  try {
+    const user = await connectGitHub(val);
+    if (msg) { msg.style.color='#2e9a63'; msg.textContent='✓ Bienvenue @' + user.login + ' !'; }
+    setTimeout(() => {
+      gateHide();
+      GHPage.showConnected(user); GHPage.loadRepo(); GHPage.loadRuns();
+      syncKPIs(); renderLoginLog();
+      showToast('✓ Connecté — @' + user.login, '#2e9a63');
+    }, 600);
+  } catch (e) {
+    const err = e.message.includes('401') ? 'Token invalide' : e.message.includes('403') ? 'Scopes insuffisants — coche "repo"' : e.message;
+    if (msg) { msg.style.color='#c0392b'; msg.textContent='✗ ' + err; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter avec GitHub'; }
+    if (inp) inp.value = '';
+  }
+}
+function renderLoginLog() {
+  const box = document.getElementById('gh-login-log'); if (!box) return;
+  let log = []; try { log = JSON.parse(localStorage.getItem('souanpt_login_log')||'[]'); } catch {}
+  if (!log.length) { box.innerHTML=''; return; }
+  box.innerHTML = '<div style="font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px;font-weight:700">Dernières connexions</div>' +
+    log.slice(0,5).map(l => `<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)"><span>${esc(l.ua||'Navigateur')}</span><span>${new Date(l.ts).toLocaleString('fr-FR')}</span></div>`).join('');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  if (!Auth.ok()) gateShow();   // pas connecté → dashboard verrouillé
+  renderLoginLog();
   renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
   renderBehancePage(); updateAvisCheckTime();
   syncKPIs();

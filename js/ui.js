@@ -239,6 +239,7 @@ function ghDisconnect() {
   Auth.clear();
   GHPage.showDisconnected();
   showToast('Déconnecté','#666');
+  setTimeout(() => location.reload(), 600); // la porte de connexion se réaffiche
 }
 
 function ghOpenSite() {
@@ -263,6 +264,10 @@ function edLoad() {
   set('ep-layout',    cfg.layout);
   set('ep-theme',     cfg.theme);
   const ac=document.getElementById('ep-accent-color'); if(ac)ac.value=cfg.accentColor||'#C8FF00';
+  const s=cfg.sections||{};
+  const setChk=(id,v)=>{ const el=document.getElementById(id); if(el) el.checked=v!==false; };
+  setChk('ep-sec-projects', s.projects); setChk('ep-sec-avis', s.avis); setChk('ep-sec-contact', s.contact);
+  set('ep-avis-mode', cfg.avisMode||'defile');
   const dot=document.getElementById('ed-gh-dot'); const lbl=document.getElementById('ed-gh-label');
   if (Auth.ok()) { if(dot)dot.style.background='#2e9a63'; if(lbl)lbl.textContent='@'+(Auth.user()?.login||'?')+' · connecté'; }
   else           { if(dot)dot.style.background='var(--muted)'; if(lbl)lbl.textContent='GitHub non connecté — cliquer'; }
@@ -279,6 +284,12 @@ function edGetConfig() {
     behance:     document.getElementById('ep-behance')?.value      || '',
     email:       document.getElementById('ep-email')?.value        || '',
     repo:        SiteConfig.get().repo || '',
+    sections: {
+      projects: document.getElementById('ep-sec-projects')?.checked !== false,
+      avis:     document.getElementById('ep-sec-avis')?.checked    !== false,
+      contact:  document.getElementById('ep-sec-contact')?.checked !== false,
+    },
+    avisMode: document.getElementById('ep-avis-mode')?.value || 'defile',
   };
 }
 
@@ -303,12 +314,32 @@ function edRefreshPreview() {
   if (urlEl) urlEl.textContent=owner.toLowerCase()+'.github.io/'+(r||SITE_REPO_NAME);
 }
 
-function edSaveConfig() {
+function edSaveConfig(silent) {
   const cfg=edGetConfig(); const existing=SiteConfig.get(); SiteConfig.save({...existing,...cfg});
   const el=document.getElementById('ed-last-save');
-  if (el) el.textContent='Sauvegardé à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-  showToast('Config sauvegardée ✓','#2e9a63');
+  if (el) el.textContent=(silent?'Auto-sauvegardé à ':'Sauvegardé à ')+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  if (!silent) showToast('Config sauvegardée ✓','#2e9a63');
 }
+
+/* Aperçu par appareil (PC / tablette / mobile) */
+function edDevice(w, btn) {
+  const f = document.getElementById('ed-preview-frame'); if (!f) return;
+  f.style.transition = 'width .3s ease';
+  f.style.width  = w ? w + 'px' : '100%';
+  f.style.margin = w ? '0 auto' : '';
+  f.style.borderLeft  = w ? '1px solid rgba(255,255,255,.1)' : 'none';
+  f.style.borderRight = w ? '1px solid rgba(255,255,255,.1)' : 'none';
+  document.querySelectorAll('.ed-dev-btn').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+}
+
+/* Sauvegarde automatique de l'éditeur (30 s + avant fermeture) */
+setInterval(() => {
+  if (document.getElementById('page-editor')?.classList.contains('active')) edSaveConfig(true);
+}, 30000);
+window.addEventListener('beforeunload', () => {
+  if (document.getElementById('page-editor')?.classList.contains('active')) edSaveConfig(true);
+});
 
 function edPreviewExternal() {
   const html=generateSite(edGetConfig()); const win=window.open('','_blank'); if(win){win.document.write(html);win.document.close();}
