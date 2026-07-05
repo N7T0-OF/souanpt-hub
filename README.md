@@ -12,13 +12,16 @@ Dashboard tout-en-un : Portfolio · Behance Sync · Éditeur de site · Avis vis
 
 ```
 hub/
-├── index.html      # SPA complète du dashboard
+├── index.html      # Landing page publique (vitrine, style haunt.gg)
+├── app.html        # SPA complète du dashboard (espace privé)
 ├── js/
 │   ├── core.js     # GitHub API, Auth PAT, SiteConfig, Générateur, Deploy, Behance RSS, Avis
 │   └── ui.js       # GHPage, Éditeur, BubbleWidget, navigation
 ├── scripts/sync-behance.js   # sync RSS optionnelle (Node, sans clé API)
 └── _legacy/        # anciens fichiers non chargés (archive)
 ```
+
+Navigation : la racine (`/`) affiche la vitrine publique ; le bouton **Tableau de bord** ouvre `app.html`. Dans le dashboard, cliquer le logo souanpt.hub ramène à la vitrine.
 
 ## Connexion GitHub (PAT)
 
