@@ -964,9 +964,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <div style="font-size:12px;font-weight:700">Statistiques réelles — GoatCounter</div>
             <div style="font-size:9px;color:var(--muted2)" id="gc-status">Non configuré</div>
           </div>
-          <a id="gc-open" href="#" target="_blank" class="btn btn-accent" style="display:none;font-size:10px">↗ Voir mes stats</a>
+          <button onclick="refreshRealStats(false)" class="btn btn-ghost" style="font-size:10px">↻ Actualiser</button>
+          <a id="gc-open" href="#" target="_blank" class="btn btn-accent" style="display:none;font-size:10px">↗ Détails</a>
         </div>
-        <div class="hintbox" style="margin-bottom:10px">Gratuit, sans cookie, compatible GitHub Pages : <strong style="color:var(--text)">1.</strong> crée un compte sur <a href="https://www.goatcounter.com" target="_blank" style="color:var(--accent3)">goatcounter.com →</a> · <strong style="color:var(--text)">2.</strong> choisis un code (ex : <code style="color:var(--accent)">souanpt</code>) · <strong style="color:var(--text)">3.</strong> colle-le ici · <strong style="color:var(--text)">4.</strong> 🚀 Publie ton site. Vues, visiteurs, pays, sources et appareils remontent en temps réel.</div>
+        <div class="hintbox" style="margin-bottom:10px">Gratuit, sans cookie, compatible GitHub Pages : <strong style="color:var(--text)">1.</strong> compte sur <a href="https://www.goatcounter.com" target="_blank" style="color:var(--accent3)">goatcounter.com →</a> · <strong style="color:var(--text)">2.</strong> code (ex : <code style="color:var(--accent)">souanpt</code>) collé ici · <strong style="color:var(--text)">3.</strong> dans GoatCounter → <strong style="color:var(--text)">Settings → coche « Allow using the visitor counter »</strong> (indispensable pour afficher les stats ici) · <strong style="color:var(--text)">4.</strong> 🚀 Publie. Les <strong style="color:var(--accent)">Vues</strong> et <strong style="color:var(--accent)">Visiteurs</strong> remontent dans les cartes ci-dessus et l'onglet Vue d'ensemble.</div>
         <div style="display:flex;gap:8px">
           <input class="prop-input" id="gc-code" placeholder="ton-code (→ ton-code.goatcounter.com)" style="flex:1" onkeydown="if(event.key==='Enter')saveGoat()">
           <button class="btn btn-ghost" onclick="saveGoat()" style="white-space:nowrap">Sauvegarder</button>
@@ -1093,6 +1094,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         </div>
         <div class="stor-bar-w"><div class="stor-bar" id="stor-bar" style="width:5%"></div></div>
         <div style="font-size:9px;color:var(--muted2);text-align:center">localStorage · <span id="stor-username">—</span></div>
+      </div>
+      <div class="gc" style="padding:16px;max-width:500px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;margin-bottom:6px">🗜 Optimisation des images</div>
+        <div class="hintbox" style="margin-bottom:10px">Recompresse en <strong style="color:var(--text)">WebP ≤900px</strong> toutes les couvertures importées (déjà présentes et futures) pour libérer de l'espace. Les projets Behance et les couvertures par URL ne sont pas concernés (ce sont des liens, ils ne pèsent rien).</div>
+        <button class="btn btn-accent" id="opt-btn" onclick="optimizeAllCovers()" style="font-size:11px">🗜 Optimiser les images</button>
       </div>
       <div class="gc" id="stor-files"></div>
     </div>
@@ -1333,6 +1339,25 @@ function fileToDataURL(file, cb) {
   };
   rd.readAsDataURL(file);
 }
+/* Compresse une image (data: URL) en WebP ≤900px. Renvoie null si échec/CORS. */
+function compressImageSrc(src, cb) {
+  if (!src || !src.startsWith('data:')) { cb(null); return; }  // URL distante = pas de recompression (canvas tainté)
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const MAX = 900; let w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) { cb(null); return; }
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      let out = cv.toDataURL('image/webp', .8);
+      if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', .82);
+      cb(out.length < src.length ? out : src);  // ne garde que si plus léger
+    } catch { cb(null); }
+  };
+  img.onerror = () => cb(null);
+  img.src = src;
+}
 function npCoverFile(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const rd = new FileReader();
@@ -1416,19 +1441,47 @@ function addProject() {
   const title = document.getElementById('np-title')?.value.trim(); if (!title) { showToast('Titre requis','#c0392b',1500); return; }
   const tags  = (document.getElementById('np-tags')?.value || '').split(',').map(t=>t.trim()).filter(Boolean);
   const url   = document.getElementById('np-url')?.value.trim() || '';
-  const cover = _npCover || document.getElementById('np-cover-url')?.value.trim() || '';
-  const projs = getProjects();
+  const rawCover = _npCover || document.getElementById('np-cover-url')?.value.trim() || '';
   const wasEdit = !!_editingId;
-  if (wasEdit) {
-    const p = projs.find(x => x.id === _editingId);
-    if (p) { p.title = title; p.tags = tags; p.url = url; if (cover) p.cover = cover; }
+  const finalize = (cover) => {
+    const projs = getProjects();
+    if (wasEdit) {
+      const p = projs.find(x => x.id === _editingId);
+      if (p) { p.title = title; p.tags = tags; p.url = url; if (cover) p.cover = cover; }
+    } else {
+      projs.unshift({ id: Date.now().toString(), title, tags, url, cover, views:0, createdAt:Date.now() });
+    }
+    try { localStorage.setItem('hub_projects', JSON.stringify(projs)); }
+    catch { showToast('⚠ Image trop lourde — utilise une URL d\'image à la place','#c0392b',3500); return; }
+    resetProjectForm(); renderProjects(); syncKPIs();
+    showToast(wasEdit ? 'Projet mis à jour ✓' : 'Projet ajouté ✓','#2e9a63');
+  };
+  // Couverture collée en data: (ex : champ URL) non-WebP → on compresse avant de stocker
+  if (rawCover.startsWith('data:') && !rawCover.startsWith('data:image/webp')) {
+    compressImageSrc(rawCover, c => finalize(c || rawCover));
   } else {
-    projs.unshift({ id: Date.now().toString(), title, tags, url, cover, views:0, createdAt:Date.now() });
+    finalize(rawCover);
   }
-  try { localStorage.setItem('hub_projects', JSON.stringify(projs)); }
-  catch { showToast('⚠ Image trop lourde — utilise une URL d\'image à la place','#c0392b',3500); return; }
-  resetProjectForm(); renderProjects(); syncKPIs();
-  showToast(wasEdit ? 'Projet mis à jour ✓' : 'Projet ajouté ✓','#2e9a63');
+}
+
+/* ═══ OPTIMISATION DES IMAGES — compresse les couvertures data: déjà stockées ═══ */
+async function optimizeAllCovers() {
+  const projs = getProjects();
+  const targets = projs.filter(p => p.cover && p.cover.startsWith('data:'));
+  if (!targets.length) { showToast('Aucune couverture à optimiser (les liens Behance/URL ne pèsent rien) ✓','#2e9a63',3000); return; }
+  const btn = document.getElementById('opt-btn'); if (btn) { btn.disabled = true; btn.textContent = '⟳ Optimisation…'; }
+  let before = 0, after = 0, done = 0;
+  for (const p of targets) {
+    before += p.cover.length;
+    const optimized = await new Promise(res => compressImageSrc(p.cover, res));
+    if (optimized) { p.cover = optimized; done++; }
+    after += p.cover.length;
+  }
+  try { localStorage.setItem('hub_projects', JSON.stringify(projs)); } catch {}
+  const savedKo = Math.max(0, Math.round((before - after) * 0.75 / 1024));
+  renderProjects(); renderBehancePage?.(); syncKPIs();
+  if (btn) { btn.disabled = false; btn.textContent = '🗜 Optimiser les images'; }
+  showToast(`✓ ${done} couverture(s) optimisée(s) — ${savedKo} Ko économisés`, '#2e9a63', 4000);
 }
 function editProject(id) {
   const p = getProjects().find(x => x.id === id); if (!p) return;
@@ -1763,6 +1816,11 @@ function syncKPIs() {
   set('kpi-projects',projs.length);
   set('kpi-revenue',paid.toLocaleString('fr')+' €');
   set('an-revenue',paid.toLocaleString('fr')+' €');
+  // Clics = total des clics sur les liens du profil
+  let links=[]; try{links=JSON.parse(localStorage.getItem('hub_links')||'[]');}catch{}
+  const clicks=links.reduce((s,l)=>s+(l.clicks||0),0);
+  set('kpi-clicks',clicks.toLocaleString('fr'));
+  set('an-clicks',clicks.toLocaleString('fr'));
   set('fac-total',paid.toLocaleString('fr')+' €');
   set('fac-paid-count',inv.filter(i=>i.status==='paid').length);
   set('fac-pending-count',inv.filter(i=>i.status==='pending'||i.status==='acompte'||!i.status).length);
@@ -1794,6 +1852,7 @@ function saveGoat() {
   const inp = document.getElementById('gc-code'); if (inp) inp.value = code;
   renderGoat();
   showToast(code ? '✓ GoatCounter configuré — 🚀 Publie pour activer le suivi' : 'GoatCounter désactivé', code ? '#2e9a63' : '#666', 3000);
+  refreshRealStats(false);
 }
 function renderGoat() {
   const cfg = SiteConfig.get();
@@ -1807,6 +1866,33 @@ function renderGoat() {
     open.style.display = cfg.goatcounter ? '' : 'none';
     if (cfg.goatcounter) open.href = 'https://' + cfg.goatcounter + '.goatcounter.com';
   }
+}
+
+/* Récupère les vraies stats GoatCounter et remplit les KPI du dashboard */
+let _statsLoading = false;
+async function refreshRealStats(silent) {
+  const cfg = SiteConfig.get();
+  const set = (id,v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  if (!cfg.goatcounter) { ['kpi-views','kpi-visitors','an-views','an-visitors'].forEach(id=>set(id,'—')); return; }
+  if (_statsLoading) return; _statsLoading = true;
+  if (!silent) { ['kpi-views','kpi-visitors','an-views','an-visitors'].forEach(id=>set(id,'…')); }
+  try {
+    const s = await fetchGoatStats();
+    if (s) {
+      set('kpi-views', s.views.toLocaleString('fr'));
+      set('an-views',  s.views.toLocaleString('fr'));
+      set('kpi-visitors', s.visitors.toLocaleString('fr'));
+      set('an-visitors',  s.visitors.toLocaleString('fr'));
+      const st = document.getElementById('gc-status');
+      if (st) st.textContent = '✓ ' + cfg.goatcounter + '.goatcounter.com — ' + s.views.toLocaleString('fr') + ' vues · ' + s.visitors.toLocaleString('fr') + ' visiteurs';
+      localStorage.setItem('souanpt_stats_cache', JSON.stringify({ ...s, ts: Date.now() }));
+      if (!silent) showToast('✓ Statistiques à jour', '#2e9a63', 1800);
+    } else {
+      ['kpi-views','kpi-visitors','an-views','an-visitors'].forEach(id=>set(id,'—'));
+      if (!silent) showToast('Stats indisponibles — active l\'endpoint dans GoatCounter (voir aide)', '#e4b24a', 4000);
+    }
+  } catch { if (!silent) showToast('Stats indisponibles', '#c0392b', 2500); }
+  finally { _statsLoading = false; }
 }
 
 /* ═══ PORTE DE CONNEXION — dashboard verrouillé sans login ═══ */
@@ -1844,7 +1930,7 @@ function renderLoginLog() {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!Auth.ok()) gateShow();   // pas connecté → dashboard verrouillé
-  renderLoginLog(); renderGoat();
+  renderLoginLog(); renderGoat(); refreshRealStats(true);
   renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
   renderCatalog(); refreshInvDatalists();
   renderBehancePage(); updateAvisCheckTime();

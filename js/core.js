@@ -143,6 +143,7 @@ const Auth = {
 ══════════════════════════════════════════════════════ */
 const REPO_DATA_SUFFIX = '-hub-data';  // {username}-hub-data (backup privé)
 const HUB_REPO_NAME    = 'souanpt-hub'; // repo du dashboard — jamais utilisé comme cible de déploiement
+const HUB_HOME_URL     = 'https://n7t0-of.github.io/souanpt-hub/'; // accueil souanpt.hub (cible du badge des sites publiés)
 const SITE_REPO_NAME   = 'souanpt-folio'; // repo par défaut du site public
 
 async function connectGitHub(token) {
@@ -336,6 +337,12 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
 .rhint{font-size:10px;color:var(--m);margin-top:10px;line-height:1.6;text-align:center}
 .ci{text-align:center;padding:60px 32px;max-width:600px;margin:0 auto}
 footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10px;color:var(--m)}
+/* ── BADGE "Made by Souanpt HUB" (style Framer) ── */
+.made{position:fixed;bottom:16px;right:16px;z-index:200;display:flex;align-items:center;gap:7px;padding:7px 12px 7px 9px;border-radius:999px;background:rgba(10,10,10,.82);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 6px 22px rgba(0,0,0,.35);font-size:11px;font-weight:700;color:#f0ece4;text-decoration:none;transition:transform .2s,box-shadow .2s;font-family:'Syne',system-ui,sans-serif}
+.made:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.45)}
+.made .mic{width:18px;height:18px;border-radius:5px;background:var(--a);display:inline-flex;align-items:center;justify-content:center;color:#060606;font-size:11px;flex-shrink:0}
+.made b{color:var(--a)}
+@media(max-width:640px){.made{bottom:12px;right:12px;padding:6px 10px 6px 8px;font-size:10px}}
 @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .pc{animation:fu .4s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}
 /* ── À PROPOS ── */
@@ -365,6 +372,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 <div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>
 ${bodySections}
 <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
+<a class="made" href="${HUB_HOME_URL}" target="_blank" rel="noopener" title="Créé avec Souanpt HUB — clique pour découvrir"><span class="mic">✳</span>Made by <b>Souanpt&nbsp;HUB</b></a>
 <script>
 var _rvN=5;
 document.querySelectorAll('#rvstars span').forEach(function(s,i){
@@ -463,15 +471,37 @@ async function deployPortfolio(onLog, onStep) {
   return url;
 }
 
+const CORS_PROXIES = [
+  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+];
+
+/* ══════════════════════════════════════════════════════
+   GOATCOUNTER — stats réelles remontées dans le dashboard
+   Utilise l'endpoint public /counter/TOTAL.json
+   (à activer dans GoatCounter → Settings → "Allow using the
+    visitor counter" pour rendre l'endpoint accessible)
+══════════════════════════════════════════════════════ */
+async function fetchGoatStats() {
+  const code = String(SiteConfig.get().goatcounter || '').trim();
+  if (!code) return null;
+  const url = `https://${code}.goatcounter.com/counter/TOTAL.json`;
+  const parse = txt => { const j = JSON.parse(txt); const n = s => parseInt(String(s ?? '0').replace(/[^\d]/g, '')) || 0; return { views: n(j.count), visitors: n(j.count_unique) }; };
+  // 1) direct (les endpoints counter envoient du CORS *)
+  try { const r = await fetch(url, { headers: { 'Accept': 'application/json' } }); if (r.ok) return parse(await r.text()); } catch {}
+  // 2) repli via proxy
+  for (const wrap of CORS_PROXIES) {
+    try { const r = await fetch(wrap(url)); if (r.ok) { const t = await r.text(); if (t.includes('count')) return parse(t); } } catch {}
+  }
+  return null;
+}
+
 /* ══════════════════════════════════════════════════════
    BEHANCE — sync via flux RSS public (l'API Behance est fermée,
    plus aucune clé API nécessaire — juste le pseudo)
 ══════════════════════════════════════════════════════ */
 const Behance = {
-  PROXIES: [
-    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-    u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
-  ],
+  PROXIES: CORS_PROXIES,
 
   async fetchProjects(username) {
     const user = (username || '').trim().replace('@','');

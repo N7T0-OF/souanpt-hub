@@ -1,0 +1,40 @@
+name: Deploy hub to GitHub Pages
+
+# Déploiement fiable : un seul déploiement à la fois (anti-collision),
+# ce qui règle l'erreur récurrente "Deployment failed, try again later".
+# Prérequis : Settings → Pages → Source = "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Sérialise les déploiements : les pushs rapprochés s'enchaînent
+# au lieu de se marcher dessus et d'échouer.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
