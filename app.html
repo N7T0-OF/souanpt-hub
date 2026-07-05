@@ -564,6 +564,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .ed-dev-btn.active{color:var(--accent);border-color:rgba(200,255,0,.25);background:rgba(200,255,0,.06)}
 .sec-tog{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text);padding:4px 0;cursor:pointer}
 .sec-tog input{accent-color:var(--accent);cursor:pointer}
+
+/* ── FACTURATION V2 ── */
+.fs-acompte{background:var(--blue-dim);color:var(--blue)}
+.fs-cancel{background:var(--s3);color:var(--muted2)}
+.inv-pg{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;font-size:10px;color:var(--muted2)}
+.inv-pg button{background:var(--s2);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;padding:3px 10px;font-family:inherit;font-size:11px;transition:all .15s}
+.inv-pg button:hover:not(:disabled){border-color:rgba(200,255,0,.3);color:var(--accent)}
+.inv-pg button:disabled{opacity:.3;cursor:default}
+.cat-chip{display:inline-flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:4px 10px;font-size:9px;color:var(--text);cursor:pointer;transition:all .15s}
+.cat-chip:hover{border-color:rgba(200,255,0,.3);color:var(--accent)}
+.cat-chip b{color:var(--gold-l)}
+.cat-chip .x{color:var(--muted2);font-size:10px;padding:0 2px}
+.cat-chip .x:hover{color:var(--red)}
 </style>
 </head>
 <body>
@@ -955,7 +968,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
     <!-- ══ PAGE: FACTURATION ══ -->
     <div class="page" id="page-facturation">
-      <div class="section-header"><div class="section-title">Facturation</div><div class="section-line"></div><button class="btn btn-ghost" style="font-size:10px" onclick="document.getElementById('add-inv-form').classList.toggle('visible')">+ Prestation</button></div>
+      <div class="section-header"><div class="section-title">Facturation</div><div class="section-line"></div>
+        <input class="prop-input" id="inv-search" placeholder="🔍 Rechercher…" style="width:180px;font-size:10px" oninput="_invPage=1;renderInvoices()">
+        <button class="btn btn-ghost" style="font-size:10px" onclick="exportInvoicesCSV()" title="Exporter en CSV (Excel)">⬇ CSV</button>
+        <button class="btn btn-accent" style="font-size:10px" onclick="document.getElementById('add-inv-form').classList.toggle('visible')">+ Prestation</button>
+      </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
         <div class="kpi-card k3"><div class="kpi-label">Total payé</div><div class="kpi-val" id="fac-total">0 €</div></div>
         <div class="kpi-card k4"><div class="kpi-label">Factures payées</div><div class="kpi-val" id="fac-paid-count">0</div></div>
@@ -963,15 +980,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div class="kpi-card k2"><div class="kpi-label">Clients</div><div class="kpi-val" id="fac-clients-count">0</div></div>
       </div>
       <div class="form-box" id="add-inv-form">
-        <div style="display:grid;grid-template-columns:2fr 1fr 80px;gap:8px">
-          <div><div class="prop-label">Prestation</div><input class="prop-input" id="inv-name" placeholder="Logo design"></div>
-          <div><div class="prop-label">Client</div><input class="prop-input" id="inv-client" placeholder="NomClient"></div>
-          <div><div class="prop-label">Prix (€)</div><input class="prop-input" id="inv-price" type="number" placeholder="500"></div>
+        <div style="display:grid;grid-template-columns:2fr 1fr 100px;gap:8px">
+          <div><div class="prop-label">Prestation</div><input class="prop-input" id="inv-name" placeholder="Logo design" list="dl-catalog" oninput="invSuggestPrice()"></div>
+          <div><div class="prop-label">Client</div><input class="prop-input" id="inv-client" placeholder="Choisir ou créer…" list="dl-clients"></div>
+          <div><div class="prop-label">Prix (€)</div><input class="prop-input" id="inv-price" type="number" placeholder="500"><div id="inv-price-hint" style="font-size:8px;color:var(--accent);margin-top:3px;min-height:10px"></div></div>
         </div>
+        <datalist id="dl-catalog"></datalist>
+        <datalist id="dl-clients"></datalist>
+        <div class="hintbox">💡 Un client inconnu est <strong style="color:var(--text)">créé automatiquement</strong> dans Clients. La prestation rejoint le <strong style="color:var(--text)">catalogue</strong> : la prochaine fois, son prix se préremplit tout seul.</div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn btn-accent" onclick="addInvoice()">Ajouter</button>
           <button class="btn btn-ghost" onclick="document.getElementById('add-inv-form').classList.remove('visible')">Annuler</button>
         </div>
+      </div>
+      <div class="gc" style="padding:12px 14px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap"><span style="font-size:11px;font-weight:700">📒 Catalogue de prestations</span><span style="font-size:8px;color:var(--muted2)">clique une prestation pour préremplir le formulaire · se remplit automatiquement</span></div>
+        <div id="catalog-list" style="display:flex;gap:6px;flex-wrap:wrap;font-size:9px;color:var(--muted2)">Vide — ajoute ta première prestation</div>
       </div>
       <div class="gc" style="overflow:hidden">
         <div class="fac-row" style="border-bottom:1px solid var(--border)">
@@ -983,6 +1007,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div></div>
         </div>
         <div id="invoices-list"></div>
+        <div class="inv-pg" id="inv-pagination"></div>
       </div>
     </div>
 
@@ -1462,29 +1487,124 @@ function renderClients() {
   ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${(c.name||'?')[0].toUpperCase()}</div><div><div class="client-name">${c.name}</div><div class="client-sub">${c.type||'Nouveau'}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${c.progress||0}%"></div></div><span>${c.progress||0}%</span></div><button onclick="deleteClient('${c.id}')" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div>`).join('');
 }
 
+/* ═══ FACTURATION V2 — recherche, pagination, catalogue, statuts, CSV ═══ */
+const INV_STATUS = {
+  pending:   { label:'En attente',   cls:'fs-wait' },
+  acompte:   { label:'Acompte reçu', cls:'fs-acompte' },
+  paid:      { label:'Payée',        cls:'fs-paid' },
+  cancelled: { label:'Annulée',      cls:'fs-cancel' },
+};
+const INV_CYCLE = ['pending','acompte','paid','cancelled'];
+let _invPage = 1;
+
+function getInvoices() { try { return JSON.parse(localStorage.getItem('hub_invoices')||'[]'); } catch { return []; } }
+function getCatalog()  { try { return JSON.parse(localStorage.getItem('hub_catalog') ||'[]'); } catch { return []; } }
+
 function addInvoice() {
-  const name=document.getElementById('inv-name')?.value.trim(); if(!name) return;
+  const name=document.getElementById('inv-name')?.value.trim(); if(!name){ showToast('Nom de la prestation requis','#c0392b',1500); return; }
+  const client=document.getElementById('inv-client')?.value.trim()||'';
   const price=parseFloat(document.getElementById('inv-price')?.value)||0;
-  const inv=JSON.parse(localStorage.getItem('hub_invoices')||'[]');
-  inv.push({ id:Date.now().toString(), name, client:document.getElementById('inv-client')?.value.trim()||'', price, status:'pending', createdAt:Date.now() });
+  const inv=getInvoices();
+  inv.push({ id:Date.now().toString(), name, client, price, status:'pending', createdAt:Date.now() });
   localStorage.setItem('hub_invoices', JSON.stringify(inv));
-  renderInvoices(); syncKPIs();
+  // Catalogue : la prestation est mémorisée (prix conseillé la prochaine fois)
+  if (price > 0) {
+    const cat=getCatalog();
+    const ex=cat.find(c=>c.name.toLowerCase()===name.toLowerCase());
+    if (ex) ex.price=price; else cat.push({ id:Date.now().toString(), name, price });
+    localStorage.setItem('hub_catalog', JSON.stringify(cat));
+  }
+  // Client inconnu → créé automatiquement dans Clients
+  if (client) {
+    const cls=JSON.parse(localStorage.getItem('hub_clients')||'[]');
+    if (!cls.find(c=>(c.name||'').toLowerCase()===client.toLowerCase())) {
+      cls.push({ id:Date.now().toString()+'c', name:client, type:'', status:'active', progress:0, revenue:0, createdAt:Date.now() });
+      localStorage.setItem('hub_clients', JSON.stringify(cls));
+      renderClients();
+      showToast('Client « '+client+' » créé automatiquement ✓','#2e9a63',2500);
+    }
+  }
+  _invPage=1;
+  renderInvoices(); renderCatalog(); refreshInvDatalists(); syncKPIs();
   document.getElementById('add-inv-form').classList.remove('visible');
   ['inv-name','inv-client','inv-price'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const h=document.getElementById('inv-price-hint'); if(h)h.textContent='';
 }
 function toggleInvStatus(id) {
-  const inv=JSON.parse(localStorage.getItem('hub_invoices')||'[]');
+  const inv=getInvoices();
   const i=inv.find(x=>x.id===id); if(!i) return;
-  i.status=i.status==='paid'?'pending':'paid';
+  const idx=INV_CYCLE.indexOf(i.status||'pending');
+  i.status=INV_CYCLE[(idx+1)%INV_CYCLE.length];
   localStorage.setItem('hub_invoices', JSON.stringify(inv));
   renderInvoices(); syncKPIs();
 }
-function deleteInv(id) { localStorage.setItem('hub_invoices', JSON.stringify(JSON.parse(localStorage.getItem('hub_invoices')||'[]').filter(i=>i.id!==id))); renderInvoices(); syncKPIs(); }
+function deleteInv(id) { localStorage.setItem('hub_invoices', JSON.stringify(getInvoices().filter(i=>i.id!==id))); renderInvoices(); syncKPIs(); }
+window._invPage = _invPage;
+function invPage(d){ _invPage+=d; renderInvoices(); }
 function renderInvoices() {
-  const inv=JSON.parse(localStorage.getItem('hub_invoices')||'[]');
   const ct=document.getElementById('invoices-list'); if(!ct) return;
-  if(!inv.length){ct.innerHTML='<div class="empty"><div class="empty-title">Aucune prestation</div></div>';return;}
-  ct.innerHTML=[...inv].reverse().map(i=>`<div class="fac-row"><div class="fac-name">${i.name}</div><div class="fac-client">${i.client||'—'}</div><div class="fac-price">${(i.price||0).toLocaleString('fr')} €</div><div class="fac-date">${new Date(i.createdAt).toLocaleDateString('fr-FR')}</div><div class="fac-status ${i.status==='paid'?'fs-paid':'fs-wait'}" onclick="toggleInvStatus('${i.id}')" style="cursor:pointer">${i.status==='paid'?'Payé':'En attente'}</div><button onclick="deleteInv('${i.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted2)">✕</button></div>`).join('');
+  const all=getInvoices();
+  const q=(document.getElementById('inv-search')?.value||'').toLowerCase().trim();
+  const filtered=[...all].reverse().filter(i=>!q || (i.name||'').toLowerCase().includes(q) || (i.client||'').toLowerCase().includes(q));
+  const PER=8, pages=Math.max(1, Math.ceil(filtered.length/PER));
+  if(_invPage>pages)_invPage=pages; if(_invPage<1)_invPage=1;
+  const slice=filtered.slice((_invPage-1)*PER, _invPage*PER);
+  if(!filtered.length){
+    ct.innerHTML=q?'<div class="empty"><div class="empty-title">Aucun résultat</div><div class="empty-sub">pour « '+esc(q)+' »</div></div>':'<div class="empty"><div class="empty-title">Aucune prestation</div><div class="empty-sub">Ajoute ta première prestation</div></div>';
+  } else {
+    ct.innerHTML=slice.map(i=>{
+      const st=INV_STATUS[i.status]||INV_STATUS.pending;
+      const late=(i.status==='pending'||i.status==='acompte') && (Date.now()-(i.createdAt||0))>14*86400000;
+      return `<div class="fac-row"><div class="fac-name">${esc(i.name)}${late?' <span style="color:var(--red);font-size:8px;font-weight:700">· EN RETARD</span>':''}</div><div class="fac-client">${esc(i.client||'—')}</div><div class="fac-price">${(i.price||0).toLocaleString('fr')} €</div><div class="fac-date">${new Date(i.createdAt).toLocaleDateString('fr-FR')}</div><div class="fac-status ${st.cls}" onclick="toggleInvStatus('${i.id}')" style="cursor:pointer" title="Cliquer : En attente → Acompte → Payée → Annulée">${st.label}</div><button onclick="deleteInv('${i.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted2)">✕</button></div>`;
+    }).join('');
+  }
+  const pg=document.getElementById('inv-pagination');
+  if(pg) pg.innerHTML = pages>1
+    ? `<button onclick="invPage(-1)" ${_invPage<=1?'disabled':''}>←</button><span>${_invPage} / ${pages}</span><button onclick="invPage(1)" ${_invPage>=pages?'disabled':''}>→</button>`
+    : (filtered.length?`<span>${filtered.length} prestation(s)</span>`:'');
+}
+function renderCatalog() {
+  const box=document.getElementById('catalog-list'); if(!box) return;
+  const cat=getCatalog();
+  if(!cat.length){ box.innerHTML='Vide — ajoute ta première prestation'; return; }
+  box.innerHTML=cat.map(c=>`<span class="cat-chip" onclick="if(!event.target.closest('.x'))catFill('${c.id}')">${esc(c.name)} <b>${(c.price||0).toLocaleString('fr')} €</b> <span class="x" onclick="catDel('${c.id}')" title="Retirer du catalogue">✕</span></span>`).join('');
+}
+function catFill(id) {
+  const c=getCatalog().find(x=>x.id===id); if(!c) return;
+  document.getElementById('add-inv-form').classList.add('visible');
+  const n=document.getElementById('inv-name'), p=document.getElementById('inv-price');
+  if(n)n.value=c.name; if(p)p.value=c.price;
+  const h=document.getElementById('inv-price-hint'); if(h)h.textContent='Prix du catalogue ✓';
+  document.getElementById('inv-client')?.focus();
+}
+function catDel(id) {
+  localStorage.setItem('hub_catalog', JSON.stringify(getCatalog().filter(c=>c.id!==id)));
+  renderCatalog(); refreshInvDatalists();
+}
+function invSuggestPrice() {
+  const name=document.getElementById('inv-name')?.value.trim().toLowerCase();
+  const h=document.getElementById('inv-price-hint'); const p=document.getElementById('inv-price');
+  const c=name?getCatalog().find(x=>x.name.toLowerCase()===name):null;
+  if(c){ if(p&&!p.value)p.value=c.price; if(h)h.textContent='Prix conseillé : '+(c.price||0).toLocaleString('fr')+' €'; }
+  else if(h)h.textContent='';
+}
+function refreshInvDatalists() {
+  const dc=document.getElementById('dl-catalog');
+  if(dc) dc.innerHTML=getCatalog().map(c=>`<option value="${esc(c.name)}">`).join('');
+  const dl=document.getElementById('dl-clients');
+  if(dl){ let cls=[]; try{cls=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{} dl.innerHTML=cls.map(c=>`<option value="${esc(c.name)}">`).join(''); }
+}
+function exportInvoicesCSV() {
+  const inv=getInvoices();
+  if(!inv.length){ showToast('Aucune prestation à exporter','#e4b24a',2000); return; }
+  const rows=[['Prestation','Client','Prix (EUR)','Date','Statut'],
+    ...inv.map(i=>[i.name,i.client||'',i.price||0,new Date(i.createdAt).toLocaleDateString('fr-FR'),(INV_STATUS[i.status]||INV_STATUS.pending).label])];
+  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='prestations-souanpt-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Export CSV téléchargé ✓ (compatible Excel)','#2e9a63',2500);
 }
 
 function addReview() {
@@ -1563,7 +1683,7 @@ function syncKPIs() {
   set('an-revenue',paid.toLocaleString('fr')+' €');
   set('fac-total',paid.toLocaleString('fr')+' €');
   set('fac-paid-count',inv.filter(i=>i.status==='paid').length);
-  set('fac-pending-count',inv.filter(i=>i.status!=='paid').length);
+  set('fac-pending-count',inv.filter(i=>i.status==='pending'||i.status==='acompte'||!i.status).length);
   set('fac-clients-count',cl.length);
   // Storage
   const used=Object.keys(localStorage).reduce((s,k)=>s+(localStorage.getItem(k)||'').length,0);
@@ -1644,6 +1764,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!Auth.ok()) gateShow();   // pas connecté → dashboard verrouillé
   renderLoginLog(); renderGoat();
   renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
+  renderCatalog(); refreshInvDatalists();
   renderBehancePage(); updateAvisCheckTime();
   syncKPIs();
   if (Auth.ok()) { BubbleWidget.init(); document.getElementById('gh-disconnect-btn') && (document.getElementById('gh-disconnect-btn').style.display=''); }
