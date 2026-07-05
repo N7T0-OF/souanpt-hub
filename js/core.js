@@ -487,6 +487,177 @@ async function deployPortfolio(onLog, onStep) {
   return url;
 }
 
+/* ══════════════════════════════════════════════════════
+   PORTAIL CLIENT — page mission autonome, lien privé sans compte
+   Publiée sur le repo du site à /p/{id}/ ; reprend le thème du portfolio.
+   Lecture seule (le suivi 2 sens — messagerie, validation, signature —
+   nécessitera un backend : c'est la V2 Supabase/Firebase).
+══════════════════════════════════════════════════════ */
+const PORTAL_STEPS = ['Brief', 'Devis', 'Acompte', 'Production', 'Livraison', 'Terminé'];
+
+function randomId(len = 16) {
+  const a = new Uint8Array(len);
+  (crypto || window.crypto).getRandomValues(a);
+  return Array.from(a, b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
+}
+
+function generatePortal(p, cfg) {
+  cfg = cfg || SiteConfig.get();
+  const dark   = cfg.theme !== '#f8f8f8';
+  const acc    = cfg.accentColor || '#C8FF00';
+  const bg     = dark ? '#0b0b0d' : '#f4f4f6';
+  const card   = dark ? 'rgba(255,255,255,.035)' : '#fff';
+  const textC  = dark ? '#f0ece4' : '#141414';
+  const mutedC = dark ? 'rgba(240,236,228,.55)' : '#666';
+  const brdC   = dark ? 'rgba(255,255,255,.09)' : 'rgba(0,0,0,.1)';
+  const total  = Number(p.total) || 0;
+  const acPct  = Number(p.acomptePct) || 0;
+  const acompte = Math.round(total * acPct / 100);
+  const solde   = total - acompte;
+  const idx    = Number(p.stepIndex) || 0;
+  const acompteRecu = idx >= 2;
+  const money  = n => n.toLocaleString('fr-FR') + ' €';
+  const STATUS = { brief:'Brief', devis:'Devis', production:'En production', livraison:'Livraison', termine:'Terminé', valide:'Validé' };
+  const statusKey = p.status || (idx >= 5 ? 'termine' : idx >= 3 ? 'production' : idx >= 1 ? 'devis' : 'brief');
+  const statusLbl = STATUS[statusKey] || 'En cours';
+
+  const steps = PORTAL_STEPS.map((s, i) => {
+    const state = i < idx ? 'done' : i === idx ? 'cur' : 'todo';
+    const mark = state === 'done' ? '✓' : state === 'cur' ? '●' : '○';
+    return `<div class="stp ${state}"><div class="stp-c">${mark}</div><div class="stp-l">${esc(s)}</div></div>`;
+  }).join('<div class="stp-line"></div>');
+
+  const deliverables = (p.deliverables || []).filter(d => d && d.url);
+  const delivHtml = deliverables.length
+    ? deliverables.map(d => `<a class="dl" href="${esc(d.url)}" target="_blank" rel="noopener"><span>📎 ${esc(d.label || 'Fichier')}</span><span class="dl-go">Ouvrir ↗</span></a>`).join('')
+    : `<div class="muted" style="padding:6px 2px">Vos fichiers finaux apparaîtront ici à la livraison — accessibles pour toujours depuis ce lien.</div>`;
+
+  const payBtn = (solde > 0 && statusKey !== 'termine' && p.paymentLink)
+    ? `<a class="pay" href="${esc(p.paymentLink)}" target="_blank" rel="noopener">Payer le solde — ${money(solde)} →</a>` : '';
+
+  const body = `
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="ic">✳</span> ${esc(cfg.siteName || 'FOLIO')}</div>
+    <div class="muted sm">Espace mission sécurisé</div>
+  </header>
+  <div class="muted sm">Votre espace mission avec</div>
+  <h1>${esc(p.mission || 'Mission')}</h1>
+  <div class="muted">Avec <b style="color:${textC}">${esc(cfg.siteName || '')}</b>${p.client ? ' · ' + esc(p.client) : ''}</div>
+  <div class="row">
+    <span class="pin">📌 Retrouvez tout ici — sans email, sans PDF perdu</span>
+    <span class="badge">${esc(statusLbl)}</span>
+  </div>
+
+  <section class="c">
+    <div class="c-t">Avancement de la mission</div>
+    <div class="steps">${steps}</div>
+    ${p.note ? `<div class="muted sm" style="margin-top:14px">📝 ${esc(p.note)}</div>` : ''}
+  </section>
+
+  <section class="c">
+    <div class="c-h"><span class="c-t">💰 Suivi financier</span>${acompteRecu ? '<span class="ok">✓ Acompte reçu</span>' : ''}</div>
+    <div class="fin"><span>Total mission</span><b>${money(total)}</b></div>
+    <div class="fin"><span>Acompte (${acPct}%)</span><b style="color:${acc}">${money(acompte)}</b></div>
+    <div class="fin"><span>Solde à la livraison</span><b>${money(solde)}</b></div>
+    ${payBtn}
+  </section>
+
+  <section class="c">
+    <div class="c-h"><span class="c-t">📦 Livrables</span><span class="muted sm">${deliverables.length ? deliverables.length + ' fichier(s)' : 'En attente de livraison'}</span></div>
+    ${delivHtml}
+  </section>
+
+  <footer class="foot">Propulsé par <a href="${HUB_HOME_URL}" target="_blank" rel="noopener">Souanpt HUB</a> · L'espace client des créatifs freelance</footer>
+</div>`;
+
+  const gate = p.password
+    ? `<div id="lock"><div class="lockbox"><div class="brand" style="justify-content:center;margin-bottom:8px"><span class="ic">✳</span> ${esc(cfg.siteName || 'FOLIO')}</div><div class="muted sm" style="text-align:center;margin-bottom:14px">Cet espace est protégé par un mot de passe.</div><input id="pw" type="password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')chk()"><button onclick="chk()">Déverrouiller</button><div id="pwmsg" class="muted sm" style="text-align:center;margin-top:8px;min-height:14px"></div></div></div>` : '';
+
+  return `<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>${esc(p.mission || 'Mission')} — Espace client</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--a:${acc};--bg:${bg};--c:${card};--t:${textC};--m:${mutedC};--b:${brdC}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t);font-family:'Syne',system-ui,sans-serif;line-height:1.5;padding:20px;min-height:100vh}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:560px;margin:0 auto;animation:fu .4s ease both}
+@keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.top{display:flex;align-items:center;justify-content:space-between;padding:14px 0 22px}
+.brand{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:800}
+.brand .ic{width:26px;height:26px;border-radius:8px;background:var(--a);color:#060606;display:inline-flex;align-items:center;justify-content:center;font-size:14px}
+.muted{color:var(--m)}.sm{font-size:12px}
+h1{font-size:clamp(24px,5vw,32px);font-weight:800;letter-spacing:-1px;margin:2px 0 4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0 22px}
+.pin{font-size:11px;background:rgba(255,90,120,.12);color:#ff6b8a;padding:5px 12px;border-radius:999px;font-weight:700}
+.badge{font-size:11px;background:rgba(90,140,255,.15);color:#7aa2ff;padding:5px 12px;border-radius:999px;font-weight:700}
+.c{background:var(--c);border:1px solid var(--b);border-radius:16px;padding:18px;margin-bottom:14px}
+.c-t{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.c-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.ok{font-size:12px;color:var(--a);font-weight:700}
+.steps{display:flex;align-items:flex-start;justify-content:space-between}
+.stp{display:flex;flex-direction:column;align-items:center;gap:7px;flex-shrink:0;width:58px}
+.stp-c{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:1.5px solid var(--b);color:var(--m)}
+.stp-l{font-size:10px;color:var(--m);text-align:center}
+.stp.done .stp-c{background:rgba(255,90,120,.15);border-color:transparent;color:#ff6b8a}
+.stp.cur .stp-c{background:var(--a);border-color:transparent;color:#060606;box-shadow:0 0 0 4px rgba(200,255,0,.15)}
+.stp.cur .stp-l,.stp.done .stp-l{color:var(--t);font-weight:700}
+.stp-line{flex:1;height:1.5px;background:var(--b);margin-top:17px}
+.fin{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--b);font-size:14px}
+.fin:last-of-type{border-bottom:none}.fin b{font-weight:800}
+.pay{display:block;text-align:center;margin-top:14px;padding:13px;background:var(--a);color:#060606;border-radius:10px;font-weight:800;font-size:14px}
+.dl{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:rgba(128,128,128,.08);border:1px solid var(--b);border-radius:10px;margin-bottom:8px;font-size:13px;font-weight:600;transition:.15s}
+.dl:hover{border-color:var(--a)}.dl-go{color:var(--a);font-size:12px;font-weight:700}
+.foot{text-align:center;font-size:11px;color:var(--m);padding:20px 0}
+.foot a{color:var(--a);font-weight:700}
+#lock{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+.lockbox{width:100%;max-width:340px;background:var(--c);border:1px solid var(--b);border-radius:16px;padding:26px}
+.lockbox input{width:100%;padding:11px;border-radius:8px;border:1px solid var(--b);background:transparent;color:var(--t);font-family:inherit;font-size:14px;margin-bottom:10px;outline:none}
+.lockbox button{width:100%;padding:11px;border:none;border-radius:8px;background:var(--a);color:#060606;font-weight:800;font-family:inherit;font-size:14px;cursor:pointer}
+@media(max-width:480px){.stp{width:44px}.stp-l{font-size:8px}}
+</style></head><body>
+${gate}
+${body}
+${p.password ? `<script>
+document.querySelector('.wrap').style.display='none';
+function chk(){var v=document.getElementById('pw').value;if(v===${JSON.stringify(String(p.password))}){document.getElementById('lock').style.display='none';document.querySelector('.wrap').style.display='';}else{document.getElementById('pwmsg').textContent='Mot de passe incorrect';}}
+</script>` : ''}
+</body></html>`;
+}
+
+/** Détermine le repo du site (jamais le hub) */
+function portalRepo(cfg) {
+  let repo = (cfg.repo && cfg.repo.includes('/')) ? cfg.repo.split('/')[1] : (cfg.repo || SITE_REPO_NAME);
+  if (!repo || repo.toLowerCase() === HUB_REPO_NAME) repo = SITE_REPO_NAME;
+  return repo;
+}
+
+/** Publie (ou met à jour) le portail sur le repo du site → renvoie l'URL */
+async function publishPortal(p) {
+  const token = Auth.token(); if (!token) throw new Error('Connecte GitHub d\'abord');
+  const owner = Auth.owner(); if (!owner) throw new Error('Profil GitHub introuvable');
+  const cfg = SiteConfig.get();
+  const repo = portalRepo(cfg);
+  await GH.ensureRepo(token, owner, repo, false);
+  await GH.enablePages(token, owner, repo);
+  const path = 'p/' + p.id + '/index.html';
+  const html = p.active === false ? generatePortalDisabled(cfg) : generatePortal(p, cfg);
+  const sha = await GH.fileSha(token, owner, repo, path);
+  await GH.putFile(token, owner, repo, path, html, sha, 'portal: ' + (p.mission || p.id));
+  return `https://${owner.toLowerCase()}.github.io/${repo}/p/${p.id}/`;
+}
+
+function generatePortalDisabled(cfg) {
+  const acc = cfg.accentColor || '#C8FF00';
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Lien désactivé</title>
+<style>body{background:#0b0b0d;color:#f0ece4;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center;padding:24px}b{color:${acc}}</style></head>
+<body><div><div style="font-size:40px;margin-bottom:12px">🔒</div><h1>Lien désactivé</h1><p style="color:rgba(240,236,228,.55);margin-top:8px">Ce lien de mission n'est plus actif.<br>Contacte ton prestataire pour un nouvel accès.</p><p style="margin-top:16px;font-size:12px">Propulsé par <b>Souanpt HUB</b></p></div></body></html>`;
+}
+
 const CORS_PROXIES = [
   u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
   u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),

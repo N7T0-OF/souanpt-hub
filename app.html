@@ -724,6 +724,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <svg viewBox="0 0 16 16" fill="none"><polygon points="8,1 10,6 15,6 11,9 13,14 8,11 3,14 5,9 1,6 6,6" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
       Avis <span class="nbadge" id="avis-badge" style="display:none"></span>
     </button>
+    <button class="ni" data-page="portals" onclick="showPage('portals')">
+      <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="1.5" r="1" fill="currentColor"/></svg>
+      Portails Clients <span class="nbadge" id="portals-badge" style="display:none"></span>
+    </button>
   </div>
 
   <div class="nav-section">
@@ -1056,6 +1060,50 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="reviews-list"></div>
+    </div>
+
+    <!-- ══ PAGE: PORTAILS CLIENTS ══ -->
+    <div class="page" id="page-portals">
+      <div class="section-header"><div class="section-title">Portails Clients</div><div class="section-line"></div>
+        <button class="btn btn-accent" style="font-size:10px" onclick="portalOpenForm()">+ Nouveau portail</button>
+      </div>
+      <div class="infobox">🔗 <strong>Un espace mission par client, sans qu'il ait de compte.</strong> Tu crées le portail → Souanpt Hub génère un <strong>lien privé</strong> (<code style="color:var(--accent)">ton-site.github.io/p/xxxx</code>) que tu envoies par mail. Le client y voit l'avancement, le suivi financier et les livrables — le tout à ton image. Lecture seule (messagerie/validation en 2 sens = version future avec serveur).</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+        <div class="kpi-card k1"><div class="kpi-label">Portails</div><div class="kpi-val" id="pt-count">0</div></div>
+        <div class="kpi-card k4"><div class="kpi-label">Actifs</div><div class="kpi-val" id="pt-active">0</div></div>
+        <div class="kpi-card k3"><div class="kpi-label">Solde en attente</div><div class="kpi-val" id="pt-due" style="font-size:18px">0 €</div></div>
+        <div class="kpi-card k2"><div class="kpi-label">Publiés</div><div class="kpi-val" id="pt-published">0</div></div>
+      </div>
+
+      <div class="form-box" id="portal-form">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div class="prop-label">Nom de la mission</div><input class="prop-input" id="pt-mission" placeholder="Identité visuelle Bloom Studio"></div>
+          <div><div class="prop-label">Client</div><input class="prop-input" id="pt-client" placeholder="Choisir ou créer…" list="dl-clients"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 90px 1fr;gap:8px;margin-top:8px">
+          <div><div class="prop-label">Montant total (€)</div><input class="prop-input" id="pt-total" type="number" placeholder="2400"></div>
+          <div><div class="prop-label">Acompte %</div><input class="prop-input" id="pt-acompte" type="number" value="50"></div>
+          <div><div class="prop-label">Étape actuelle</div><select class="prop-input prop-select" id="pt-step">
+            <option value="0">Brief</option><option value="1">Devis</option><option value="2">Acompte</option><option value="3" selected>Production</option><option value="4">Livraison</option><option value="5">Terminé</option>
+          </select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div><div class="prop-label">Lien de paiement (Stripe, PayPal, SumUp…)</div><input class="prop-input" id="pt-pay" placeholder="https://buy.stripe.com/…"></div>
+          <div><div class="prop-label">Mot de passe (optionnel)</div><input class="prop-input" id="pt-pw" placeholder="laisser vide = aucun"></div>
+        </div>
+        <div style="margin-top:8px"><div class="prop-label">Note pour le client (optionnel)</div><input class="prop-input" id="pt-note" placeholder="Prochaine étape : validation des maquettes"></div>
+        <div style="margin-top:10px"><div class="prop-label">Livrables — liens (Drive, WeTransfer, GitHub Release…)</div>
+          <div id="pt-deliv-list"></div>
+          <button class="btn btn-ghost" style="font-size:9px;margin-top:6px" onclick="portalAddDelivRow()">+ Ajouter un livrable</button>
+        </div>
+        <div class="hintbox">💡 Le lien de paiement et les livrables sont de simples liens externes — Souanpt Hub ne stocke aucun fichier lourd et ne touche jamais à l'argent.</div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-accent" id="pt-submit" onclick="portalSave()">Créer le portail</button>
+          <button class="btn btn-ghost" onclick="portalCloseForm()">Annuler</button>
+        </div>
+      </div>
+
+      <div id="portals-list" style="display:flex;flex-direction:column;gap:10px"></div>
     </div>
 
     <!-- ══ PAGE: QR BUILDER ══ -->
@@ -1690,6 +1738,13 @@ function addInvoice() {
   document.getElementById('add-inv-form').classList.remove('visible');
   ['inv-name','inv-client','inv-price'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const h=document.getElementById('inv-price-hint'); if(h)h.textContent='';
+  // Création automatique : proposer un portail client pour cette prestation
+  setTimeout(()=>{
+    if (confirm('Créer un portail client pour « '+name+' » ?\n(espace mission avec lien privé, sans compte pour le client)')) {
+      showPage('portals');
+      portalOpenForm({ mission:name, client, total:price });
+    }
+  }, 250);
 }
 function toggleInvStatus(id) {
   const inv=getInvoices();
@@ -1872,6 +1927,155 @@ function syncKPIs() {
   if(Auth.ok())BubbleWidget.refresh();
 }
 
+/* ═══ PORTAILS CLIENTS ═══ */
+let _ptEditId = null;
+function getPortals() { try { return JSON.parse(localStorage.getItem('hub_portals')||'[]'); } catch { return []; } }
+function setPortals(p) { localStorage.setItem('hub_portals', JSON.stringify(p)); }
+
+function portalOpenForm(prefill) {
+  _ptEditId = null;
+  ['pt-mission','pt-client','pt-total','pt-pay','pt-pw','pt-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('pt-acompte').value = 50;
+  document.getElementById('pt-step').value = 3;
+  document.getElementById('pt-deliv-list').innerHTML = '';
+  portalAddDelivRow();
+  if (prefill) { if(prefill.client) document.getElementById('pt-client').value=prefill.client; if(prefill.mission) document.getElementById('pt-mission').value=prefill.mission; if(prefill.total) document.getElementById('pt-total').value=prefill.total; }
+  document.getElementById('pt-submit').textContent = 'Créer le portail';
+  document.getElementById('portal-form').classList.add('visible');
+  refreshInvDatalists();
+  document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
+}
+function portalCloseForm() { document.getElementById('portal-form').classList.remove('visible'); _ptEditId=null; }
+function portalAddDelivRow(label, url) {
+  const box = document.getElementById('pt-deliv-list'); if(!box) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr auto;gap:6px;margin-bottom:6px';
+  row.innerHTML = `<input class="prop-input pt-dl-label" placeholder="Logo final" value="${esc(label||'')}"><input class="prop-input pt-dl-url" placeholder="https://…" value="${esc(url||'')}"><button class="btn btn-ghost" style="font-size:11px" onclick="this.parentElement.remove()">✕</button>`;
+  box.appendChild(row);
+}
+function portalCollectDeliv() {
+  return [...document.querySelectorAll('#pt-deliv-list > div')].map(r=>({
+    label: r.querySelector('.pt-dl-label')?.value.trim()||'',
+    url: r.querySelector('.pt-dl-url')?.value.trim()||''
+  })).filter(d=>d.url);
+}
+function portalSave() {
+  const mission = document.getElementById('pt-mission')?.value.trim();
+  if (!mission) { showToast('Nom de la mission requis','#c0392b',1500); return; }
+  const client = document.getElementById('pt-client')?.value.trim()||'';
+  const data = {
+    mission, client,
+    total: parseFloat(document.getElementById('pt-total')?.value)||0,
+    acomptePct: parseFloat(document.getElementById('pt-acompte')?.value)||0,
+    stepIndex: parseInt(document.getElementById('pt-step')?.value)||0,
+    paymentLink: document.getElementById('pt-pay')?.value.trim()||'',
+    password: document.getElementById('pt-pw')?.value.trim()||'',
+    note: document.getElementById('pt-note')?.value.trim()||'',
+    deliverables: portalCollectDeliv(),
+  };
+  const portals = getPortals();
+  if (_ptEditId) {
+    const p = portals.find(x=>x.id===_ptEditId);
+    if (p) Object.assign(p, data);
+  } else {
+    portals.unshift({ id: randomId(16), active:true, createdAt:Date.now(), publishedAt:0, ...data });
+    // Client inconnu → créé dans Clients
+    if (client) {
+      const cls=JSON.parse(localStorage.getItem('hub_clients')||'[]');
+      if(!cls.find(c=>(c.name||'').toLowerCase()===client.toLowerCase())){
+        cls.push({id:Date.now().toString()+'c',name:client,type:'',status:'active',progress:0,revenue:0,createdAt:Date.now()});
+        localStorage.setItem('hub_clients',JSON.stringify(cls)); renderClients();
+      }
+    }
+  }
+  setPortals(portals);
+  portalCloseForm(); renderPortals();
+  showToast(_ptEditId?'Portail mis à jour ✓ — republie pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
+}
+function portalEdit(id) {
+  const p = getPortals().find(x=>x.id===id); if(!p) return;
+  _ptEditId = id;
+  const set=(i,v)=>{const el=document.getElementById(i);if(el)el.value=v??'';};
+  set('pt-mission',p.mission); set('pt-client',p.client); set('pt-total',p.total);
+  set('pt-acompte',p.acomptePct); set('pt-step',p.stepIndex); set('pt-pay',p.paymentLink);
+  set('pt-pw',p.password); set('pt-note',p.note);
+  const box=document.getElementById('pt-deliv-list'); box.innerHTML='';
+  (p.deliverables||[]).forEach(d=>portalAddDelivRow(d.label,d.url)); if(!(p.deliverables||[]).length) portalAddDelivRow();
+  document.getElementById('pt-submit').textContent='Enregistrer';
+  document.getElementById('portal-form').classList.add('visible');
+  document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
+}
+function portalDelete(id) {
+  if(!confirm('Supprimer ce portail ? (le lien ne fonctionnera plus après le prochain déploiement)')) return;
+  setPortals(getPortals().filter(p=>p.id!==id)); renderPortals();
+}
+function portalRegen(id) {
+  if(!confirm('Régénérer le lien ? L\'ancien lien cessera de fonctionner.')) return;
+  const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
+  p.id=randomId(16); p.publishedAt=0; setPortals(portals); renderPortals();
+  showToast('Nouveau lien généré — clique « Publier »','#e4b24a',3000);
+}
+async function portalToggleActive(id) {
+  const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
+  p.active=!p.active; setPortals(portals); renderPortals();
+  if(p.publishedAt) portalPublish(id); // répercute l'état en ligne
+}
+async function portalPublish(id) {
+  if(!Auth.ok()){ showToast('Connecte GitHub d\'abord','#e4b24a'); showPage('github'); return; }
+  const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
+  const btn=document.getElementById('pub-'+id); if(btn){btn.disabled=true;btn.textContent='⟳ Publication…';}
+  try {
+    const url=await publishPortal(p);
+    p.publishedAt=Date.now(); p.url=url; setPortals(portals);
+    await navigator.clipboard.writeText(url).catch(()=>{});
+    renderPortals();
+    showToast('✓ Portail publié — lien copié !','#2e9a63',3000);
+  } catch(e){ showToast('✗ '+e.message,'#c0392b',3500); if(btn){btn.disabled=false;btn.textContent='🚀 Publier';} }
+}
+function portalCopy(id){
+  const p=getPortals().find(x=>x.id===id); if(!p||!p.url) return;
+  navigator.clipboard.writeText(p.url).then(()=>showToast('Lien copié ✓','#2e9a63',1500));
+}
+function renderPortals() {
+  const portals=getPortals();
+  const set=(i,v)=>{const el=document.getElementById(i);if(el)el.textContent=v;};
+  set('pt-count',portals.length);
+  set('pt-active',portals.filter(p=>p.active!==false).length);
+  set('pt-published',portals.filter(p=>p.publishedAt).length);
+  const due=portals.reduce((s,p)=>{const t=Number(p.total)||0;const a=Math.round(t*(Number(p.acomptePct)||0)/100);return s+(p.stepIndex>=5?0:(t-a));},0);
+  set('pt-due',due.toLocaleString('fr')+' €');
+  const badge=document.getElementById('portals-badge');
+  if(badge){const n=portals.filter(p=>p.active!==false).length;badge.textContent=n||'';badge.style.display=n?'':'none';}
+  const ct=document.getElementById('portals-list'); if(!ct) return;
+  if(!portals.length){ct.innerHTML='<div class="empty"><i class="ti ti-link"></i><div class="empty-title">Aucun portail</div><div class="empty-sub">Crée ton premier espace mission client</div></div>';return;}
+  ct.innerHTML=portals.map(p=>{
+    const t=Number(p.total)||0, a=Math.round(t*(Number(p.acomptePct)||0)/100), solde=t-a;
+    const stepLbl=['Brief','Devis','Acompte','Production','Livraison','Terminé'][p.stepIndex]||'Brief';
+    const pub=p.publishedAt;
+    return `<div class="gc" style="padding:14px;${p.active===false?'opacity:.55':''}">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:160px">
+          <div style="font-size:13px;font-weight:700">${esc(p.mission)}${p.password?' <span title="Protégé par mot de passe">🔒</span>':''}${p.active===false?' <span style="color:var(--red);font-size:9px">DÉSACTIVÉ</span>':''}</div>
+          <div style="font-size:10px;color:var(--muted2)">${esc(p.client||'Sans client')} · ${stepLbl} · ${t.toLocaleString('fr')} € (solde ${solde.toLocaleString('fr')} €)</div>
+        </div>
+        <span style="font-size:9px;padding:3px 9px;border-radius:10px;background:${pub?'var(--green-dim)':'var(--gold-dim)'};color:${pub?'var(--green)':'var(--gold-l)'};font-weight:700">${pub?'En ligne':'Non publié'}</span>
+      </div>
+      ${pub?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:7px 10px;background:var(--s2);border-radius:6px">
+        <span style="flex:1;font-size:10px;color:var(--accent3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.url)}</span>
+        <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="portalCopy('${p.id}')">Copier</button>
+        <a class="btn btn-ghost" style="font-size:9px;padding:3px 8px" href="${esc(p.url)}" target="_blank">Ouvrir ↗</a>
+      </div>`:''}
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-accent" id="pub-${p.id}" style="font-size:10px" onclick="portalPublish('${p.id}')">${pub?'↻ Republier':'🚀 Publier'}</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="portalEdit('${p.id}')">✎ Modifier</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="portalToggleActive('${p.id}')">${p.active===false?'Réactiver':'Désactiver'}</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="portalRegen('${p.id}')" title="Nouveau lien">↺ Lien</button>
+        <button class="btn btn-ghost" style="font-size:10px;color:var(--red)" onclick="portalDelete('${p.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 /* ═══ GOATCOUNTER — statistiques réelles gratuites ═══ */
 function saveGoat() {
   const raw = document.getElementById('gc-code')?.value.trim() || '';
@@ -1960,7 +2164,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!Auth.ok()) gateShow();   // pas connecté → dashboard verrouillé
   renderLoginLog(); renderGoat(); refreshRealStats(true);
   renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
-  renderCatalog(); refreshInvDatalists();
+  renderCatalog(); refreshInvDatalists(); renderPortals();
   renderBehancePage(); updateAvisCheckTime();
   syncKPIs();
   if (Auth.ok()) { BubbleWidget.init(); document.getElementById('gh-disconnect-btn') && (document.getElementById('gh-disconnect-btn').style.display=''); }
