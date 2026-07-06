@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// Règles Firebase Storage — souanpt.hub V2
+// Uniquement les PETITES ressources : avatars, logos, couvertures optimisées, miniatures.
+// Les gros fichiers (ZIP, PSD, vidéos) restent hébergés en externe (Drive, WeTransfer,
+// GitHub Releases…) et ne sont référencés que par un lien dans Firestore.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/{allPaths=**} {
+      allow read: if true;  // avatars/logos/couvertures = publics
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 5 * 1024 * 1024          // 5 Mo max
+                   && request.resource.contentType.matches('image/.*'); // images uniquement
+    }
+  }
+}

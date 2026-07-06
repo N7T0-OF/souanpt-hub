@@ -1302,9 +1302,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <div class="setting-group">
               <div class="setting-group-title">Confidentialité</div>
               <div class="setting-row"><div class="setting-info"><div class="setting-name">Portfolio public</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
-              <div style="margin-top:14px;display:flex;gap:8px">
-                <button class="btn btn-ghost" style="font-size:10px" onclick="exportDataFull()">Export JSON</button>
-                <button class="btn btn-ghost" style="font-size:10px" onclick="importDataFull()">Import JSON</button>
+            </div>
+            <div class="setting-group">
+              <div class="setting-group-title">Sauvegarde complète du Hub</div>
+              <div class="hintbox" style="margin-bottom:10px">Exporte <strong style="color:var(--text)">toutes tes données</strong> (projets, clients, factures, avis, portails, paramètres) dans un seul fichier. C'est ta sauvegarde — et le point de départ de la future migration vers le cloud (Firebase). Le token GitHub n'est jamais inclus.</div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-accent" style="font-size:10px" onclick="exportDataFull()">⬇ Exporter mon Hub</button>
+                <button class="btn btn-ghost" style="font-size:10px" onclick="importDataFull()">⬆ Importer</button>
               </div>
             </div>
           </div>
@@ -1352,13 +1356,53 @@ function settingsSaveDomain() {
   if (d) SiteConfig.set('customDomain', 'https://' + d.replace('https://',''));
   showToast('Domaine sauvegardé','#2e9a63');
 }
-function exportDataFull() { BubbleWidget?.exportJSON?.(); }
+/* ═══ EXPORT / IMPORT COMPLET DU HUB — filet de sécurité + base migration Firebase ═══ */
+/* Chaque clé mappe une future collection Firestore (users/UID/<clé>) */
+const HUB_COLLECTIONS = {
+  projects:'hub_projects', links:'hub_links', clients:'hub_clients',
+  invoices:'hub_invoices', catalog:'hub_catalog', reviews:'hub_reviews',
+  portals:'hub_portals', media:'hub_media',
+};
+function hubExportObject() {
+  const data = {};
+  Object.entries(HUB_COLLECTIONS).forEach(([k, key]) => {
+    try { data[k] = JSON.parse(localStorage.getItem(key) || '[]'); } catch { data[k] = []; }
+  });
+  return {
+    souanpt: 'hub-export', version: 2, exportedAt: new Date().toISOString(),
+    user: Auth.user()?.login || null,
+    config: SiteConfig.get(),
+    imgQuality: localStorage.getItem('hub_img_quality') || 'balanced',
+    data,
+    // NB : le token GitHub n'est jamais exporté (sécurité)
+  };
+}
+function exportDataFull() {
+  const blob = new Blob([JSON.stringify(hubExportObject(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'souanpt-hub-' + (Auth.user()?.login || 'export') + '-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  showToast('✓ Sauvegarde complète téléchargée','#2e9a63',2500);
+}
 function importDataFull() {
   const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
   inp.onchange = e => {
     const f = e.target.files[0]; if (!f) return;
     const r = new FileReader();
-    r.onload = ev => { try { const d=JSON.parse(ev.target.result); if(d.config) SiteConfig.save(d.config); showToast('Import réussi','#2e9a63'); } catch { showToast('Fichier invalide','#c0392b'); }};
+    r.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (!confirm('Remplacer les données actuelles du Hub par cette sauvegarde ?')) return;
+        if (d.config) SiteConfig.save(d.config);
+        if (d.imgQuality) localStorage.setItem('hub_img_quality', d.imgQuality);
+        const dd = d.data || d; // tolère l'ancien format
+        Object.entries(HUB_COLLECTIONS).forEach(([k, key]) => { if (Array.isArray(dd[k])) localStorage.setItem(key, JSON.stringify(dd[k])); });
+        // recharge tout l'affichage
+        renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews();
+        renderMedia(); renderCatalog(); refreshInvDatalists(); renderPortals(); syncKPIs();
+        showToast('✓ Hub restauré','#2e9a63',2500);
+      } catch { showToast('Fichier invalide','#c0392b'); }
+    };
     r.readAsText(f);
   };
   inp.click();
