@@ -12,3 +12,8 @@ window.FIREBASE_CONFIG = {
   appId:             "1:713471184876:web:bd97de84f9c9a074e4bac9",
   measurementId:     "G-H3NT2SKT8B",
 };
+
+// Connexion Discord : URL du Worker Cloudflare (voir cloudflare/README.md).
+// Laisse vide tant que le Worker n'est pas déployé → le bouton Discord reste masqué.
+// Exemple : "https://souanpt-discord.toncompte.workers.dev/login"
+window.DISCORD_LOGIN_URL = "";

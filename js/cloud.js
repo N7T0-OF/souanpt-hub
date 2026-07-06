@@ -39,6 +39,24 @@ const Cloud = {
   },
   async signOut() { try { await this._auth.signOut(); } catch {} },
 
+  /* ── Discord (via Cloudflare Worker qui fabrique un jeton Firebase) ── */
+  discordReady() { return this.enabled && !!window.DISCORD_LOGIN_URL; },
+  startDiscord() {
+    if (!this.discordReady()) return;
+    // le Worker gère l'échange puis nous renvoie avec #ct=<jeton>
+    location.href = window.DISCORD_LOGIN_URL;
+  },
+  /** Au retour de Discord : #ct=<customToken> → connexion Firebase */
+  async handleRedirectToken() {
+    if (!this.enabled) return false;
+    const m = location.hash.match(/[#&]ct=([^&]+)/);
+    if (!m) return false;
+    const token = decodeURIComponent(m[1]);
+    history.replaceState(null, '', location.pathname + location.search); // nettoie l'URL
+    try { await this._auth.signInWithCustomToken(token); return true; }
+    catch (e) { console.error('[cloud] discord token', e); showToast?.('Connexion Discord échouée', '#c0392b', 3000); return false; }
+  },
+
   // ── Profil utilisateur (users/{uid}) ──
   async loadProfile(uid) {
     const d = await this._db.collection('users').doc(uid).get();
