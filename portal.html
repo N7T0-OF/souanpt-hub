@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Espace mission — souanpt.hub</title>
+<style>
+body{margin:0;background:#0b0b0d;color:#f0ece4;font-family:system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.state{text-align:center;padding:30px;max-width:420px}
+.state .big{font-size:44px;margin-bottom:14px}
+.state h1{font-size:22px;margin:0 0 8px}
+.state p{color:rgba(240,236,228,.55);line-height:1.7;font-size:14px}
+.spin{width:26px;height:26px;border:3px solid rgba(255,255,255,.15);border-top-color:#C8FF00;border-radius:50%;animation:s 1s linear infinite;margin:0 auto}
+@keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="root"><div class="state"><div class="spin"></div><p style="margin-top:16px">Chargement de la mission…</p></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase/firebase-config.js"></script>
+<script src="js/core.js"></script>
+<script>
+'use strict';
+(async function () {
+  const root = document.getElementById('root');
+  const show = html => { root.innerHTML = html; };
+  const stateErr = (icon, title, sub) => show(`<div class="state"><div class="big">${icon}</div><h1>${title}</h1><p>${sub}</p></div>`);
+
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) return stateErr('🔗', 'Lien invalide', 'Aucun identifiant de mission.');
+
+  const cfg = window.FIREBASE_CONFIG;
+  if (!cfg || !cfg.apiKey || String(cfg.apiKey).startsWith('TON_')) return stateErr('⚙️', 'Non configuré', 'Firebase n\'est pas encore relié.');
+
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    const snap = await firebase.firestore().collection('portals').doc(id).get();
+    if (!snap.exists) return stateErr('🔍', 'Mission introuvable', 'Ce lien n\'existe pas ou a été supprimé.');
+    const p = snap.data();
+    if (p.active === false) return stateErr('🔒', 'Lien désactivé', 'Ce lien de mission n\'est plus actif. Contacte ton prestataire.');
+    // Rendu via le générateur de portail (thème repris de la mission)
+    const html = generatePortal(p, { siteName: p.siteName || 'FOLIO', accentColor: p.accent || '#C8FF00', theme: p.theme || '#060606' });
+    document.open(); document.write(html); document.close();
+  } catch (e) {
+    console.error(e);
+    stateErr('⚠️', 'Erreur de chargement', 'Réessaie dans un instant.');
+  }
+})();
+</script>
+</body>
+</html>

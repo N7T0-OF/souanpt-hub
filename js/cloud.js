@@ -70,6 +70,97 @@ const Cloud = {
     const q = await this._db.collection('users').where('pseudo', '==', pseudo).limit(1).get();
     return q.empty;
   },
+
+  /* ══════════════════════════════════════════════════════
+     SYNC — Firestore = source de vérité, localStorage = cache.
+     Miroir des collections business (instantané, cross-appareil, sauvegardé).
+  ══════════════════════════════════════════════════════ */
+  SYNC_KEYS: {                    // clé localStorage → nom de collection Firestore
+    hub_clients: 'clients', hub_invoices: 'invoices', hub_catalog: 'catalog',
+    hub_reviews: 'reviews', hub_links: 'links', hub_media: 'media', hub_portals: 'portals',
+  },
+  _pushTimers: {}, _mirroring: false, _origSet: null,
+
+  /** Intercepte les écritures localStorage hub_* pour pousser vers Firestore (débouncé) */
+  startMirror() {
+    if (this._mirroring || !this.enabled) return;
+    this._mirroring = true;
+    this._origSet = localStorage.setItem.bind(localStorage);
+    const self = this;
+    try {
+      localStorage.setItem = function (k, v) {
+        self._origSet(k, v);
+        if (!(self.enabled && self._user)) return;
+        if (self.SYNC_KEYS[k]) self._schedulePush(k);
+        else if (k === 'souanpt_site_cfg') self._scheduleConfigPush();
+      };
+    } catch (e) { console.warn('[sync] mirror', e); }
+  },
+  _scheduleConfigPush() {
+    clearTimeout(this._pushTimers._cfg);
+    this._pushTimers._cfg = setTimeout(() => {
+      try { this.pushConfig(JSON.parse(localStorage.getItem('souanpt_site_cfg') || '{}')); } catch {}
+    }, 1500);
+  },
+  _schedulePush(k) {
+    clearTimeout(this._pushTimers[k]);
+    this._pushTimers[k] = setTimeout(() => this._pushKey(k), 1200);
+  },
+  async _pushKey(k) {
+    if (!this._user) return;
+    const name = this.SYNC_KEYS[k]; if (!name) return;
+    let items = []; try { items = JSON.parse(localStorage.getItem(k) || '[]'); } catch {}
+    try {
+      await this._db.collection('users').doc(this._user.uid).collection('data').doc(name)
+        .set({ items, updatedAt: Date.now() });
+    } catch (e) { console.warn('[sync] push ' + name, e); }
+  },
+  /** Tire les données du cloud vers le cache local (au login) ; renvoie true si qqch a changé */
+  async syncPull() {
+    if (!this._user) return false;
+    const setRaw = this._origSet || localStorage.setItem.bind(localStorage);
+    let changed = false;
+    for (const [k, name] of Object.entries(this.SYNC_KEYS)) {
+      try {
+        const d = await this._db.collection('users').doc(this._user.uid).collection('data').doc(name).get();
+        if (d.exists && Array.isArray(d.data().items)) {
+          setRaw(k, JSON.stringify(d.data().items));  // écrit sans re-déclencher un push
+          changed = true;
+        }
+      } catch (e) { console.warn('[sync] pull ' + name, e); }
+    }
+    // Config du site (thème, etc.)
+    try {
+      const c = await this._db.collection('users').doc(this._user.uid).collection('data').doc('config').get();
+      if (c.exists && c.data().cfg) { setRaw('souanpt_site_cfg', JSON.stringify(c.data().cfg)); changed = true; }
+    } catch {}
+    return changed;
+  },
+  async pushConfig(cfg) {
+    if (!this._user) return;
+    try { await this._db.collection('users').doc(this._user.uid).collection('data').doc('config').set({ cfg, updatedAt: Date.now() }); } catch {}
+  },
+
+  /* ── Portails sur Firestore (lecture publique → instantané, sans 404) ── */
+  async savePortalDoc(p) {
+    if (!this._user) throw new Error('Non connecté');
+    const doc = {
+      id: p.id, owner: this._user.uid,
+      mission: p.mission || '', client: p.client || '',
+      total: Number(p.total) || 0, acomptePct: Number(p.acomptePct) || 0,
+      stepIndex: Number(p.stepIndex) || 0, paymentLink: p.paymentLink || '',
+      note: p.note || '', deliverables: p.deliverables || [],
+      password: p.password || '', active: p.active !== false,
+      siteName: p.siteName || '', accent: p.accent || '#C8FF00', theme: p.theme || '#060606',
+      updatedAt: Date.now(),
+    };
+    await this._db.collection('portals').doc(p.id).set(doc, { merge: true });
+    return doc;
+  },
+  async deletePortalDoc(id) {
+    if (!this._user) return;
+    try { await this._db.collection('portals').doc(id).delete(); } catch {}
+  },
 };
 
 Cloud.init();

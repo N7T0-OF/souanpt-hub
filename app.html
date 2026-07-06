@@ -1094,7 +1094,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="section-header"><div class="section-title">Portails Clients</div><div class="section-line"></div>
         <button class="btn btn-accent" style="font-size:10px" onclick="portalOpenForm()">+ Nouveau portail</button>
       </div>
-      <div class="infobox">🔗 <strong>Un espace mission par client, sans qu'il ait de compte.</strong> Tu crées le portail → Souanpt Hub génère un <strong>lien privé</strong> (<code style="color:var(--accent)">ton-site.github.io/p/xxxx</code>) que tu envoies par mail. Le client y voit l'avancement, le suivi financier et les livrables — le tout à ton image. Lecture seule (messagerie/validation en 2 sens = version future avec serveur).</div>
+      <div class="infobox">🔗 <strong>Un espace mission par client, sans qu'il ait de compte.</strong> Connecté avec Google, la publication est <strong>instantanée</strong> (via le cloud, aucun 404, aucune attente) et chaque modification est appliquée en direct. Tu envoies un <strong>lien privé</strong> ; le client y voit l'avancement, le suivi financier et les livrables — à ton image. Lecture seule (messagerie/validation 2 sens = étape suivante).</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
         <div class="kpi-card k1"><div class="kpi-label">Portails</div><div class="kpi-val" id="pt-count">0</div></div>
         <div class="kpi-card k4"><div class="kpi-label">Actifs</div><div class="kpi-val" id="pt-active">0</div></div>
@@ -2076,9 +2076,13 @@ function portalEdit(id) {
   document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
 }
 function portalDelete(id) {
-  if(!confirm('Supprimer ce portail ? (le lien ne fonctionnera plus après le prochain déploiement)')) return;
+  if(!confirm('Supprimer ce portail ? Le lien cessera de fonctionner.')) return;
   setPortals(getPortals().filter(p=>p.id!==id)); renderPortals();
+  if (window.Cloud && Cloud.enabled && Cloud.user()) Cloud.deletePortalDoc(id);
 }
+/** Le hub est-il relié au cloud (Google connecté) ? → portails instantanés via Firestore */
+function portalCloud() { return window.Cloud && Cloud.enabled && Cloud.user(); }
+function portalUrlFor(id) { return location.origin + location.pathname.replace(/[^/]*$/, '') + 'portal.html?id=' + id; }
 function portalRegen(id) {
   if(!confirm('Régénérer le lien ? L\'ancien lien cessera de fonctionner.')) return;
   const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
@@ -2091,10 +2095,27 @@ async function portalToggleActive(id) {
   if(p.publishedAt) portalPublish(id); // répercute l'état en ligne
 }
 async function portalPublish(id) {
-  if(!Auth.ok()){ showToast('Connecte GitHub d\'abord','#e4b24a'); showPage('github'); return; }
   const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
   const btn=document.getElementById('pub-'+id);
   const setBtn=t=>{if(btn)btn.textContent=t;};
+
+  // ── Voie Firestore : instantanée, aucun 404, aucune attente (Google connecté) ──
+  if (portalCloud()) {
+    if(btn)btn.disabled=true; setBtn('⟳ Publication…');
+    try {
+      const cfg=SiteConfig.get();
+      await Cloud.savePortalDoc({ ...p, siteName:cfg.siteName, accent:cfg.accentColor, theme:cfg.theme });
+      const url=portalUrlFor(p.id);
+      p.publishedAt=Date.now(); p.url=url; setPortals(portals);
+      await navigator.clipboard.writeText(url).catch(()=>{});
+      renderPortals();
+      showToast('✓ Portail en ligne instantanément — lien copié !','#2e9a63',3500);
+    } catch(e){ showToast('✗ '+e.message,'#c0392b',3500); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
+    return;
+  }
+
+  // ── Voie GitHub Pages (fallback si pas connecté au cloud) ──
+  if(!Auth.ok()){ showToast('Connecte-toi (Google) ou GitHub d\'abord','#e4b24a'); showPage('github'); return; }
   if(btn)btn.disabled=true; setBtn('⟳ Publication…');
   try {
     const { url, built }=await publishPortal(p, setBtn);
@@ -2106,6 +2127,7 @@ async function portalPublish(id) {
   } catch(e){ showToast('✗ '+e.message,'#c0392b',4000); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
 }
 async function portalVerify(id) {
+  if (portalCloud()) { showToast('✓ Portail instantané (Firestore) — actif immédiatement','#2e9a63',3000); return; }
   showToast('Vérification…','#666',1200);
   try {
     const r=await verifyPortal(id);
@@ -2265,6 +2287,18 @@ function finishLogin(pseudo) {
     }
   } catch {}
   showToast('✓ Connecté' + (pseudo ? ' — @' + pseudo : '') + ' !', '#2e9a63', 2500);
+  // ── Synchro cloud : miroir des écritures + tirage des données Firestore ──
+  if (window.Cloud && Cloud.enabled && Cloud.user()) {
+    Cloud.startMirror();
+    Cloud.syncPull().then(changed => { if (changed) reloadAllData(); }).catch(() => {});
+  }
+}
+/** Rafraîchit tout l'affichage après un tirage cloud */
+function reloadAllData() {
+  try {
+    renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews();
+    renderMedia(); renderCatalog(); refreshInvDatalists(); renderPortals(); syncKPIs();
+  } catch (e) { console.warn('[reload]', e); }
 }
 
 /* ── Choix / réservation du pseudo ── */
