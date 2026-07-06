@@ -24,9 +24,9 @@ que souanpt.hub.
 ## Étapes (≈ 10 min, une seule fois)
 
 1. Va sur https://console.firebase.google.com → **Ajouter un projet** (nom : `souanpt-hub`).
-2. Dans le projet → **Build → Authentication → Sign-in method** → active **GitHub**
-   (il te faudra créer une OAuth App sur github.com/settings/developers ; l'écran Firebase
-   te donne l'URL de callback à coller).
+2. Dans le projet → **Build → Authentication → Commencer → Sign-in method** → active
+   **Google** (aucune config à faire, un simple interrupteur). *(GitHub et Discord pourront
+   être ajoutés plus tard ; Google est la porte d'entrée principale.)*
 3. **Build → Firestore Database → Créer** (mode production) → région Europe.
 4. **Build → Storage → Créer** (facultatif, pour avatars/logos).
 5. **Paramètres du projet → Tes applis → </> (Web)** → copie les 6 valeurs.

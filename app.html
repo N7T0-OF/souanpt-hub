@@ -554,6 +554,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .gate-btn{width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:800;font-family:'Syne',sans-serif;cursor:pointer;transition:.2s}
 .gate-btn:hover{opacity:.85}
 .gate-btn:disabled{opacity:.4;cursor:not-allowed}
+.gate-google{width:100%;padding:12px;background:#fff;color:#1a1a1a;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center;gap:10px}
+.gate-google:hover{opacity:.9;transform:translateY(-1px)}
+.gate-google:disabled{opacity:.5;cursor:not-allowed}
+.gate-or{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted2);font-size:10px}
+.gate-or::before,.gate-or::after{content:'';flex:1;height:1px;background:var(--border2)}
 .gate-msg{font-size:10px;text-align:center;min-height:16px;margin-top:10px}
 .gate-links{display:flex;justify-content:space-between;margin-top:14px;font-size:10px}
 .gate-links a{color:var(--muted2);text-decoration:none;transition:.15s}
@@ -593,11 +598,30 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   <div class="gate-box">
     <div class="gate-logo"><div class="logo-icon"><svg viewBox="0 0 16 16" fill="#000" width="15" height="15"><path d="M8 1L2 5v9h4V9h4v5h4V5L8 1z"/></svg></div><div class="logo-text">souanpt<span>.hub</span></div></div>
     <div class="gate-title">Connexion</div>
-    <div class="gate-sub">Colle ton token GitHub pour déverrouiller ton dashboard.<br>Génère-le sur <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=souanpt.hub" target="_blank" style="color:var(--accent3)">github.com/settings/tokens →</a> · scope <code style="color:var(--text)">repo</code></div>
-    <input class="gate-input" id="gate-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" onkeydown="if(event.key==='Enter')gateConnect()">
-    <button class="gate-btn" id="gate-btn" onclick="gateConnect()">Se connecter avec GitHub</button>
+    <div class="gate-sub" id="gate-sub-google" style="display:none">Connecte-toi en un clic pour accéder à ton espace.</div>
+    <button class="gate-google" id="gate-google" style="display:none" onclick="gateGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.2-8l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.2 5.3C40.9 36 44 30.6 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+      Continuer avec Google
+    </button>
+    <div class="gate-or" id="gate-or" style="display:none"><span>ou</span></div>
+    <div id="gate-github-block">
+      <div class="gate-sub">Colle ton token GitHub<span id="gate-gh-why"> pour déverrouiller ton dashboard</span>.<br>Génère-le sur <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=souanpt.hub" target="_blank" style="color:var(--accent3)">github.com/settings/tokens →</a> · scope <code style="color:var(--text)">repo</code></div>
+      <input class="gate-input" id="gate-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" onkeydown="if(event.key==='Enter')gateConnect()">
+      <button class="gate-btn" id="gate-btn" onclick="gateConnect()">Se connecter avec GitHub</button>
+    </div>
     <div class="gate-msg" id="gate-msg"></div>
     <div class="gate-links"><a href="index.html">← Retour à l'accueil</a><a href="https://github.com/signup" target="_blank">Créer un compte GitHub</a></div>
+  </div>
+</div>
+
+<!-- ══ CHOIX DU PSEUDO (première connexion Google) ══ -->
+<div id="pseudo-gate" style="position:fixed;inset:0;z-index:855;background:rgba(4,4,4,.75);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px">
+  <div class="gate-box">
+    <div class="gate-title">Choisis ton pseudo</div>
+    <div class="gate-sub">Ce sera l'adresse de ton portfolio : <code style="color:var(--accent)">souanpt.hub/@<span id="ps-preview">pseudo</span></code></div>
+    <input class="gate-input" id="ps-input" placeholder="tonpseudo" autocomplete="off" oninput="pseudoOnInput()" onkeydown="if(event.key==='Enter')pseudoClaim()">
+    <button class="gate-btn" id="ps-btn" onclick="pseudoClaim()">Réserver mon pseudo</button>
+    <div class="gate-msg" id="ps-msg"></div>
   </div>
 </div>
 
@@ -1311,6 +1335,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                 <button class="btn btn-ghost" style="font-size:10px" onclick="importDataFull()">⬆ Importer</button>
               </div>
             </div>
+            <div class="setting-group">
+              <div class="setting-group-title">Compte</div>
+              <button class="btn btn-ghost" style="font-size:10px;color:var(--red);border-color:rgba(192,57,43,.25)" onclick="hubSignOut()">Se déconnecter</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1320,6 +1348,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 </div><!-- /main -->
 </div><!-- /app -->
 
+<!-- Firebase (compat) + config + module Cloud — dormant si non configuré -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase/firebase-config.js"></script>
+<script src="js/cloud.js"></script>
 <script src="js/core.js"></script>
 <script src="js/ui.js"></script>
 <script>
@@ -2170,8 +2204,107 @@ async function refreshRealStats(silent) {
 }
 
 /* ═══ PORTE DE CONNEXION — dashboard verrouillé sans login ═══ */
-function gateShow() { document.getElementById('login-gate')?.classList.add('on'); }
+let _googleUser = null;
+function gateShow() {
+  const g = document.getElementById('login-gate'); if (!g) return;
+  if (window.Cloud && Cloud.enabled) {
+    document.getElementById('gate-google').style.display = 'flex';
+    document.getElementById('gate-or').style.display = 'flex';
+    document.getElementById('gate-sub-google').style.display = '';
+    const why = document.getElementById('gate-gh-why'); if (why) why.textContent = ' (optionnel — pour publier sur GitHub Pages)';
+    const gb = document.getElementById('gate-btn'); if (gb) gb.textContent = 'Connecter GitHub (publication)';
+  }
+  g.classList.add('on');
+}
 function gateHide() { document.getElementById('login-gate')?.classList.remove('on'); }
+
+/* ── Connexion Google (Firebase) ── */
+async function gateGoogle() {
+  const btn = document.getElementById('gate-google'), msg = document.getElementById('gate-msg');
+  if (btn) btn.disabled = true;
+  if (msg) { msg.style.color = 'var(--muted2)'; msg.textContent = 'Ouverture de Google…'; }
+  try {
+    await Cloud.signInGoogle();   // la suite est gérée par Cloud.onAuth → afterGoogleLogin
+  } catch (e) {
+    const m = e.code === 'auth/popup-blocked' ? 'Pop-up bloquée — autorise les pop-ups pour ce site'
+            : e.code === 'auth/unauthorized-domain' ? 'Domaine non autorisé — ajoute-le dans Firebase → Authentication → Settings → Authorized domains'
+            : e.code === 'auth/popup-closed-by-user' ? 'Connexion annulée'
+            : (e.message || 'Erreur de connexion');
+    if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✗ ' + m; }
+    if (btn) btn.disabled = false;
+  }
+}
+async function afterGoogleLogin(user) {
+  _googleUser = user;
+  gateHide();
+  let prof = null, loadErr = false;
+  try { prof = await Cloud.loadProfile(user.uid); } catch (e) { loadErr = true; console.warn('[profil]', e); }
+  if (prof && prof.pseudo) finishLogin(prof.pseudo);
+  else if (!loadErr) pseudoShow(user);     // pas encore de profil → 1re connexion
+  else finishLogin(null);                    // souci réseau → on entre quand même
+}
+function finishLogin(pseudo) {
+  document.getElementById('pseudo-gate').style.display = 'none';
+  gateHide();
+  if (pseudo) localStorage.setItem('souanpt_pseudo', pseudo);
+  // Avatar/nom Google dans la bulle profil
+  try {
+    const u = _googleUser;
+    if (u) {
+      document.querySelectorAll('#sp-bub-name').forEach(el => el.textContent = u.displayName || pseudo || 'Moi');
+      document.querySelectorAll('#sp-bub-av,#sp-hd-av2').forEach(el => { if (u.photoURL) el.innerHTML = `<img src="${u.photoURL}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`; });
+      const bub = document.getElementById('sp-bubble-trigger'); if (bub) bub.style.display = 'flex';
+    }
+  } catch {}
+  showToast('✓ Connecté' + (pseudo ? ' — @' + pseudo : '') + ' !', '#2e9a63', 2500);
+}
+
+/* ── Choix / réservation du pseudo ── */
+function pseudoSanitize(v) { return (v || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 20); }
+function pseudoShow(user) {
+  const inp = document.getElementById('ps-input');
+  if (inp && !inp.value) inp.value = pseudoSanitize((user.email || user.displayName || '').split('@')[0]);
+  pseudoOnInput();
+  document.getElementById('pseudo-gate').style.display = 'flex';
+}
+function pseudoOnInput() {
+  const inp = document.getElementById('ps-input');
+  const clean = pseudoSanitize(inp.value);
+  if (inp.value !== clean) inp.value = clean;
+  const prev = document.getElementById('ps-preview'); if (prev) prev.textContent = clean || 'pseudo';
+}
+async function pseudoClaim() {
+  const inp = document.getElementById('ps-input'), btn = document.getElementById('ps-btn'), msg = document.getElementById('ps-msg');
+  const pseudo = pseudoSanitize(inp.value);
+  if (pseudo.length < 2) { msg.style.color = '#c0392b'; msg.textContent = 'Au moins 2 caractères (a-z, 0-9, -, _)'; return; }
+  if (btn) btn.disabled = true;
+  if (msg) { msg.style.color = 'var(--muted2)'; msg.textContent = 'Vérification…'; }
+  try {
+    const free = await Cloud.pseudoAvailable(pseudo);
+    if (!free) { msg.style.color = '#c0392b'; msg.textContent = '✗ « ' + pseudo + ' » est déjà pris'; if (btn) btn.disabled = false; return; }
+    const u = _googleUser;
+    await Cloud.saveProfile(u.uid, {
+      uid: u.uid, owner: u.uid, pseudo,
+      email: u.email || '', name: u.displayName || '', avatar: u.photoURL || '',
+      plan: 'free', createdAt: Date.now(),
+    });
+    finishLogin(pseudo);
+  } catch (e) {
+    msg.style.color = '#c0392b'; msg.textContent = '✗ ' + (e.message || 'Erreur — réessaie');
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* ── Déconnexion (Google + GitHub) ── */
+async function hubSignOut() {
+  if (!confirm('Se déconnecter de souanpt.hub ?')) return;
+  try { if (window.Cloud && Cloud.enabled) await Cloud.signOut(); } catch {}
+  Auth.clear();
+  localStorage.removeItem('souanpt_pseudo');
+  location.reload();
+}
+window.hubSignOut = hubSignOut;
+
 async function gateConnect() {
   const inp = document.getElementById('gate-pat'), btn = document.getElementById('gate-btn'), msg = document.getElementById('gate-msg');
   const val = inp?.value.trim();
@@ -2203,7 +2336,16 @@ function renderLoginLog() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (!Auth.ok()) gateShow();   // pas connecté → dashboard verrouillé
+  // Auth : Google (Firebase) en principal si configuré, sinon token GitHub
+  if (window.Cloud && Cloud.enabled) {
+    if (!Auth.ok()) gateShow();                 // porte visible le temps que Firebase réponde
+    Cloud.onAuth(u => {
+      if (u) afterGoogleLogin(u);               // connecté Google → entre (+ pseudo si 1re fois)
+      else if (!Auth.ok()) gateShow();          // ni Google ni GitHub → verrouillé
+    });
+  } else {
+    if (!Auth.ok()) gateShow();
+  }
   renderLoginLog(); renderGoat(); refreshRealStats(true);
   renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
   renderCatalog(); refreshInvDatalists(); renderPortals();
