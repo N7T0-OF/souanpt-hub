@@ -1332,6 +1332,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <div class="setting-group">
               <div class="setting-group-title">Confidentialité</div>
               <div class="setting-row"><div class="setting-info"><div class="setting-name">Portfolio public</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-name">Apparaître dans le <a href="classement.html" target="_blank" style="color:var(--accent3)">Classement 🏆</a></div><div class="setting-desc">Optionnel — décoche pour te retirer du classement public</div></div><div class="toggle on" id="tog-leaderboard" onclick="this.classList.toggle('on');saveLeaderboardOptIn()"></div></div>
             </div>
             <div class="setting-group">
               <div class="setting-group-title">Sauvegarde complète du Hub</div>
@@ -2294,12 +2295,25 @@ async function pseudoClaim() {
       uid: u.uid, owner: u.uid, pseudo,
       email: u.email || '', name: u.displayName || '', avatar: u.photoURL || '',
       plan: 'free', createdAt: Date.now(),
+      // Champs classement (remplis au fil de l'activité)
+      public: true, verified: false, country: '',
+      score: 0, views: 0, visitors: 0, projects: 0, clicks: 0, reviewsCount: 0, reviewsAvg: 0,
     });
     finishLogin(pseudo);
   } catch (e) {
     msg.style.color = '#c0392b'; msg.textContent = '✗ ' + (e.message || 'Erreur — réessaie');
     if (btn) btn.disabled = false;
   }
+}
+
+/* ── Classement : opt-in/opt-out (met à jour le profil Firestore) ── */
+async function saveLeaderboardOptIn() {
+  const on = document.getElementById('tog-leaderboard')?.classList.contains('on');
+  if (!(window.Cloud && Cloud.enabled && Cloud.user())) { showToast('Connecte-toi avec Google pour gérer ça', '#e4b24a', 2500); return; }
+  try {
+    await Cloud.saveProfile(Cloud.user().uid, { public: !!on });
+    showToast(on ? 'Tu apparais dans le classement ✓' : 'Retiré du classement ✓', '#2e9a63', 2000);
+  } catch (e) { showToast('✗ ' + (e.message || 'Erreur'), '#c0392b', 2500); }
 }
 
 /* ── Déconnexion (Google + GitHub) ── */

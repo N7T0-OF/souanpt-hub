@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Classement des meilleurs portfolios créés sur souanpt.hub.">
+<title>Classement — souanpt.hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060606;--s1:#0d0d0d;--s2:#131313;--a:#C8FF00;--a-dim:rgba(200,255,0,.1);--gold:#e4b24a;--t:#f0ece4;--m:rgba(240,236,228,.55);--m2:rgba(240,236,228,.35);--b:rgba(255,255,255,.08);--b2:rgba(255,255,255,.13)}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t);font-family:'Syne',system-ui,sans-serif;min-height:100vh}
+a{color:inherit;text-decoration:none}
+.glow{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 50% -5%,rgba(120,80,200,.14),transparent 60%),radial-gradient(ellipse 40% 30% at 85% 25%,rgba(200,255,0,.05),transparent 60%)}
+/* nav pilule */
+.navwrap{position:sticky;top:14px;z-index:100;display:flex;justify-content:center;padding:0 16px}
+nav{display:flex;align-items:center;gap:4px;width:100%;max-width:960px;padding:8px 8px 8px 16px;border-radius:999px;background:rgba(10,10,10,.75);border:1px solid var(--b);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.logo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:800;letter-spacing:-.4px;margin-right:10px;white-space:nowrap}
+.logo .ic{width:26px;height:26px;border-radius:8px;background:var(--a);display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(200,255,0,.25)}
+.logo .ic svg{width:14px;height:14px}
+.logo span.d{color:var(--a)}
+.nl{display:flex;gap:2px;margin:0 auto}
+.nl a{padding:8px 14px;border-radius:999px;font-size:12px;color:var(--m);transition:.2s;white-space:nowrap}
+.nl a:hover,.nl a.active{color:var(--t);background:rgba(255,255,255,.06)}
+.nl a.active{color:var(--a)}
+.ncta{padding:9px 18px;border-radius:999px;background:var(--a);color:#060606;font-size:12px;font-weight:800;white-space:nowrap;transition:.2s}
+.ncta:hover{opacity:.85}
+/* hero */
+.hero{padding:60px 24px 30px;text-align:center;max-width:720px;margin:0 auto}
+h1{font-size:clamp(34px,6vw,56px);font-weight:800;letter-spacing:-2px;margin-bottom:12px}
+.hsub{font-size:14px;color:var(--m);line-height:1.7}
+/* controls */
+.controls{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;max-width:900px;margin:0 auto 22px;padding:0 24px}
+.sel{position:relative;flex:1;min-width:180px;max-width:240px}
+.sel select{width:100%;appearance:none;background:var(--s1);border:1px solid var(--b);border-radius:999px;padding:12px 40px 12px 16px;color:var(--t);font-family:inherit;font-size:13px;cursor:pointer;outline:none}
+.sel select:focus{border-color:var(--a)}
+.sel::after{content:'⇅';position:absolute;right:16px;top:50%;transform:translateY(-50%);color:var(--m);pointer-events:none;font-size:12px}
+/* table */
+.wrap{max-width:900px;margin:0 auto 60px;padding:0 24px}
+.lb-head{display:grid;grid-template-columns:60px 1fr auto;gap:12px;padding:0 18px 10px;font-size:11px;color:var(--m2);text-transform:uppercase;letter-spacing:1px}
+.row{display:grid;grid-template-columns:60px 1fr auto;gap:12px;align-items:center;padding:14px 18px;border-radius:12px;transition:.15s;cursor:pointer}
+.row:hover{background:rgba(255,255,255,.03)}
+.rank{font-size:15px;font-weight:800;color:var(--m)}
+.row.top1 .rank{color:#ffd700}.row.top2 .rank{color:#c0c0c0}.row.top3 .rank{color:#cd7f32}
+.usr{display:flex;align-items:center;gap:12px;min-width:0}
+.av{width:42px;height:42px;border-radius:50%;background:var(--s2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--a);border:1px solid var(--b)}
+.av img{width:100%;height:100%;object-fit:cover}
+.uname{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700}
+.uhandle{font-size:11px;color:var(--m2)}
+.vbadge{font-size:9px;background:var(--a-dim);color:var(--a);padding:2px 8px;border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.score{font-size:15px;font-weight:800;white-space:nowrap}
+.score span{font-size:11px;color:var(--m2);font-weight:400}
+.empty{text-align:center;padding:60px 24px;color:var(--m)}
+.empty .big{font-size:40px;margin-bottom:14px}
+.empty a{color:var(--a);font-weight:700}
+footer{border-top:1px solid var(--b);padding:26px 24px;text-align:center;font-size:11px;color:var(--m2)}
+.burger{display:none;flex-direction:column;gap:4px;background:none;border:none;cursor:pointer;padding:8px}
+.burger span{width:20px;height:2px;background:var(--t);border-radius:2px}
+@media(max-width:680px){.nl{display:none}.ncta{display:none}.burger{display:flex}}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+
+<div class="navwrap"><nav>
+  <a href="index.html" class="logo"><span class="ic"><svg viewBox="0 0 16 16" fill="#060606"><path d="M8 1L2 5v9h4V9h4v5h4V5L8 1z"/></svg></span>souanpt<span class="d">.hub</span></a>
+  <div class="nl">
+    <a href="index.html">Accueil</a>
+    <a href="index.html#features">Découvrir</a>
+    <a href="classement.html" class="active">Classement 🏆</a>
+    <a href="index.html#roadmap">Roadmap</a>
+    <a href="index.html#faq">FAQ</a>
+  </div>
+  <a class="ncta" href="app.html">Tableau de bord</a>
+  <button class="burger" onclick="location.href='app.html'" aria-label="Dashboard"><span></span><span></span><span></span></button>
+</nav></div>
+
+<div class="hero">
+  <h1>Classement 🏆</h1>
+  <p class="hsub">Le top 100 des portfolios sur souanpt.hub — choisis une catégorie et une période.</p>
+</div>
+
+<div class="controls">
+  <div class="sel"><select id="cat" onchange="renderFromCache()">
+    <option value="score">Score Souanpt</option>
+    <option value="views">Vues</option>
+    <option value="reviews">Avis (note)</option>
+    <option value="projects">Projets</option>
+  </select></div>
+  <div class="sel"><select id="period" title="Les périodes détaillées arrivent avec l'historique">
+    <option value="all">Tout le temps</option>
+    <option value="30">30 jours</option>
+    <option value="7">7 jours</option>
+  </select></div>
+</div>
+
+<div class="wrap">
+  <div class="lb-head"><div>Rang</div><div>Créateur</div><div style="text-align:right">Score</div></div>
+  <div id="lb-list"><div class="empty"><div class="big">⏳</div>Chargement du classement…</div></div>
+</div>
+
+<footer>© <span id="yr"></span> souanpt.hub · Le classement est optionnel — chaque créateur peut s'en retirer dans ses paramètres.</footer>
+
+<!-- Firebase (lecture publique des profils) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase/firebase-config.js"></script>
+<script>
+'use strict';
+document.getElementById('yr').textContent = new Date().getFullYear();
+let _users = [];
+
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function num(n){return (Number(n)||0).toLocaleString('fr-FR');}
+
+/* Score Souanpt : pondération (anti-triche : les vues seules ne suffisent pas) */
+function souanptScore(u){
+  if (typeof u.score === 'number' && u.score > 0) return u.score;
+  const views=Number(u.views)||0, uniq=Number(u.visitors)||0, proj=Number(u.projects)||0,
+        rev=Number(u.reviewsCount)||0, avg=Number(u.reviewsAvg)||0, clicks=Number(u.clicks)||0;
+  return Math.round(views*1 + uniq*2 + proj*40 + rev*30 + avg*100 + clicks*3);
+}
+function sortValue(u, cat){
+  if(cat==='views') return Number(u.views)||0;
+  if(cat==='projects') return Number(u.projects)||0;
+  if(cat==='reviews') return Number(u.reviewsAvg)||0;
+  return souanptScore(u);
+}
+function scoreLabel(u, cat){
+  if(cat==='views') return num(u.views)+' <span>vues</span>';
+  if(cat==='projects') return num(u.projects)+' <span>projets</span>';
+  if(cat==='reviews') return (Number(u.reviewsAvg)||0).toFixed(2)+' <span>/5</span>';
+  return num(souanptScore(u))+' <span>pts</span>';
+}
+
+function renderBoard(users, cat){
+  cat = cat || document.getElementById('cat').value;
+  const list = document.getElementById('lb-list');
+  const ranked = users.filter(u=>u.public!==false && u.pseudo).sort((a,b)=>sortValue(b,cat)-sortValue(a,cat)).slice(0,100);
+  if(!ranked.length){
+    list.innerHTML='<div class="empty"><div class="big">🏁</div>Le classement est encore vide.<br>Sois le premier : <a href="app.html">crée ton portfolio →</a></div>';
+    return;
+  }
+  list.innerHTML = ranked.map((u,i)=>{
+    const rank=i+1, top=rank<=3?' top'+rank:'';
+    const site = u.siteUrl || (u.repo? 'https://'+String(u.repo).split('/')[0].toLowerCase()+'.github.io/'+String(u.repo).split('/')[1]+'/' : '#');
+    const initial=esc((u.pseudo||'?')[0].toUpperCase());
+    return `<div class="row${top}" onclick="window.open('${esc(site)}','_blank')">
+      <div class="rank">#${rank}</div>
+      <div class="usr">
+        <div class="av">${u.avatar?`<img src="${esc(u.avatar)}" alt="">`:initial}</div>
+        <div style="min-width:0">
+          <div class="uname">${esc(u.name||u.pseudo)}${u.verified?'<span class="vbadge">✔ Vérifié</span>':''}${u.plan==='pro'||u.plan==='premium'?'<span class="vbadge" style="color:var(--gold);background:rgba(228,178,74,.12)">★ Premium</span>':''}</div>
+          <div class="uhandle">@${esc(u.pseudo)}${u.country?' · '+esc(u.country):''}</div>
+        </div>
+      </div>
+      <div class="score">${scoreLabel(u,cat)}</div>
+    </div>`;
+  }).join('');
+}
+function renderFromCache(){ renderBoard(_users); }
+window.renderBoard = renderBoard;
+
+async function loadBoard(){
+  try{
+    const cfg=window.FIREBASE_CONFIG;
+    if(cfg && cfg.apiKey && !String(cfg.apiKey).startsWith('TON_') && window.firebase){
+      if(!firebase.apps.length) firebase.initializeApp(cfg);
+      const snap=await firebase.firestore().collection('users').limit(200).get();
+      _users=[]; snap.forEach(d=>_users.push(d.data()));
+    }
+  }catch(e){ console.warn('[classement]', e); }
+  renderBoard(_users);
+}
+loadBoard();
+</script>
+</body>
+</html>
