@@ -107,7 +107,7 @@ footer a{color:var(--m)}footer a:hover{color:var(--a)}
 <script>
 document.getElementById('yr').textContent = new Date().getFullYear();
 // Lien de paiement Premium : à remplacer par ton lien Stripe / PayPal (voir tarifs → intégration)
-window.PREMIUM_PAY_URL = ''; // ex : "https://buy.stripe.com/xxxx" ou "https://paypal.me/souanpt/4"
+window.PREMIUM_PAY_URL = 'https://www.paypal.com/paypalme/souanpt/4'; // PayPal — Premium à vie 4 €
 function goPremium(){
   if (window.PREMIUM_PAY_URL) { location.href = window.PREMIUM_PAY_URL; return; }
   alert('Le paiement Premium arrive bientôt !\n\nPour l\'activer : ajoute ton lien Stripe ou PayPal dans PREMIUM_PAY_URL (tarifs.html).');
