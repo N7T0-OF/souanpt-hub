@@ -181,6 +181,7 @@ const SiteConfig = {
     sectionOrder: ['about', 'projects', 'avis', 'contact'],
     avisMode: 'defile',
     about: '', goatcounter: '',
+    layoutStyle: 'float', heroImage: '', projectsLimit: 0,
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
   save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); },
@@ -223,9 +224,13 @@ function generateSite(cfg, projects, reviews) {
   const repoFull = cfg.repo || '';
   const behanceUser = (cfg.behance || '').replace('@','');
   const GRADS  = ['linear-gradient(135deg,#1a0533,#6B21A8)','linear-gradient(135deg,#0a1628,#1e40af)','linear-gradient(135deg,#0d1f0d,#166534)','linear-gradient(135deg,#2d0a0a,#991b1b)','linear-gradient(135deg,#1a1400,#854d0e)','linear-gradient(135deg,#0a0a1f,#1e1b4b)'];
+  const layoutStyle = cfg.layoutStyle === 'sidebar' ? 'sidebar' : 'float';
+  const heroImage   = String(cfg.heroImage || '').trim();
+  const projLimit   = parseInt(cfg.projectsLimit) || 0;   // 0 = tous
+  const hiddenCount = projLimit && projects.length > projLimit ? projects.length - projLimit : 0;
 
   const cards = projects.map((p, i) => `
-    <article class="pc"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
+    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
@@ -253,9 +258,11 @@ function generateSite(cfg, projects, reviews) {
 
   // ── Sections modulaires : visibilité + ordre pilotés par l'éditeur ──
   const SEC_LABELS = { about: 'À propos', projects: 'Projets', avis: 'Avis', contact: 'Contact' };
+  const SEC_ICONS  = { about: '◈', projects: '▦', avis: '★', contact: '✉' };
+  const tagList = [...new Set(projects.flatMap(p => (p.tags || []).slice(0, 3)).filter(Boolean))].slice(0, 8);
   const secHtml = {
     about: `<section id="about" class="rev" style="max-width:760px"><div class="sl">À propos</div><h2>Qui suis-je ?</h2><p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
-    projects: `<section id="projects" class="rev"><div class="sl">Portfolio</div><h2>Mes projets</h2><div class="pg">${cards}</div></section>`,
+    projects: `<section id="projects" class="rev"><div class="prow"><div><div class="sl">Portfolio</div><h2 style="margin-bottom:0">Mes projets</h2></div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div><div class="pg" style="margin-top:20px">${cards}</div></section>`,
     avis: `<section id="avis" class="rev"><div class="sl">Témoignages</div><h2>Avis clients</h2>
   ${avisDisplay}
   <div class="leave">
@@ -368,8 +375,56 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 .mobmenu.open{opacity:1;transform:none;pointer-events:auto}
 .mobmenu a{padding:13px 16px;border-radius:12px;font-size:14px;font-weight:600;color:var(--m)}
 .mobmenu a:hover{color:var(--t);background:rgba(128,128,128,.12)}
+/* ── Voir plus / catégories ── */
+.pc-hidden{display:none}
+.prow{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.seeall{background:var(--a);color:#060606;border:none;border-radius:999px;padding:9px 18px;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;transition:.2s;white-space:nowrap}
+.seeall:hover{opacity:.85}
+/* ── STYLE BARRE LATÉRALE ── */
+.sb-wrap{display:flex;min-height:100vh}
+.sb-side{width:230px;flex-shrink:0;position:sticky;top:0;height:100vh;padding:26px 18px;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--b);background:${dark?'rgba(255,255,255,.015)':'#fafafa'};overflow-y:auto}
+.sb-logo{display:flex;align-items:center;gap:9px;font-size:18px;font-weight:800;letter-spacing:-.5px;margin-bottom:20px}
+.sb-logo .ic{width:28px;height:28px;border-radius:9px;background:var(--a);color:#060606;display:inline-flex;align-items:center;justify-content:center;font-size:15px}
+.sb-nav{display:flex;flex-direction:column;gap:2px}
+.sb-nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:600;color:var(--m);transition:.15s}
+.sb-nav a:hover{background:rgba(128,128,128,.1);color:var(--t)}
+.sb-nav .sbi{width:18px;text-align:center;opacity:.8}
+.sb-cat{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--m);margin:20px 12px 8px}
+.sb-tags{display:flex;flex-direction:column;gap:1px}
+.sb-tags a{padding:8px 12px;border-radius:10px;font-size:12px;color:var(--m);transition:.15s;text-transform:capitalize}
+.sb-tags a:hover,.sb-tags a.on{background:rgba(128,128,128,.1);color:var(--t)}
+.sb-cta{margin-top:auto;padding:11px;border-radius:10px;background:var(--a);color:#060606;font-size:12px;font-weight:800;text-align:center;transition:.2s}
+.sb-cta:hover{opacity:.85}
+.sb-main{flex:1;min-width:0;padding:24px 28px 0}
+.sb-main section{padding:40px 4px;max-width:none}
+.sb-hero{border-radius:18px;min-height:min(56vh,420px);display:flex;align-items:flex-end;padding:34px;position:relative;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.sb-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,.72))}
+.sb-hero-in{position:relative;z-index:1}
+.sb-hero-in .htag{color:#fff;opacity:.85}
+.sb-hero-in h1{color:#fff;font-size:clamp(34px,5vw,60px)}
+.sb-hero-in .hsub{color:rgba(255,255,255,.8);margin-bottom:0}
+@media(max-width:820px){.sb-side{position:fixed;left:-240px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{left:0}.sb-main{padding:16px}}
 @media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}.navcta{display:none}.burger{display:flex}}
 </style></head><body>
+${layoutStyle === 'sidebar' ? `
+<div class="sb-wrap" id="sbw">
+  <aside class="sb-side">
+    <a href="#" class="sb-logo"><span class="ic">✳</span>${esc(cfg.siteName)}</a>
+    <nav class="sb-nav">
+      ${order.filter(k=>sec[k]).map(k=>`<a href="#${k}"><span class="sbi">${SEC_ICONS[k]||'•'}</span>${SEC_LABELS[k]}</a>`).join('')}
+      ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank"><span class="sbi">↗</span>Behance</a>`:''}
+    </nav>
+    ${tagList.length?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(t=>`<a href="#projects" onclick="return filterTag('${esc(t.toLowerCase())}')" data-t="${esc(t.toLowerCase())}">${esc(t)}</a>`).join('')}</div>`:''}
+    ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
+  </aside>
+  <main class="sb-main">
+    <div class="sb-hero" style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
+      <div class="sb-hero-in"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}</h1><p class="hsub">${esc(cfg.bio)}</p></div>
+    </div>
+    ${bodySections}
+    <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
+  </main>
+</div>` : `
 <div class="navwrap"><nav>
   <a href="#" class="logo"><span class="ic">✳</span>${esc(cfg.siteName)}<span class="d">.</span></a>
   <div class="nl">
@@ -387,7 +442,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 <div class="hero"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
 <div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>
 ${bodySections}
-<footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
+<footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>`}
 <a class="made" href="${HUB_HOME_URL}" target="_blank" rel="noopener" title="Créé avec Souanpt HUB — clique pour découvrir"><span class="mic">✳</span>Made by <b>Souanpt&nbsp;HUB</b></a>
 <script>
 var _rvN=5;
@@ -407,6 +462,16 @@ function revSend(e){
 function revMail(){
   var n=document.getElementById('rv-n').value.trim()||'', t=document.getElementById('rv-t').value.trim()||'';
   location.href='mailto:${esc(cfg.email||'')}?subject='+encodeURIComponent('[AVIS] '+_rvN+'/5 — '+n)+'&body='+encodeURIComponent(t);
+  return false;
+}
+function filterTag(t){
+  document.querySelectorAll('.sb-tags a').forEach(function(a){a.classList.toggle('on',(a.getAttribute('data-t')||'')===t);});
+  document.querySelectorAll('.pc').forEach(function(c){
+    var tags=(c.getAttribute('data-tags')||'');
+    var show = !t || tags.split('|').indexOf(t)>-1;
+    c.classList.remove('pc-hidden');
+    c.style.display = show ? '' : 'none';
+  });
   return false;
 }
 /* Apparition au scroll */

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Politique de confidentialité — souanpt.hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060606;--a:#C8FF00;--t:#f0ece4;--m:rgba(240,236,228,.6);--b:rgba(255,255,255,.08)}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--t);font-family:'Syne',system-ui,sans-serif;line-height:1.75}
+.wrap{max-width:760px;margin:0 auto;padding:40px 24px 80px}
+a{color:var(--a);text-decoration:none}.back{font-size:12px;color:var(--m);display:inline-block;margin-bottom:24px}
+h1{font-size:30px;font-weight:800;letter-spacing:-1px;margin-bottom:6px}
+.upd{font-size:12px;color:var(--m);margin-bottom:30px}
+h2{font-size:16px;font-weight:800;margin:26px 0 8px}
+p{color:var(--m);font-size:14px;margin-bottom:10px}ul{color:var(--m);font-size:14px;margin:0 0 10px 20px}
+.box{background:rgba(255,255,255,.03);border:1px solid var(--b);border-radius:12px;padding:16px 18px;font-size:13px;color:var(--m)}
+footer{border-top:1px solid var(--b);margin-top:40px;padding-top:20px;font-size:11px;color:var(--m)}
+</style></head><body>
+<div class="wrap">
+<a href="../index.html" class="back">← Retour à souanpt.hub</a>
+<h1>Politique de confidentialité</h1>
+<div class="upd">Dernière mise à jour : <span id="d"></span></div>
+
+<h2>Données collectées</h2>
+<p>Lors de la connexion via un fournisseur tiers (Google, GitHub, Discord), souanpt.hub reçoit : identifiant, nom affiché, email et avatar. Les données que tu crées (projets, clients, factures, avis, portails) sont stockées dans ton espace.</p>
+
+<h2>Où sont stockées les données</h2>
+<ul>
+  <li>Dans ton navigateur (localStorage) comme cache local.</li>
+  <li>Dans Google Firebase (Firestore) associées à ton identifiant, isolées des autres utilisateurs par des règles de sécurité.</li>
+  <li>Éventuellement dans un dépôt GitHub privé t'appartenant (sauvegarde).</li>
+</ul>
+
+<h2>Utilisation</h2>
+<p>Les données servent uniquement au fonctionnement du service. Aucune revente à des tiers. Un classement public affiche certaines statistiques uniquement si tu l'as activé (opt-in).</p>
+
+<h2>Tes droits (RGPD)</h2>
+<p>Tu peux à tout moment exporter l'intégralité de tes données (Paramètres → Sauvegarde), les supprimer, ou te déconnecter. Un droit d'accès, de rectification et d'effacement s'applique.</p>
+
+<h2>Cookies</h2>
+<p>souanpt.hub n'utilise pas de cookies publicitaires. Les statistiques de visite (GoatCounter) sont sans cookie.</p>
+
+<div class="box">Modèle de départ à adapter à ta situation réelle avant publication.</div>
+
+<footer>© <span id="y"></span> souanpt.hub · <a href="mentions.html">Mentions légales</a> · <a href="cgu.html">CGU</a></footer>
+</div>
+<script>var n=new Date();document.getElementById('d').textContent=n.toLocaleDateString('fr-FR');document.getElementById('y').textContent=n.getFullYear();</script>
+</body></html>

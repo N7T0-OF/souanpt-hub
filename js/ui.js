@@ -301,6 +301,9 @@ function edLoad() {
   edRenderBlocks();
   set('ep-about', cfg.about||'');
   set('ep-avis-mode', cfg.avisMode||'defile');
+  set('ep-layout-style', cfg.layoutStyle||'float');
+  set('ep-hero-image', cfg.heroImage||'');
+  set('ep-proj-limit', cfg.projectsLimit||0);
   const dot=document.getElementById('ed-gh-dot'); const lbl=document.getElementById('ed-gh-label');
   if (Auth.ok()) { if(dot)dot.style.background='#2e9a63'; if(lbl)lbl.textContent='@'+(Auth.user()?.login||'?')+' · connecté'; }
   else           { if(dot)dot.style.background='var(--muted)'; if(lbl)lbl.textContent='GitHub non connecté — cliquer'; }
@@ -321,6 +324,9 @@ function edGetConfig() {
     sectionOrder: (_edOrder || ['about','projects','avis','contact']).slice(),
     about:    document.getElementById('ep-about')?.value || '',
     avisMode: document.getElementById('ep-avis-mode')?.value || 'defile',
+    layoutStyle:   document.getElementById('ep-layout-style')?.value || 'float',
+    heroImage:     document.getElementById('ep-hero-image')?.value.trim() || '',
+    projectsLimit: parseInt(document.getElementById('ep-proj-limit')?.value) || 0,
   };
 }
 
