@@ -1290,6 +1290,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="settings-grid">
         <div class="settings-nav">
           <div class="settings-nav-item active" onclick="settingsTab('general',this)">Général</div>
+          <div class="settings-nav-item" onclick="settingsTab('premium',this)">⭐ Premium</div>
           <div class="settings-nav-item" onclick="settingsTab('behance',this)">Behance API</div>
           <div class="settings-nav-item" onclick="settingsTab('domain',this)">Domaine</div>
           <div class="settings-nav-item" onclick="settingsTab('privacy',this)">Confidentialité</div>
@@ -1313,6 +1314,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                 </select>
               </div>
               <div class="hintbox">S'applique aux prochaines couvertures importées. Pour recompresser celles déjà en place avec ce réglage : <strong style="color:var(--accent);cursor:pointer" onclick="showPage('storage')">Stockage → Optimiser les images →</strong></div>
+            </div>
+          </div>
+          <div id="set-tab-premium" class="set-tab" style="display:none">
+            <div class="setting-group">
+              <div class="setting-group-title">⭐ Premium à vie</div>
+              <div id="prem-status" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--s2);border:1px solid var(--border);margin-bottom:14px">
+                <div style="font-size:24px">⭐</div>
+                <div style="flex:1"><div style="font-size:13px;font-weight:700" id="prem-plan">Plan Gratuit</div><div style="font-size:10px;color:var(--muted2)" id="prem-sub">Tous les outils sont déjà gratuits.</div></div>
+              </div>
+              <div class="hintbox" style="margin-bottom:12px">Le Premium ne bloque <strong style="color:var(--text)">aucune</strong> fonctionnalité essentielle. Il débloque : thèmes &amp; styles exclusifs, animations premium, domaine perso, stockage étendu, badge Premium, stats avancées. <strong style="color:var(--accent)">Paiement unique, à vie.</strong></div>
+              <div id="prem-buy" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+                <a class="btn btn-accent" style="font-size:11px" href="https://www.paypal.com/paypalme/souanpt/4" target="_blank" onclick="premAwaitCode()">Passer à Premium — 4 € (PayPal)</a>
+                <a class="btn btn-ghost" style="font-size:11px" href="tarifs.html" target="_blank">Voir les tarifs</a>
+              </div>
+              <div class="setting-group-title" style="margin-top:6px">J'ai un code cadeau</div>
+              <div class="hintbox" style="margin-bottom:8px">Après paiement, tu reçois un <strong style="color:var(--text)">code</strong> à entrer ici → Premium débloqué immédiatement. Un code s'offre aussi : donne-le à qui tu veux 🎁.</div>
+              <div style="display:flex;gap:8px">
+                <input class="prop-input" id="prem-code" placeholder="ex : SOUANPT-XXXX" style="flex:1" onkeydown="if(event.key==='Enter')redeemCode()">
+                <button class="btn btn-accent" id="prem-redeem-btn" onclick="redeemCode()" style="white-space:nowrap">Activer</button>
+              </div>
+              <div id="prem-msg" style="font-size:10px;min-height:16px;text-align:center;margin-top:8px"></div>
             </div>
           </div>
           <div id="set-tab-behance" class="set-tab" style="display:none">
@@ -1374,6 +1396,7 @@ function settingsTab(name, el) {
   const tab = document.getElementById('set-tab-' + name);
   if (tab) tab.style.display = '';
   if (el) el.classList.add('active');
+  if (name === 'premium' && typeof renderPremium === 'function') renderPremium();
 }
 function saveImgQuality() {
   const v = document.getElementById('set-img-quality')?.value || 'balanced';
@@ -2267,14 +2290,47 @@ async function gateGoogle() {
     if (btn) btn.disabled = false;
   }
 }
+let _myProfile = null;
 async function afterGoogleLogin(user) {
   _googleUser = user;
   gateHide();
   let prof = null, loadErr = false;
   try { prof = await Cloud.loadProfile(user.uid); } catch (e) { loadErr = true; console.warn('[profil]', e); }
+  _myProfile = prof;
+  renderPremium();
   if (prof && prof.pseudo) finishLogin(prof.pseudo);
   else if (!loadErr) pseudoShow(user);     // pas encore de profil → 1re connexion
   else finishLogin(null);                    // souci réseau → on entre quand même
+}
+function isPremium() { return !!(_myProfile && (_myProfile.plan === 'pro' || _myProfile.plan === 'premium')); }
+function renderPremium() {
+  const pro = isPremium();
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('prem-plan', pro ? '⭐ Premium à vie' : 'Plan Gratuit');
+  set('prem-sub', pro ? 'Merci ! Toutes les options premium sont débloquées.' : 'Tous les outils sont déjà gratuits.');
+  const buy = document.getElementById('prem-buy'); if (buy) buy.style.display = pro ? 'none' : 'flex';
+}
+function premAwaitCode() { showToast('Après le paiement, entre le code reçu ci-dessous pour activer Premium ⭐', '#e4b24a', 5000); }
+async function redeemCode() {
+  const inp = document.getElementById('prem-code'), msg = document.getElementById('prem-msg'), btn = document.getElementById('prem-redeem-btn');
+  const code = (inp?.value || '').trim().toUpperCase();
+  const say = (t, c) => { if (msg) { msg.style.color = c || 'var(--muted2)'; msg.textContent = t; } };
+  if (!code) { say('Entre ton code', '#c0392b'); return; }
+  if (!(window.Cloud && Cloud.enabled && Cloud.user())) { say('Connecte-toi avec Google d\'abord', '#c0392b'); return; }
+  if (btn) btn.disabled = true; say('Vérification…');
+  try {
+    const ref = Cloud._db.collection('codes').doc(code);
+    const d = await ref.get();
+    if (!d.exists) { say('✗ Code inconnu', '#c0392b'); if (btn) btn.disabled = false; return; }
+    if (d.data().used) { say('✗ Code déjà utilisé', '#c0392b'); if (btn) btn.disabled = false; return; }
+    await ref.set({ used: true, usedBy: Cloud.user().uid, usedAt: Date.now() }, { merge: true });
+    await Cloud.saveProfile(Cloud.user().uid, { plan: 'pro', premiumSince: Date.now() });
+    _myProfile = { ...(_myProfile || {}), plan: 'pro' };
+    renderPremium();
+    say('✓ Premium activé ! Merci 🎉', '#2e9a63');
+    showToast('⭐ Premium activé — merci !', '#2e9a63', 4000);
+    if (inp) inp.value = '';
+  } catch (e) { say('✗ ' + (e.message || 'Erreur'), '#c0392b'); if (btn) btn.disabled = false; }
 }
 function finishLogin(pseudo) {
   document.getElementById('pseudo-gate').style.display = 'none';

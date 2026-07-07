@@ -40,6 +40,16 @@ service cloud.firestore {
       allow update, delete: if isOwner();
     }
 
+    // Codes Premium (cadeaux) — lisibles pour vérification ; un utilisateur connecté
+    // ne peut que passer un code inutilisé de used:false → used:true (une seule fois).
+    // Création/suppression : uniquement depuis la console Firebase (admin).
+    match /codes/{code} {
+      allow read: if true;
+      allow update: if signedIn()
+                    && resource.data.used == false
+                    && request.resource.data.used == true;
+    }
+
     // Collections privées scopées par owner
     match /{col}/{id} {
       allow read:   if isOwner();

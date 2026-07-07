@@ -56,3 +56,31 @@ Push → le bouton **« Continuer avec Discord »** apparaît sur la page de con
 > Cloudflare, jamais dans le code du site. Ne les colle jamais ailleurs.
 
 Quand tout est en place, préviens-moi : on teste le flux ensemble et je corrige si besoin.
+
+## 3. Premium — 2 modes d'attribution
+
+Un lien **PayPal.me ne peut PAS** débloquer le Premium automatiquement (aucun serveur
+n'est prévenu de « qui a payé »). Deux solutions :
+
+### Mode A — Codes cadeaux (marche aujourd'hui, zéro backend) 🎁
+1. L'acheteur paie via PayPal (bouton « Passer à Premium »).
+2. Tu crées un **code** dans Firebase → Firestore → collection `codes` → nouveau document :
+   ID = `SOUANPT-XXXX` (ce que tu veux), champ `used` (boolean) = `false`.
+3. Tu envoies le code à l'acheteur (ou il l'offre à qui il veut).
+4. Il l'entre dans **Paramètres → Premium → J'ai un code** → Premium activé instantanément.
+   Les règles Firestore empêchent la réutilisation d'un code.
+
+> ⚠ Ce mode n'est pas infalsifiable (un utilisateur technique pourrait forcer son plan).
+> Suffisant pour lancer ; passe au mode B pour verrouiller.
+
+### Mode B — Stripe automatique & sécurisé (100% auto)
+Déploie `premium-stripe-worker.js` (même méthode que le Worker Discord) :
+1. Stripe → crée un **Payment Link** « Premium 4 € ».
+2. Sur ta page tarifs, redirige vers ce lien en ajoutant `?client_reference_id={UID}`
+   (l'UID Firebase de l'acheteur connecté).
+3. Stripe → Developers → Webhooks → `checkout.session.completed` → URL du Worker.
+4. Secrets du Worker : `STRIPE_WEBHOOK_SECRET`, `FIREBASE_PROJECT_ID`,
+   `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`.
+5. Résultat : dès qu'un paiement réussit, le Worker passe `users/{uid}.plan = "pro"`
+   tout seul. Pour verrouiller, on ajoutera une règle empêchant l'utilisateur de
+   modifier `plan` lui-même (seul le Worker le peut).
