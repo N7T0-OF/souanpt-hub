@@ -45,11 +45,16 @@ Tu obtiens un JSON avec `client_email` et `private_key`.
    `https://souanpt-discord.<toncompte>.workers.dev`
 5. Onglet **Settings → Variables and Secrets** du Worker → ajoute (en **Secret**) :
    - `DISCORD_CLIENT_ID` = `1523719456768135229`
-   - `DISCORD_CLIENT_SECRET` = *(depuis le portail Discord → OAuth2)*
-   - `FIREBASE_CLIENT_EMAIL` = le `client_email` du service account
-   - `FIREBASE_PRIVATE_KEY` = la `private_key` (colle-la telle quelle, avec les `\n`)
-   - `APP_URL` = `https://souanpt-hub.pages.dev/app.html`
-   - `WORKER_URL` = l'URL du Worker (sans `/` final)
+   - `DISCORD_CLIENT_SECRET` = *(Discord Developer Portal → ton app → OAuth2 → Reset Secret)*
+   - `FIREBASE_CLIENT_EMAIL` = le `client_email` du JSON service account
+     *(Firebase → ⚙ Paramètres → Comptes de service → Générer une nouvelle clé privée)*
+   - `FIREBASE_PRIVATE_KEY` = la `private_key` du même JSON (colle-la telle quelle,
+     avec les `\n` — le Worker gère les deux formats)
+   - `APP_URL` = l'URL de ton dashboard, ex : `https://n7t0-of.github.io/souanpt-hub/app.html`
+
+   *(L'URL du Worker est détectée automatiquement — plus besoin de `WORKER_URL`.)*
+   Après chaque ajout de secret, le Worker redémarre tout seul. Tant qu'un secret
+   manque, `/login` affiche un message qui te dit **lequel** ajouter.
 
 6. **Test rapide** : ouvre `https://souanpt-discord.<toncompte>.workers.dev` dans le
    navigateur → tu dois voir « souanpt Discord auth — /login ». Puis ouvre `/login` :

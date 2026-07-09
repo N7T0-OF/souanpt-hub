@@ -1390,8 +1390,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                 <span class="int-arrow">▾</span>
               </div>
               <div class="int-body">
-                <div class="hintbox" style="margin-top:10px">La connexion Discord passe par un petit relais gratuit (Cloudflare Worker) à déployer une fois — guide : <code style="color:var(--accent)">cloudflare/README.md</code>. Dès qu'il est en ligne, le bouton Discord apparaît sur la porte de connexion.</div>
-                <button class="btn btn-ghost" id="int-discord-btn" style="font-size:10px;margin-top:8px;display:none" onclick="Cloud.startDiscord()">Se connecter avec Discord</button>
+                <div class="hintbox" style="margin-top:10px" id="int-discord-hint">La connexion Discord passe par un petit relais gratuit (Cloudflare Worker) à déployer une fois — guide : <code style="color:var(--accent)">cloudflare/README.md</code>. Dès qu'il est en ligne, le bouton Discord apparaît sur la porte de connexion.</div>
+                <button class="btn btn-accent" id="int-discord-btn" style="font-size:10px;margin-top:8px;display:none" onclick="Cloud.startDiscord()">Se connecter avec Discord</button>
               </div>
             </div>
 
@@ -1510,8 +1510,12 @@ function renderIntegrations() {
   const g = window.Cloud && Cloud.enabled && Cloud.user();
   set('google', g ? '✓ Connecté' : 'Non connecté', g);
   const dReady = window.Cloud && Cloud.discordReady && Cloud.discordReady();
-  set('discord', dReady ? 'Prêt' : 'Bientôt', false);
+  set('discord', dReady ? 'Prêt' : 'Bientôt', dReady);
   const dBtn = document.getElementById('int-discord-btn'); if (dBtn) dBtn.style.display = dReady ? '' : 'none';
+  const dHint = document.getElementById('int-discord-hint');
+  if (dHint) dHint.innerHTML = dReady
+    ? '✓ Relais Cloudflare en ligne (<code style="color:var(--accent)">souanpt-discord</code>). Si la connexion affiche une erreur : recolle la dernière version du code dans le Worker (Edit code) et vérifie les <strong style="color:var(--text)">5 secrets</strong> — guide <code style="color:var(--accent)">cloudflare/README.md</code>.'
+    : 'La connexion Discord passe par un petit relais gratuit (Cloudflare Worker) à déployer une fois — guide : <code style="color:var(--accent)">cloudflare/README.md</code>. Dès qu\'il est en ligne, le bouton Discord apparaît sur la porte de connexion.';
   const cfg = SiteConfig.get();
   set('behance', cfg.behance ? '✓ @' + cfg.behance : 'Non configuré', !!cfg.behance);
   set('paypal', cfg.paypalLink ? '✓ Configuré' : 'Non configuré', !!cfg.paypalLink);

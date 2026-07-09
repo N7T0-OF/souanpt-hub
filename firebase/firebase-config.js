@@ -14,6 +14,5 @@ window.FIREBASE_CONFIG = {
 };
 
 // Connexion Discord : URL du Worker Cloudflare (voir cloudflare/README.md).
-// Laisse vide tant que le Worker n'est pas déployé → le bouton Discord reste masqué.
-// Exemple : "https://souanpt-discord.toncompte.workers.dev/login"
-window.DISCORD_LOGIN_URL = "";
+// Le bouton « Continuer avec Discord » apparaît dès que cette URL est renseignée.
+window.DISCORD_LOGIN_URL = "https://souanpt-discord.titaneolinne13.workers.dev/login";
