@@ -381,8 +381,8 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 .seeall{background:var(--a);color:#060606;border:none;border-radius:999px;padding:9px 18px;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;transition:.2s;white-space:nowrap}
 .seeall:hover{opacity:.85}
 /* ── STYLE BARRE LATÉRALE ── */
-.sb-wrap{display:flex;min-height:100vh}
-.sb-side{width:230px;flex-shrink:0;position:sticky;top:0;height:100vh;padding:26px 18px;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--b);background:${dark?'rgba(255,255,255,.015)':'#fafafa'};overflow-y:auto}
+.sb-wrap{display:flex;min-height:100vh;gap:14px;padding:14px}
+.sb-side{width:230px;flex-shrink:0;position:sticky;top:14px;height:calc(100vh - 28px);padding:24px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow-y:auto}
 .sb-logo{display:flex;align-items:center;gap:9px;font-size:18px;font-weight:800;letter-spacing:-.5px;margin-bottom:20px}
 .sb-logo .ic{width:28px;height:28px;border-radius:9px;background:var(--a);color:#060606;display:inline-flex;align-items:center;justify-content:center;font-size:15px}
 .sb-nav{display:flex;flex-direction:column;gap:2px}
@@ -395,15 +395,15 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 .sb-tags a:hover,.sb-tags a.on{background:rgba(128,128,128,.1);color:var(--t)}
 .sb-cta{margin-top:auto;padding:11px;border-radius:10px;background:var(--a);color:#060606;font-size:12px;font-weight:800;text-align:center;transition:.2s}
 .sb-cta:hover{opacity:.85}
-.sb-main{flex:1;min-width:0;padding:24px 28px 0}
+.sb-main{flex:1;min-width:0;padding:0 12px}
 .sb-main section{padding:40px 4px;max-width:none}
-.sb-hero{border-radius:18px;min-height:min(56vh,420px);display:flex;align-items:flex-end;padding:34px;position:relative;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.sb-hero{border-radius:14px;min-height:min(56vh,420px);display:flex;align-items:flex-end;padding:34px;position:relative;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35)}
 .sb-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,.72))}
 .sb-hero-in{position:relative;z-index:1}
 .sb-hero-in .htag{color:#fff;opacity:.85}
 .sb-hero-in h1{color:#fff;font-size:clamp(34px,5vw,60px)}
 .sb-hero-in .hsub{color:rgba(255,255,255,.8);margin-bottom:0}
-@media(max-width:820px){.sb-side{position:fixed;left:-240px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{left:0}.sb-main{padding:16px}}
+@media(max-width:820px){.sb-side{position:fixed;left:-260px;top:14px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{left:14px}.sb-main{padding:0}}
 @media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}.navcta{display:none}.burger{display:flex}}
 </style></head><body>
 ${layoutStyle === 'sidebar' ? `

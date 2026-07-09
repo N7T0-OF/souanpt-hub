@@ -1362,10 +1362,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <div class="setting-group">
               <div class="setting-group-title">Sauvegarde complète du Hub</div>
               <div class="hintbox" style="margin-bottom:10px">Exporte <strong style="color:var(--text)">toutes tes données</strong> (projets, clients, factures, avis, portails, paramètres) dans un seul fichier. C'est ta sauvegarde — et le point de départ de la future migration vers le cloud (Firebase). Le token GitHub n'est jamais inclus.</div>
-              <div style="display:flex;gap:8px">
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn btn-accent" style="font-size:10px" onclick="exportDataFull()">⬇ Exporter mon Hub</button>
                 <button class="btn btn-ghost" style="font-size:10px" onclick="importDataFull()">⬆ Importer</button>
+                <button class="btn btn-ghost" style="font-size:10px" onclick="restoreV1()">☁ Restaurer mes données V1 (GitHub)</button>
               </div>
+              <div class="hintbox">💡 <strong style="color:var(--text)">Tes données V1 ne sont pas perdues</strong> : elles sont dans ta sauvegarde GitHub privée (<code>ton-compte-hub-data</code>). Connecte GitHub (token) puis clique « Restaurer » — projets, clients, factures et avis reviennent, et se synchronisent ensuite dans le cloud automatiquement.</div>
             </div>
             <div class="setting-group">
               <div class="setting-group-title">Compte</div>
@@ -1473,6 +1475,26 @@ function importDataFull() {
     r.readAsText(f);
   };
   inp.click();
+}
+
+/* Restaure les données V1 depuis la sauvegarde GitHub privée ({login}-hub-data) */
+async function restoreV1() {
+  if (!Auth.ok()) {
+    showToast('Connecte d\'abord GitHub avec ton token (GitHub & Deploy) — c\'est là qu\'est ta sauvegarde V1', '#e4b24a', 4500);
+    showPage('github');
+    return;
+  }
+  if (!confirm('Restaurer tes données V1 depuis ta sauvegarde GitHub ?\n\nProjets, liens, clients, factures et avis seront remplacés par la sauvegarde.')) return;
+  showToast('⟳ Restauration en cours…', '#666', 2000);
+  try {
+    await restoreFromGitHub();   // écrit en localStorage → le miroir cloud pousse tout seul si Google est connecté
+    reloadAllData();
+    renderBehancePage?.(); edLoad?.();
+    const cloud = window.Cloud && Cloud.enabled && Cloud.user();
+    showToast('✓ Données V1 restaurées !' + (cloud ? ' Synchronisation cloud en cours…' : ''), '#2e9a63', 4500);
+  } catch (e) {
+    showToast('✗ ' + (e.message || 'Aucune sauvegarde trouvée'), '#c0392b', 4000);
+  }
 }
 
 /* ═══ PROJETS — lien cliquable + couverture + édition ═══ */
