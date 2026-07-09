@@ -549,6 +549,16 @@ const BubbleWidget = {
    NAVIGATION
 ══════════════════════════════════════════════════════ */
 function showPage(id) {
+  // Behance & GitHub ont déménagé dans Paramètres → Intégrations
+  if (id === 'github' || id === 'behance') {
+    showPage('settings');
+    setTimeout(() => {
+      const nav = [...document.querySelectorAll('.settings-nav-item')].find(n => n.textContent.includes('Intégrations'));
+      window.settingsTab?.('integrations', nav);
+      window.intOpen?.(id);
+    }, 80);
+    return;
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   const page=document.getElementById('page-'+id); if(page)page.classList.add('active');

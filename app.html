@@ -590,6 +590,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .tpl-card:hover{border-color:rgba(200,255,0,.35);color:var(--accent)}
 .tpl-card.active{border-color:var(--accent);color:var(--accent)}
 .tpl-dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+
+/* ── INTÉGRATIONS (cartes dépliables) ── */
+.int-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;transition:border-color .2s}
+.int-card:hover{border-color:var(--border2)}
+.int-card.open{border-color:rgba(200,255,0,.25)}
+.int-head{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none}
+.int-logo{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0;color:#fff}
+.int-info{flex:1;min-width:0}
+.int-name{font-size:13px;font-weight:800}
+.int-desc{font-size:9px;color:var(--muted2);margin-top:2px}
+.int-status{font-size:9px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--s3);color:var(--muted2);white-space:nowrap}
+.int-status.on{background:var(--green-dim);color:var(--green)}
+.int-arrow{color:var(--muted2);transition:transform .25s;flex-shrink:0;font-size:12px}
+.int-card.open .int-arrow{transform:rotate(180deg)}
+.int-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border)}
+.int-card.open .int-body{display:block;animation:fadeIn .2s ease}
 </style>
 </head>
 <body>
@@ -773,18 +789,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   </div>
 
   <div class="nav-section">
-    <div class="nav-label">Intégrations</div>
-    <button class="ni" data-page="behance" onclick="showPage('behance')">
-      <svg viewBox="0 0 16 16" fill="none"><path d="M2 12V4h5a3 3 0 010 6H2" stroke="currentColor" stroke-width="1.2"/><path d="M9 6h5M9 10h5" stroke="currentColor" stroke-width="1.2"/></svg>
-      Behance Sync
-    </button>
-    <button class="ni" data-page="github" onclick="showPage('github')">
-      <svg viewBox="0 0 16 16" fill="none"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="currentColor" opacity=".6"/></svg>
-      GitHub & Deploy <span id="set-gh-badge" style="display:none;width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
-    </button>
+    <div class="nav-label">Système</div>
     <button class="ni" data-page="settings" onclick="showPage('settings')">
       <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13" stroke="currentColor" stroke-width="1.2"/></svg>
-      Paramètres
+      Paramètres <span id="set-gh-badge" style="display:none;width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
     </button>
   </div>
 
@@ -1165,35 +1173,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="gc" id="stor-files"></div>
     </div>
 
-    <!-- ══ PAGE: BEHANCE ══ -->
-    <div class="page" id="page-behance">
-      <div class="section-header"><div class="section-title">Behance Sync</div><div class="section-line"></div></div>
-      <div style="max-width:600px">
-        <div class="infobox">✨ <strong>Zéro clé API nécessaire</strong> — l'API Behance a été fermée par Adobe. La sync utilise le <strong>flux RSS public</strong> de ton profil : ton pseudo suffit. Chaque projet importé arrive avec son <strong>lien cliquable</strong> et sa <strong>couverture</strong>, prêt à publier.</div>
-        <div class="behance-connect">
-          <div style="width:36px;height:36px;background:#1769FF;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:white;flex-shrink:0">Be</div>
-          <div style="flex:1">
-            <div style="font-size:12px;font-weight:700">Behance</div>
-            <div class="behance-connected" id="behance-status">Entre ton pseudo pour synchroniser</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px">
-          <input class="prop-input" id="be-user" placeholder="tonpseudo (ex: souanpt)" style="flex:1" onkeydown="if(event.key==='Enter')beImport()">
-          <button class="btn btn-accent" id="be-import-btn" onclick="beImport()" style="white-space:nowrap">↻ Importer / Synchroniser</button>
-        </div>
-        <div class="hintbox">🔄 Sync <strong style="color:var(--text)">automatique toutes les 30 min</strong> quand le hub est ouvert. Les nouveaux projets Behance apparaissent dans ton Portfolio, dédupliqués par lien.</div>
-        <div class="gc" style="padding:16px;margin-top:14px">
-          <div style="font-size:11px;font-weight:700;margin-bottom:10px">Projets Behance importés</div>
-          <div id="behance-imported-list" style="font-size:10px;color:var(--muted2)">Aucun projet importé</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ PAGE: GITHUB ══ -->
-    <div class="page" id="page-github">
-      <div style="max-width:680px">
-        <div class="section-header"><div class="section-title">GitHub & Déploiement</div><div class="section-line"></div></div>
-
+    <!-- Behance & GitHub ont déménagé dans Paramètres → Intégrations -->
+    <div style="display:none" id="page-github-legacy">
         <!-- Connect card -->
         <div class="gc" style="padding:18px;margin-bottom:14px">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
@@ -1282,7 +1263,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             </div>
           </div>
         </div>
-      </div>
     </div>
 
     <!-- ══ PAGE: SETTINGS ══ -->
@@ -1290,8 +1270,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="settings-grid">
         <div class="settings-nav">
           <div class="settings-nav-item active" onclick="settingsTab('general',this)">Général</div>
+          <div class="settings-nav-item" onclick="settingsTab('integrations',this)">🔗 Intégrations</div>
           <div class="settings-nav-item" onclick="settingsTab('premium',this)">⭐ Premium</div>
-          <div class="settings-nav-item" onclick="settingsTab('behance',this)">Behance API</div>
           <div class="settings-nav-item" onclick="settingsTab('domain',this)">Domaine</div>
           <div class="settings-nav-item" onclick="settingsTab('privacy',this)">Confidentialité</div>
         </div>
@@ -1337,13 +1317,129 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
               <div id="prem-msg" style="font-size:10px;min-height:16px;text-align:center;margin-top:8px"></div>
             </div>
           </div>
-          <div id="set-tab-behance" class="set-tab" style="display:none">
-            <div class="setting-group">
-              <div class="setting-group-title">Connexion Behance</div>
-              <div style="font-size:10px;color:var(--muted2);margin-bottom:10px;line-height:1.6">✨ <strong style="color:var(--text)">Plus besoin de clé API</strong> — Adobe a fermé l'API Behance. La sync passe par le flux RSS public de ton profil : ton pseudo suffit.</div>
-              <div class="prop-row"><div class="prop-label">Behance Username</div><input class="prop-input" id="set-behance-user" placeholder="tonpseudo (ex: souanpt)"></div>
-              <div class="hintbox">Gère l'import complet dans la page <strong style="color:var(--accent)" onclick="showPage('behance')" role="button">Behance Sync →</strong></div>
-              <button class="btn btn-ghost" style="font-size:10px;margin-top:10px" onclick="settingsSaveBehance()">Sauvegarder</button>
+          <div id="set-tab-integrations" class="set-tab" style="display:none">
+            <div class="setting-group-title" style="border:none;margin-bottom:4px">🔗 Intégrations</div>
+            <div class="hintbox" style="margin-bottom:14px">Tous tes services au même endroit. Clique une carte pour la déplier et régler ses options — chaque intégration s'active ou se déconnecte sans toucher aux autres.</div>
+
+            <!-- GOOGLE -->
+            <div class="int-card" id="int-google">
+              <div class="int-head" onclick="intToggle('google')">
+                <div class="int-logo" style="background:#fff"><svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.2-8l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.2 5.3C40.9 36 44 30.6 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg></div>
+                <div class="int-info"><div class="int-name">Google</div><div class="int-desc">Compte cloud · données synchronisées &amp; portails instantanés</div></div>
+                <span class="int-status" id="int-st-google">Non connecté</span>
+                <span class="int-arrow">▾</span>
+              </div>
+              <div class="int-body">
+                <div style="font-size:10px;color:var(--muted2);margin:10px 0" id="int-google-name">Connexion en 1 clic — synchronise ton hub dans le cloud.</div>
+                <button class="btn btn-accent" id="int-google-btn" style="font-size:10px" onclick="intGoogleConnect()">Se connecter avec Google</button>
+              </div>
+            </div>
+
+            <!-- GITHUB -->
+            <div class="int-card" id="int-github">
+              <div class="int-head" onclick="intToggle('github')">
+                <div class="int-logo" style="background:#161b22"><svg viewBox="0 0 16 16" width="20" height="20" fill="#fff"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></div>
+                <div class="int-info"><div class="int-name">GitHub</div><div class="int-desc">Déploiement du site · sauvegarde &amp; synchronisation des données</div></div>
+                <span class="int-status" id="int-st-github">Non connecté</span>
+                <span class="int-arrow">▾</span>
+              </div>
+              <div class="int-body">
+                <div id="int-github-mount" style="padding-top:10px"></div>
+                <div class="gc" style="padding:14px;margin-top:12px">
+                  <div style="font-size:11px;font-weight:700;margin-bottom:8px">💾 Sauvegarde &amp; données</div>
+                  <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted2);margin-bottom:10px">
+                    <span style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
+                    Sauvegarde auto toutes les 5 min vers ton repo privé · dernière : <span id="int-bk-time" style="color:var(--text)">—</span>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-ghost" style="font-size:10px" onclick="intBackupNow()">↑ Sauvegarder maintenant</button>
+                    <button class="btn btn-ghost" style="font-size:10px" onclick="restoreV1()">☁ Restaurer mes données (V1)</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- BEHANCE -->
+            <div class="int-card" id="int-behance">
+              <div class="int-head" onclick="intToggle('behance')">
+                <div class="int-logo" style="background:#1769FF;font-family:'Syne',sans-serif;font-size:13px">Be</div>
+                <div class="int-info"><div class="int-name">Behance</div><div class="int-desc">Import automatique des projets (flux RSS public — zéro clé API)</div></div>
+                <span class="int-status" id="int-st-behance">Non configuré</span>
+                <span class="int-arrow">▾</span>
+              </div>
+              <div class="int-body">
+                <div style="font-size:10px;color:var(--muted2);margin:10px 0" id="behance-status">Entre ton pseudo pour synchroniser</div>
+                <div style="display:flex;gap:8px;margin-bottom:10px">
+                  <input class="prop-input" id="be-user" placeholder="tonpseudo (ex: souanpt)" style="flex:1" onkeydown="if(event.key==='Enter')beImport()">
+                  <button class="btn btn-accent" id="be-import-btn" onclick="beImport()" style="white-space:nowrap;font-size:10px">↻ Importer / Synchroniser</button>
+                </div>
+                <div class="hintbox">🔄 Sync <strong style="color:var(--text)">auto toutes les 30 min</strong> quand le hub est ouvert. Chaque projet arrive avec lien cliquable + couverture, dédupliqué.</div>
+                <div class="gc" style="padding:12px;margin-top:10px">
+                  <div style="font-size:10px;font-weight:700;margin-bottom:8px">Projets importés</div>
+                  <div id="behance-imported-list" style="font-size:10px;color:var(--muted2)">Aucun projet importé</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- DISCORD -->
+            <div class="int-card" id="int-discord">
+              <div class="int-head" onclick="intToggle('discord')">
+                <div class="int-logo" style="background:#5865F2"><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.2.5c1.7.4 2.5.9 3.4 1.6a13.6 13.6 0 0 0-10-.4c-.5.2-.8.3-.8.3.9-.7 1.8-1.2 3.4-1.6L11 3a19.8 19.8 0 0 0-5 1.4C2.8 9.1 2 13.7 2.3 18.2a20 20 0 0 0 6 3l.5-.7c-1-.3-1.9-.7-2.7-1.3l.6-.4a14.2 14.2 0 0 0 12 0l.6.4c-.8.6-1.7 1-2.7 1.3l.5.7a20 20 0 0 0 6-3c.4-5.2-.7-9.8-2.8-13.8ZM8.9 15.3c-1 0-1.7-.9-1.7-2s.8-2 1.7-2 1.7.9 1.7 2-.8 2-1.7 2Zm6.2 0c-1 0-1.7-.9-1.7-2s.8-2 1.7-2 1.7.9 1.7 2-.7 2-1.7 2Z"/></svg></div>
+                <div class="int-info"><div class="int-name">Discord</div><div class="int-desc">Connexion au compte (via Worker Cloudflare)</div></div>
+                <span class="int-status" id="int-st-discord">Bientôt</span>
+                <span class="int-arrow">▾</span>
+              </div>
+              <div class="int-body">
+                <div class="hintbox" style="margin-top:10px">La connexion Discord passe par un petit relais gratuit (Cloudflare Worker) à déployer une fois — guide : <code style="color:var(--accent)">cloudflare/README.md</code>. Dès qu'il est en ligne, le bouton Discord apparaît sur la porte de connexion.</div>
+                <button class="btn btn-ghost" id="int-discord-btn" style="font-size:10px;margin-top:8px;display:none" onclick="Cloud.startDiscord()">Se connecter avec Discord</button>
+              </div>
+            </div>
+
+            <!-- PAYPAL -->
+            <div class="int-card" id="int-paypal">
+              <div class="int-head" onclick="intToggle('paypal')">
+                <div class="int-logo" style="background:#003087;font-family:'Syne',sans-serif">P</div>
+                <div class="int-info"><div class="int-name">PayPal</div><div class="int-desc">Lien de paiement — prérempli dans tes portails clients</div></div>
+                <span class="int-status" id="int-st-paypal">Non configuré</span>
+                <span class="int-arrow">▾</span>
+              </div>
+              <div class="int-body">
+                <div style="display:flex;gap:8px;margin-top:10px">
+                  <input class="prop-input" id="int-paypal-inp" placeholder="https://www.paypal.com/paypalme/tonpseudo" style="flex:1">
+                  <button class="btn btn-accent" style="font-size:10px" onclick="saveIntLink('paypal')">Enregistrer</button>
+                </div>
+                <div class="hintbox">Souanpt Hub ne touche jamais à l'argent : le client est simplement redirigé vers ton lien.</div>
+              </div>
+            </div>
+
+            <!-- STRIPE -->
+            <div class="int-card" id="int-stripe">
+              <div class="int-head" onclick="intToggle('stripe')">
+                <div class="int-logo" style="background:#635BFF;font-family:'Syne',sans-serif">S</div>
+                <div class="int-info"><div class="int-name">Stripe</div><div class="int-desc">Payment Link — cartes bancaires (prioritaire sur PayPal si rempli)</div></div>
+                <span class="int-status" id="int-st-stripe">Non configuré</span>
+                <span class="int-arrow">▾</span>
+              </div>
+              <div class="int-body">
+                <div style="display:flex;gap:8px;margin-top:10px">
+                  <input class="prop-input" id="int-stripe-inp" placeholder="https://buy.stripe.com/…" style="flex:1">
+                  <button class="btn btn-accent" style="font-size:10px" onclick="saveIntLink('stripe')">Enregistrer</button>
+                </div>
+                <div class="hintbox">Crée un Payment Link gratuit sur <a href="https://stripe.com" target="_blank" style="color:var(--accent3)">stripe.com</a>. C'est aussi la clé du Premium 100% automatique (guide <code>cloudflare/README.md</code>).</div>
+              </div>
+            </div>
+
+            <!-- GOOGLE DRIVE (bientôt) -->
+            <div class="int-card" id="int-drive" style="opacity:.55">
+              <div class="int-head" onclick="intToggle('drive')">
+                <div class="int-logo" style="background:#1a1a1a">📁</div>
+                <div class="int-info"><div class="int-name">Google Drive</div><div class="int-desc">Stockage de documents (CV, contrats, sources…)</div></div>
+                <span class="int-status">Bientôt</span>
+                <span class="int-arrow">▾</span>
+              </div>
+              <div class="int-body">
+                <div class="hintbox" style="margin-top:10px">Prévu dans la roadmap : lier tes documents Drive sans les copier — aucun stockage consommé côté hub.</div>
+              </div>
             </div>
           </div>
           <div id="set-tab-domain" class="set-tab" style="display:none">
@@ -1399,6 +1495,54 @@ function settingsTab(name, el) {
   if (tab) tab.style.display = '';
   if (el) el.classList.add('active');
   if (name === 'premium' && typeof renderPremium === 'function') renderPremium();
+  if (name === 'integrations') {
+    renderIntegrations(); renderBehancePage?.(); renderLoginLog?.();
+    setTimeout(() => GHPage.init(), 50);
+  }
+}
+
+/* ═══ INTÉGRATIONS — cartes dépliables ═══ */
+function intToggle(id) { document.getElementById('int-' + id)?.classList.toggle('open'); }
+function intOpen(id)   { const c = document.getElementById('int-' + id); if (c) { c.classList.add('open'); c.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
+function renderIntegrations() {
+  const set = (id, txt, on) => { const el = document.getElementById('int-st-' + id); if (!el) return; el.textContent = txt; el.classList.toggle('on', !!on); };
+  set('github', Auth.ok() ? '✓ Connecté' : 'Non connecté', Auth.ok());
+  const g = window.Cloud && Cloud.enabled && Cloud.user();
+  set('google', g ? '✓ Connecté' : 'Non connecté', g);
+  const dReady = window.Cloud && Cloud.discordReady && Cloud.discordReady();
+  set('discord', dReady ? 'Prêt' : 'Bientôt', false);
+  const dBtn = document.getElementById('int-discord-btn'); if (dBtn) dBtn.style.display = dReady ? '' : 'none';
+  const cfg = SiteConfig.get();
+  set('behance', cfg.behance ? '✓ @' + cfg.behance : 'Non configuré', !!cfg.behance);
+  set('paypal', cfg.paypalLink ? '✓ Configuré' : 'Non configuré', !!cfg.paypalLink);
+  set('stripe', cfg.stripeLink ? '✓ Configuré' : 'Non configuré', !!cfg.stripeLink);
+  const bt = document.getElementById('int-bk-time');
+  if (bt) { const ts = parseInt(localStorage.getItem('souanpt_last_backup') || '0'); bt.textContent = ts ? 'il y a ' + timeAgo(ts) : 'jamais'; }
+  const pp = document.getElementById('int-paypal-inp'); if (pp && !pp.value) pp.value = cfg.paypalLink || '';
+  const si = document.getElementById('int-stripe-inp'); if (si && !si.value) si.value = cfg.stripeLink || '';
+  const gname = document.getElementById('int-google-name');
+  if (gname) gname.textContent = g ? '✓ Connecté en tant que ' + (Cloud.user().displayName || Cloud.user().email || '') : 'Connexion en 1 clic — synchronise ton hub dans le cloud.';
+  const gbtn = document.getElementById('int-google-btn'); if (gbtn) gbtn.textContent = g ? 'Se déconnecter' : 'Se connecter avec Google';
+}
+async function intGoogleConnect() {
+  if (!(window.Cloud && Cloud.enabled)) { showToast('Cloud non configuré', '#e4b24a', 2500); return; }
+  if (Cloud.user()) { hubSignOut(); return; }
+  try { await Cloud.signInGoogle(); renderIntegrations(); }
+  catch (e) { showToast('✗ ' + (e.message || 'Connexion annulée'), '#c0392b', 3000); }
+}
+async function intBackupNow() {
+  if (!Auth.ok()) { showToast('Connecte GitHub d\'abord (carte GitHub, juste au-dessus)', '#e4b24a', 3000); intOpen('github'); return; }
+  showToast('⟳ Sauvegarde en cours…', '#666', 1500);
+  await autoBackup();
+  renderIntegrations();
+  showToast('✓ Données sauvegardées sur ton repo GitHub privé', '#2e9a63', 2500);
+}
+function saveIntLink(kind) {
+  const inp = document.getElementById('int-' + kind + '-inp');
+  const v = (inp?.value || '').trim();
+  SiteConfig.set(kind + 'Link', v);
+  renderIntegrations();
+  showToast(v ? '✓ Lien ' + (kind === 'paypal' ? 'PayPal' : 'Stripe') + ' enregistré — prérempli dans tes portails clients' : 'Lien retiré', '#2e9a63', 2800);
 }
 function saveImgQuality() {
   const v = document.getElementById('set-img-quality')?.value || 'balanced';
@@ -2055,6 +2199,9 @@ function portalOpenForm(prefill) {
   ['pt-mission','pt-client','pt-total','pt-pay','pt-pw','pt-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pt-acompte').value = 50;
   document.getElementById('pt-step').value = 3;
+  // Lien de paiement prérempli depuis les intégrations (Stripe prioritaire, sinon PayPal)
+  const _plc = SiteConfig.get();
+  const _pay = document.getElementById('pt-pay'); if (_pay) _pay.value = _plc.stripeLink || _plc.paypalLink || '';
   document.getElementById('pt-deliv-list').innerHTML = '';
   portalAddDelivRow();
   if (prefill) { if(prefill.client) document.getElementById('pt-client').value=prefill.client; if(prefill.mission) document.getElementById('pt-mission').value=prefill.mission; if(prefill.total) document.getElementById('pt-total').value=prefill.total; }
@@ -2483,6 +2630,11 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     if (!Auth.ok()) gateShow();
   }
+  // Déplace le bloc GitHub (connexion + repo + pipeline + runs) dans sa carte d'intégration
+  const legacy = document.getElementById('page-github-legacy');
+  const mount = document.getElementById('int-github-mount');
+  if (legacy && mount) { while (legacy.firstChild) mount.appendChild(legacy.firstChild); legacy.remove(); }
+  renderIntegrations();
   renderLoginLog(); renderGoat(); refreshRealStats(true);
   renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
   renderCatalog(); refreshInvDatalists(); renderPortals();
