@@ -1,0 +1,10 @@
+# Optionnel — déploiement du Worker Discord en ligne de commande (alternative au
+# copier-coller dans l'éditeur Cloudflare). Nécessite Node.js :
+#   npm install -g wrangler
+#   cd cloudflare
+#   wrangler deploy
+# Les secrets se posent ensuite avec :  wrangler secret put DISCORD_CLIENT_SECRET  (etc.)
+
+name = "souanpt-discord"
+main = "discord-auth-worker.js"
+compatibility_date = "2026-07-01"

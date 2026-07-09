@@ -28,11 +28,22 @@ Discord n'est pas un fournisseur OpenID → ce Worker fait le pont vers Firebase
 Firebase → ⚙ **Paramètres du projet → Comptes de service → Générer une nouvelle clé privée**.
 Tu obtiens un JSON avec `client_email` et `private_key`.
 
-### b) Déployer le Worker
-1. Cloudflare → **Workers & Pages → Create → Worker** → colle le contenu de
-   `discord-auth-worker.js` → **Deploy**. Note son URL (ex :
-   `https://souanpt-discord.toncompte.workers.dev`).
-2. Onglet **Settings → Variables and Secrets** du Worker → ajoute (en **Secret**) :
+### b) Déployer le Worker — SANS téléverser de fichier ⚠
+
+> ❌ N'utilise PAS « Upload and deploy » (glisser-déposer) : cet écran sert aux sites
+> statiques et refuse les fichiers .js (« requires a build process… use wrangler »).
+> ✅ Le code d'un Worker se COLLE dans l'éditeur en ligne. Voici le bon chemin :
+
+1. Cloudflare → **Workers & Pages** → **Create** (Créer) → onglet **Workers**
+   → **Create Worker** (le modèle « Hello World », pas Pages, pas Upload).
+2. Donne-lui un nom clair : `souanpt-discord` → clique **Deploy** (il déploie le
+   modèle vide, c'est normal).
+3. Sur la page du Worker → bouton **Edit code** (Modifier le code) → l'éditeur s'ouvre :
+   **supprime tout** le code d'exemple, puis **colle l'intégralité** de
+   `discord-auth-worker.js` → bouton **Deploy** en haut à droite.
+4. Ton Worker est en ligne. Note son URL (affichée sur sa page) :
+   `https://souanpt-discord.<toncompte>.workers.dev`
+5. Onglet **Settings → Variables and Secrets** du Worker → ajoute (en **Secret**) :
    - `DISCORD_CLIENT_ID` = `1523719456768135229`
    - `DISCORD_CLIENT_SECRET` = *(depuis le portail Discord → OAuth2)*
    - `FIREBASE_CLIENT_EMAIL` = le `client_email` du service account
@@ -40,10 +51,14 @@ Tu obtiens un JSON avec `client_email` et `private_key`.
    - `APP_URL` = `https://souanpt-hub.pages.dev/app.html`
    - `WORKER_URL` = l'URL du Worker (sans `/` final)
 
+6. **Test rapide** : ouvre `https://souanpt-discord.<toncompte>.workers.dev` dans le
+   navigateur → tu dois voir « souanpt Discord auth — /login ». Puis ouvre `/login` :
+   tu dois être redirigé vers l'écran d'autorisation Discord. Si oui, le Worker tourne ✓.
+
 ### c) Portail Discord
 https://discord.com/developers → ton app → **OAuth2 → Redirects** → ajoute :
 `https://souanpt-discord.toncompte.workers.dev/callback`
-*(remplace par ton vraie URL de Worker + `/callback`)*.
+*(remplace par ta vraie URL de Worker + `/callback`)*.
 
 ### d) Allumer le bouton côté site
 Dans `firebase/firebase-config.js`, renseigne :
