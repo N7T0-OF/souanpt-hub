@@ -11,7 +11,7 @@
  *   DISCORD_CLIENT_SECRET   ← Discord Developer Portal → OAuth2 (jamais côté site)
  *   FIREBASE_CLIENT_EMAIL   (service account : ...@souanpt-hub.iam.gserviceaccount.com)
  *   FIREBASE_PRIVATE_KEY    (la private_key du JSON service account, collée telle quelle)
- *   APP_URL                 (URL du dashboard, ex : https://n7t0-of.github.io/souanpt-hub/app.html)
+ *   APP_URL                 (URL du dashboard V2 : https://souanptjub.pages.dev/app.html)
  *
  * L'URL du Worker est détectée automatiquement (plus besoin de WORKER_URL).
  * Dans le portail Discord (OAuth2 → Redirects), ajoute : https://TON-WORKER.workers.dev/callback

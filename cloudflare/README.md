@@ -50,7 +50,7 @@ Tu obtiens un JSON avec `client_email` et `private_key`.
      *(Firebase → ⚙ Paramètres → Comptes de service → Générer une nouvelle clé privée)*
    - `FIREBASE_PRIVATE_KEY` = la `private_key` du même JSON (colle-la telle quelle,
      avec les `\n` — le Worker gère les deux formats)
-   - `APP_URL` = l'URL de ton dashboard, ex : `https://n7t0-of.github.io/souanpt-hub/app.html`
+   - `APP_URL` = l'URL de ton dashboard V2 : `https://souanptjub.pages.dev/app.html`
 
    *(L'URL du Worker est détectée automatiquement — plus besoin de `WORKER_URL`.)*
    Après chaque ajout de secret, le Worker redémarre tout seul. Tant qu'un secret

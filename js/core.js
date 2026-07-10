@@ -143,7 +143,7 @@ const Auth = {
 ══════════════════════════════════════════════════════ */
 const REPO_DATA_SUFFIX = '-hub-data';  // {username}-hub-data (backup privé)
 const HUB_REPO_NAME    = 'souanpt-hub'; // repo du dashboard — jamais utilisé comme cible de déploiement
-const HUB_HOME_URL     = 'https://n7t0-of.github.io/souanpt-hub/'; // accueil souanpt.hub (cible du badge des sites publiés)
+const HUB_HOME_URL     = 'https://souanptjub.pages.dev/'; // accueil souanpt.hub V2 (Cloudflare Pages — cible du badge des sites publiés)
 const SITE_REPO_NAME   = 'souanpt-folio'; // repo par défaut du site public
 
 async function connectGitHub(token) {
