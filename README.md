@@ -2,32 +2,42 @@
 
 Dashboard tout-en-un : Portfolio · Behance Sync · Éditeur de site · Avis visiteurs · Facturation · Clients · QR · Backup GitHub — 100% gratuit, zéro serveur.
 
-## Architecture V2 — qui fait quoi
+## Architecture V2 — Cloudflare est la plateforme principale
 
 ```
 SOUANPT.HUB V2
 
-Cloudflare
-├── Pages    → héberge le hub (frontend), rebuild auto à chaque push GitHub
-├── Workers  → relais Discord (souanpt-discord), Stripe Premium (optionnel)
-├── Domaine personnalisé (plus tard)
-└── CDN / SSL
+Cloudflare  ★ PLATEFORME PRINCIPALE
+├── Pages    → héberge le hub (frontend)
+├── Workers  → API & fonctions serveur (relais Discord, Stripe Premium…)
+├── DNS      → domaine personnalisé (hub.souanpt.fr, souanpt.app…)
+└── CDN/SSL  → cache, performances, sécurité
 
-Firebase (projet : souanpt-hub)
+Firebase (projet : souanpt-hub)  ★ BACKEND
 ├── Authentication → comptes (Google, Discord via Worker)
-├── Firestore      → données (profils, portails, clients, factures, avis, classement)
-└── Storage        → petites images (plus tard, Phase 3)
+├── Firestore      → données temps réel (profils, portails, clients, factures, avis, classement)
+└── Storage        → petites images (Phase 3)
 
-GitHub
-├── Code source + historique
-├── Déclencheur des déploiements Cloudflare Pages (push → rebuild)
-├── Sites générés + portails fallback (GitHub Pages, repo souanpt-folio/stock)
+GitHub  (optionnel)
+├── Sauvegarde du code source + historique Git
+├── Sites générés & portails fallback (GitHub Pages, repo souanpt-folio/stock)
 └── Sauvegarde privée des données ({user}-hub-data)
 ```
 
-**Règle d'or : toute modification doit être poussée sur GitHub** — c'est le push qui
-déclenche la reconstruction du site sur Cloudflare Pages. GitHub n'héberge plus le hub,
-mais il reste le point de départ de la chaîne de déploiement.
+## Déployer le hub — 2 modes
+
+**Mode A — Déploiement direct Cloudflare (officiel, sans GitHub)**
+Double-clique sur `deploy-cloudflare.ps1` → le site part directement sur Cloudflare Pages.
+Prérequis une seule fois : installer Node.js LTS (nodejs.org) + autoriser l'outil au
+premier lancement. ⚠ Nécessite un projet Pages en mode **Direct Upload** (un projet
+Pages « connecté à Git » n'accepte pas l'upload direct — crée un nouveau projet
+« Upload assets » si besoin, l'URL .pages.dev change alors).
+
+**Mode B — Via GitHub (automatique si le projet Pages est connecté au repo)**
+`git push` → Cloudflare détecte le commit → rebuild automatique. Simple et sans
+installation ; GitHub sert alors de déclencheur, pas d'hébergeur.
+
+Dans les deux cas, garder GitHub à jour reste recommandé : c'est la sauvegarde du code.
 
 ## Architecture (2 repos)
 
