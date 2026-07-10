@@ -2,6 +2,33 @@
 
 Dashboard tout-en-un : Portfolio · Behance Sync · Éditeur de site · Avis visiteurs · Facturation · Clients · QR · Backup GitHub — 100% gratuit, zéro serveur.
 
+## Architecture V2 — qui fait quoi
+
+```
+SOUANPT.HUB V2
+
+Cloudflare
+├── Pages    → héberge le hub (frontend), rebuild auto à chaque push GitHub
+├── Workers  → relais Discord (souanpt-discord), Stripe Premium (optionnel)
+├── Domaine personnalisé (plus tard)
+└── CDN / SSL
+
+Firebase (projet : souanpt-hub)
+├── Authentication → comptes (Google, Discord via Worker)
+├── Firestore      → données (profils, portails, clients, factures, avis, classement)
+└── Storage        → petites images (plus tard, Phase 3)
+
+GitHub
+├── Code source + historique
+├── Déclencheur des déploiements Cloudflare Pages (push → rebuild)
+├── Sites générés + portails fallback (GitHub Pages, repo souanpt-folio/stock)
+└── Sauvegarde privée des données ({user}-hub-data)
+```
+
+**Règle d'or : toute modification doit être poussée sur GitHub** — c'est le push qui
+déclenche la reconstruction du site sur Cloudflare Pages. GitHub n'héberge plus le hub,
+mais il reste le point de départ de la chaîne de déploiement.
+
 ## Architecture (2 repos)
 
 | Repo | Rôle |
