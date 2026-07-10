@@ -312,6 +312,9 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
 
 <script>
 'use strict';
+// Filet de sécurité : si un jeton de connexion (#ct=…) atterrit sur la vitrine
+// (retour Discord mal configuré), on le fait suivre au dashboard sans le perdre.
+if (/[#&]ct=/.test(location.hash)) location.replace('app.html' + location.hash);
 document.getElementById('yr').textContent = new Date().getFullYear();
 
 /* Menu mobile */
