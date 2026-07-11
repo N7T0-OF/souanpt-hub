@@ -5,7 +5,7 @@
 #    1. Installer Node.js LTS → https://nodejs.org (bouton vert, installation par défaut)
 #    2. Au premier lancement, une page Cloudflare s'ouvrira pour autoriser l'outil.
 # ══════════════════════════════════════════════════════════════════
-param([string]$Project = "souanptjub")
+param([string]$Project = "souanpthub")  # nom du projet Pages (le domaine reste souanptjub.pages.dev)
 
 $ErrorActionPreference = "Stop"
 

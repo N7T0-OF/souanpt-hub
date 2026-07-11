@@ -46,7 +46,7 @@ const Cloud = {
     const base = window.DISCORD_LOGIN_URL;
     if (!base) return '';
     let path = location.pathname;
-    if (!/app\.html$/.test(path)) path = path.replace(/[^/]*$/, '') + 'app.html';
+    if (!/app(\.html)?$/.test(path)) path = path.replace(/[^/]*$/, '') + 'app.html'; // gère /app (Pages) et /app.html
     const here = location.origin + path;
     return base + (base.includes('?') ? '&' : '?') + 'return=' + encodeURIComponent(here);
   },

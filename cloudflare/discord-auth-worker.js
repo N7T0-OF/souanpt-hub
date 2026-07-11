@@ -41,6 +41,7 @@ function safeReturn(raw, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    env = trimEnv(env);   // nettoie espaces/tabulations collés par erreur dans les secrets
     try {
       if (url.pathname.endsWith('/login'))    return handleLogin(url, env);
       if (url.pathname.endsWith('/callback')) return await handleCallback(url, env);
@@ -50,6 +51,14 @@ export default {
     }
   },
 };
+
+function trimEnv(env) {
+  const out = {};
+  for (const k of ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY', 'APP_URL']) {
+    out[k] = env[k] ? String(env[k]).trim() : env[k];
+  }
+  return out;
+}
 
 /* Vérifie que les secrets nécessaires sont posés ; sinon message clair */
 function needSecrets(env, keys) {
