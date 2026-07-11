@@ -41,10 +41,19 @@ const Cloud = {
 
   /* ── Discord (via Cloudflare Worker qui fabrique un jeton Firebase) ── */
   discordReady() { return this.enabled && !!window.DISCORD_LOGIN_URL; },
+  /** URL de login Discord + retour AUTOMATIQUE vers le site actuel (V2, local, domaine perso…) */
+  discordLoginUrl() {
+    const base = window.DISCORD_LOGIN_URL;
+    if (!base) return '';
+    let path = location.pathname;
+    if (!/app\.html$/.test(path)) path = path.replace(/[^/]*$/, '') + 'app.html';
+    const here = location.origin + path;
+    return base + (base.includes('?') ? '&' : '?') + 'return=' + encodeURIComponent(here);
+  },
   startDiscord() {
     if (!this.discordReady()) return;
-    // le Worker gère l'échange puis nous renvoie avec #ct=<jeton>
-    location.href = window.DISCORD_LOGIN_URL;
+    // le Worker gère l'échange puis nous renvoie ICI avec #ct=<jeton>
+    location.href = this.discordLoginUrl();
   },
   /** Au retour de Discord : #ct=<customToken> → connexion Firebase */
   async handleRedirectToken() {

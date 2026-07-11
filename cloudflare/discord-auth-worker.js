@@ -6,18 +6,37 @@
  *   /callback → échange le code, récupère l'utilisateur Discord,
  *               fabrique un "custom token" Firebase, renvoie l'app avec #ct=…
  *
- * Secrets à définir dans Cloudflare (Settings → Variables and Secrets) — 5 au total :
+ * Secrets à définir dans Cloudflare (Settings → Variables and Secrets) — 4 obligatoires :
  *   DISCORD_CLIENT_ID       (ex : 1523719456768135229)
  *   DISCORD_CLIENT_SECRET   ← Discord Developer Portal → OAuth2 (jamais côté site)
  *   FIREBASE_CLIENT_EMAIL   (service account : ...@souanpt-hub.iam.gserviceaccount.com)
  *   FIREBASE_PRIVATE_KEY    (la private_key du JSON service account, collée telle quelle)
- *   APP_URL                 (URL du dashboard V2 : https://souanptjub.pages.dev/app.html)
+ *   APP_URL                 (OPTIONNEL — simple secours : le retour suit automatiquement
+ *                            le site qui a lancé la connexion, via le paramètre "return")
  *
  * L'URL du Worker est détectée automatiquement (plus besoin de WORKER_URL).
  * Dans le portail Discord (OAuth2 → Redirects), ajoute : https://TON-WORKER.workers.dev/callback
  */
 
 const AUD = 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit';
+
+// Sites autorisés à recevoir le jeton (anti-vol : jamais de redirection ailleurs).
+// Ajoute ici ton futur domaine perso (ex : 'https://hub.souanpt.fr').
+const ALLOWED_RETURNS = [
+  'https://souanptjub.pages.dev',   // V2 — hub officiel (Cloudflare Pages)
+  'http://localhost:5180',          // tests locaux
+];
+
+/** Valide l'URL de retour ; sinon retombe sur APP_URL puis sur la V2 officielle */
+function safeReturn(raw, env) {
+  try {
+    const u = new URL(raw);
+    const ok = ALLOWED_RETURNS.some(o => u.origin === o)
+            || (env.APP_URL && u.origin === new URL(env.APP_URL).origin);
+    if (ok) return u.origin + u.pathname;
+  } catch {}
+  return env.APP_URL || (ALLOWED_RETURNS[0] + '/app.html');
+}
 
 export default {
   async fetch(request, env) {
@@ -49,11 +68,14 @@ function handleLogin(url, env) {
   auth.searchParams.set('response_type', 'code');
   auth.searchParams.set('redirect_uri', url.origin + '/callback');
   auth.searchParams.set('scope', 'identify email');
+  // le site d'origine voyage dans "state" → le retour revient exactement là-bas
+  const ret = url.searchParams.get('return');
+  if (ret) auth.searchParams.set('state', ret);
   return Response.redirect(auth.toString(), 302);
 }
 
 async function handleCallback(url, env) {
-  const err = needSecrets(env, ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY', 'APP_URL']);
+  const err = needSecrets(env, ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY']);
   if (err) return err;
   const code = url.searchParams.get('code');
   if (!code) return new Response('Code manquant — repasse par /login', { status: 400 });
@@ -91,8 +113,9 @@ async function handleCallback(url, env) {
     avatar: me.avatar ? `https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png` : '',
   });
 
-  // 4) retour vers l'app avec le jeton dans le fragment (#) — jamais envoyé aux serveurs
-  return Response.redirect(env.APP_URL + '#ct=' + encodeURIComponent(jwt), 302);
+  // 4) retour vers le site qui a lancé la connexion (validé), jeton dans le fragment (#)
+  const dest = safeReturn(url.searchParams.get('state') || '', env);
+  return Response.redirect(dest + '#ct=' + encodeURIComponent(jwt), 302);
 }
 
 /* ── Fabrication du custom token Firebase (JWT RS256) ── */
