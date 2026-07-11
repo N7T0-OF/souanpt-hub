@@ -182,7 +182,7 @@ const SiteConfig = {
     avisMode: 'defile',
     about: '', goatcounter: '',
     layoutStyle: 'float', heroImage: '', projectsLimit: 0,
-    animLevel: 'smooth', fx: { tilt: false, glow: false, parallax: false },
+    animLevel: 'smooth', fx: { tilt: false, intensity: 7, shine: false, lift: false, scale: false, glow: false, mouseglow: false, parallax: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
   save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); },
@@ -357,8 +357,14 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 @media(max-width:640px){.made{bottom:12px;right:12px;padding:6px 10px 6px 8px;font-size:10px}}
 @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 ${animLevel==='none'?'':`.pc{animation:fu ${revDur*.7}s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}`}
-${fx.tilt?`.pc{transform-style:preserve-3d;transition:transform .12s ease,box-shadow .25s}`:''}
-${fx.glow?`.pc:hover{box-shadow:0 14px 40px color-mix(in srgb,var(--a) 32%,transparent)!important}`:''}
+/* Effets premium (survol & souris) */
+.pc{transition:transform .18s ease,box-shadow .25s ease}
+${fx.tilt?`.pc{transform-style:preserve-3d;transition:transform .1s ease,box-shadow .25s}`:''}
+${fx.lift&&!fx.tilt?`.pc:hover{transform:translateY(-7px)}`:''}
+${fx.scale&&!fx.tilt&&!fx.lift?`.pc:hover{transform:scale(1.03)}`:''}
+${fx.glow?`.pc:hover{box-shadow:0 16px 42px color-mix(in srgb,var(--a) 32%,transparent)!important}`:''}
+${fx.shine?`.pc{position:relative}.pc::before{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.22) 48%,transparent 60%);transform:translateX(-130%);transition:transform .7s ease}.pc:hover::before{transform:translateX(130%)}`:''}
+${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(180px circle at var(--mx,50%) var(--my,50%),color-mix(in srgb,var(--a) 22%,transparent),transparent 60%)}.pc:hover::after{opacity:1}`:''}
 /* ── À PROPOS ── */
 .about-p{font-size:14px;color:var(--m);line-height:1.95}
 /* ── AVIS DÉFILEMENT INFINI ── */
@@ -490,10 +496,16 @@ if ('IntersectionObserver' in window) {
   document.querySelectorAll('.rev').forEach(function(el){el.classList.add('in');});
 }`}
 ${fx.tilt?`
-// Inclinaison 3D des projets au survol
+// Effet 3D interactif (Gun.lol / Haunt.gg) — la carte s'incline vers la souris
+var _ti=${Math.max(3,Math.min(16,Number(fx.intensity)||7))};
 document.querySelectorAll('.pc').forEach(function(c){
-  c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(700px) rotateY('+(x*7)+'deg) rotateX('+(-y*7)+'deg) translateY(-3px)';});
+  c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(700px) rotateY('+(x*_ti)+'deg) rotateX('+(-y*_ti)+'deg) translateY(-4px)';});
   c.addEventListener('mouseleave',function(){c.style.transform='';});
+});`:''}
+${fx.mouseglow?`
+// Halo lumineux qui suit le curseur
+document.querySelectorAll('.pc').forEach(function(c){
+  c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px');});
 });`:''}
 ${fx.parallax?`
 // Parallaxe du hero suivant la souris

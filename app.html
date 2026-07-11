@@ -646,6 +646,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .fx-tog{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--text);padding:4px 0;cursor:pointer}
 .fx-tog input{accent-color:var(--accent);cursor:pointer;flex-shrink:0}
 .ed-tip{font-size:8px;color:var(--gold-l);line-height:1.5;padding:3px 0;display:flex;gap:5px}
+/* ── Barre de performance (haut de l'aperçu) ── */
+.edperf{display:flex;align-items:center;gap:14px;min-width:0;flex:1}
+.edperf-ic{font-size:16px;flex-shrink:0}
+.edperf-gauge{width:160px;flex-shrink:0}
+.edperf-top{display:flex;align-items:baseline;gap:8px}
+.edperf-top b{font-size:13px;font-weight:800;color:var(--green)}
+.edperf-top span{font-size:9px;color:var(--muted2)}
+.edperf-track{height:5px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:3px}
+.edperf-track div{height:100%;background:var(--green);border-radius:3px;transition:width .3s,background .3s}
+.edperf-times{display:flex;flex-direction:column;font-size:9px;color:var(--muted2);flex-shrink:0;line-height:1.4}
+.edperf-tips{display:flex;gap:8px;align-items:center;overflow:hidden;min-width:0;flex:1}
+.edperf-tips .ptip{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--gold-l);white-space:nowrap}
+.edperf-tips .ptip button{font-size:8px;padding:2px 8px;border-radius:5px;border:1px solid rgba(200,255,0,.3);background:var(--accent-dim,rgba(200,255,0,.1));color:var(--accent);cursor:pointer;font-family:inherit}
+@media(max-width:1100px){.edperf-tips{display:none}}
 </style>
 </head>
 <body>
@@ -948,28 +962,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
     <!-- ══ PAGE: ÉDITEUR ══ -->
     <div class="page" id="page-editor" style="padding:0;height:calc(100vh - 52px);overflow:hidden">
-      <!-- Topbar -->
-      <div style="height:42px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;background:var(--bg);flex-shrink:0">
-        <div id="ed-gh-badge" style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--s2);border:1px solid var(--border);border-radius:6px;font-size:10px;cursor:pointer" onclick="edToggleGhPanel()">
-          <div id="ed-gh-dot" style="width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0"></div>
-          <span id="ed-gh-label">GitHub non connecté — cliquer</span>
-          <span style="color:var(--muted2);font-size:9px">▾</span>
+      <!-- Topbar : barre d'analyse de performance en temps réel -->
+      <div style="height:46px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:14px;background:var(--bg);flex-shrink:0">
+        <div class="edperf">
+          <span class="edperf-ic">⚡</span>
+          <div class="edperf-gauge">
+            <div class="edperf-top"><b id="ed-perf-num">98/100</b><span id="ed-perf-label">Ultra rapide</span></div>
+            <div class="edperf-track"><div id="ed-perf-bar" style="width:98%"></div></div>
+          </div>
+          <div class="edperf-times"><span id="ed-perf-load">≈0.6s desktop</span><span id="ed-perf-mob">≈1.0s mobile</span></div>
+          <div class="edperf-tips" id="ed-tips"></div>
         </div>
-        <div style="display:flex;gap:3px" id="ed-pages-tabs">
-          <button class="ed-page-tab active">Hero</button>
-          <button class="ed-page-tab">Projets</button>
-          <button class="ed-page-tab">Contact</button>
-          <button class="ed-page-tab" onclick="edAddBlock()" style="color:var(--accent)">+</button>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0">
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edSaveConfig()">↑ Sauver</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edPreviewExternal()">⬚ Aperçu</button>
+          <button class="btn btn-accent" style="font-size:10px;padding:5px 12px" id="ed-deploy-btn" onclick="edDeploy()">🚀 Publier</button>
         </div>
-        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="edSaveConfig()">↑ Sauver</button>
-          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="edPreviewExternal()">⬚ Aperçu</button>
-          <button class="btn btn-accent" style="font-size:10px;padding:4px 12px" id="ed-deploy-btn" onclick="edDeploy()">🚀 Publier</button>
-        </div>
-      </div>
-      <!-- GitHub panel -->
-      <div id="ed-gh-panel" style="display:none;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--s2)">
-        <div style="font-size:10px;color:var(--muted2)">Token configuré dans <strong style="color:var(--accent3);cursor:pointer" onclick="showPage('github')">GitHub & Déploiement →</strong></div>
       </div>
       <!-- Body -->
       <div style="display:flex;flex:1;height:calc(100% - 42px);overflow:hidden">
@@ -1003,17 +1011,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div style="width:210px;border-left:1px solid var(--border);background:var(--s1);overflow-y:auto;flex-shrink:0">
           <div style="padding:9px 12px;border-bottom:1px solid var(--border);font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1.5px;font-weight:700">Propriétés</div>
 
-          <!-- Jauge de performance (temps réel) -->
-          <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-              <span class="prop-label" style="margin:0">⚡ Performance</span>
-              <span id="ed-perf-num" style="font-size:11px;font-weight:800;color:var(--green)">98/100</span>
-            </div>
-            <div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden"><div id="ed-perf-bar" style="height:100%;width:98%;background:var(--green);border-radius:3px;transition:width .3s,background .3s"></div></div>
-            <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--muted2);margin-top:5px"><span id="ed-perf-label">Ultra rapide</span><span id="ed-perf-load">~0.6s desktop</span></div>
-            <div id="ed-tips" style="margin-top:6px"></div>
-          </div>
-
           <div style="padding:6px 0">
             <!-- 🎨 THÈME -->
             <div class="eg open">
@@ -1040,7 +1037,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                 <div class="prop-row"><div class="prop-label">Nom du site</div><input class="prop-input" id="ep-site-name" value="FOLIO" oninput="edUpdatePreview()"></div>
                 <div class="prop-row"><div class="prop-label">Bio / Tagline</div><input class="prop-input" id="ep-bio" value="Designer & Motion" oninput="edUpdatePreview()"></div>
                 <div class="prop-row"><div class="prop-label">Hero text</div><input class="prop-input" id="ep-hero-text" value="Créatif · Designer" oninput="edUpdatePreview()"></div>
-                <div class="prop-row"><div class="prop-label">Image hero (URL, style latéral)</div><input class="prop-input" id="ep-hero-image" placeholder="https://…/image.jpg" oninput="edUpdatePreview()"></div>
+                <div class="prop-row"><div class="prop-label">Image hero / bannière (style latéral)</div><input class="prop-input" id="ep-hero-image" placeholder="URL de l'image, ou importe ↓" oninput="edUpdatePreview()">
+                  <label class="file-btn" style="margin-top:6px;font-size:10px">📷 Importer une image<input type="file" accept="image/*" style="display:none" onchange="edHeroImport(event)"></label>
+                </div>
                 <div class="prop-row"><div class="prop-label">À propos (vide = masqué)</div><textarea class="prop-input" id="ep-about" style="height:60px;resize:none" placeholder="Parle de toi, ton style…" oninput="edUpdatePreview()"></textarea></div>
                 <div class="prop-row"><div class="prop-label">Email</div><input class="prop-input" id="ep-email" placeholder="contact@..." oninput="edUpdatePreview()"></div>
                 <div class="prop-row"><div class="prop-label">Behance</div><input class="prop-input" id="ep-behance" placeholder="@pseudo" oninput="edUpdatePreview()"></div>
@@ -1062,11 +1061,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
               <div class="eg-h" onclick="edGroup(this)"><span>🎞️ Animations & effets</span><span class="eg-ar">▾</span></div>
               <div class="eg-b">
                 <div class="prop-row"><div class="prop-label">Niveau d'animation</div><select class="prop-input prop-select" id="ep-anim" onchange="edUpdatePreview()"><option value="none">Aucune — le plus rapide</option><option value="light">Légère — petits fondus</option><option value="smooth" selected>Fluide — recommandé</option><option value="premium">Premium — plus travaillé</option></select></div>
-                <div class="prop-label" style="margin:8px 0 5px">Effets (survol & souris)</div>
-                <label class="fx-tog"><input type="checkbox" id="ep-fx-tilt" onchange="edUpdatePreview()"> Inclinaison 3D des projets</label>
-                <label class="fx-tog"><input type="checkbox" id="ep-fx-glow" onchange="edUpdatePreview()"> Reflet lumineux au survol</label>
-                <label class="fx-tog"><input type="checkbox" id="ep-fx-parallax" onchange="edUpdatePreview()"> Parallaxe du hero</label>
-                <div class="hintbox" style="margin-top:8px">💡 Chaque effet ajoute un peu de charge — surveille la jauge de perf en haut.</div>
+                <div class="prop-label" style="margin:8px 0 5px">Effets premium (survol & souris)</div>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-tilt" onchange="edUpdatePreview()"> ✨ Effet 3D interactif <span style="color:var(--muted2);font-size:8px">(Gun.lol / Haunt.gg)</span></label>
+                <div id="ep-fx-tilt-row" class="prop-row" style="margin:2px 0 6px 22px;display:none">
+                  <div class="prop-label" style="font-size:8px">Intensité <span id="ep-tilt-val">7</span>°</div>
+                  <input type="range" id="ep-fx-intensity" min="3" max="16" value="7" style="width:100%;accent-color:var(--accent)" oninput="document.getElementById('ep-tilt-val').textContent=this.value;edUpdatePreview()">
+                </div>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-shine" onchange="edUpdatePreview()"> 💎 Brillance diagonale (Shine)</label>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-lift" onchange="edUpdatePreview()"> ⬆ Hover Lift (la carte monte)</label>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-scale" onchange="edUpdatePreview()"> 🔍 Zoom léger au survol</label>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-glow" onchange="edUpdatePreview()"> 🌟 Reflet lumineux (ombre accent)</label>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-mouseglow" onchange="edUpdatePreview()"> 🔦 Halo qui suit la souris</label>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-parallax" onchange="edUpdatePreview()"> 🌄 Parallaxe du hero (image de fond)</label>
+                <div class="hintbox" style="margin-top:8px">💡 Effets subtils, façon portfolios premium. Chacun ajoute un peu de charge — surveille la jauge en haut. Tout se désactive pour privilégier les perfs.</div>
               </div>
             </div>
           </div>

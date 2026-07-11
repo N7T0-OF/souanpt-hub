@@ -307,7 +307,10 @@ function edLoad() {
   set('ep-anim', cfg.animLevel||'smooth');
   const fx = cfg.fx || {};
   const chk=(id,v)=>{ const el=document.getElementById(id); if(el) el.checked=!!v; };
-  chk('ep-fx-tilt', fx.tilt); chk('ep-fx-glow', fx.glow); chk('ep-fx-parallax', fx.parallax);
+  chk('ep-fx-tilt', fx.tilt); chk('ep-fx-shine', fx.shine); chk('ep-fx-lift', fx.lift);
+  chk('ep-fx-scale', fx.scale); chk('ep-fx-glow', fx.glow); chk('ep-fx-mouseglow', fx.mouseglow);
+  chk('ep-fx-parallax', fx.parallax);
+  const intv=document.getElementById('ep-fx-intensity'); if(intv){intv.value=fx.intensity||7; const tv=document.getElementById('ep-tilt-val'); if(tv)tv.textContent=fx.intensity||7;}
   edSyncThemeCards();
   edPerf();
   const dot=document.getElementById('ed-gh-dot'); const lbl=document.getElementById('ed-gh-label');
@@ -335,11 +338,25 @@ function edGetConfig() {
     projectsLimit: parseInt(document.getElementById('ep-proj-limit')?.value) || 0,
     animLevel:     document.getElementById('ep-anim')?.value || 'smooth',
     fx: {
-      tilt:     !!document.getElementById('ep-fx-tilt')?.checked,
-      glow:     !!document.getElementById('ep-fx-glow')?.checked,
-      parallax: !!document.getElementById('ep-fx-parallax')?.checked,
+      tilt:      !!document.getElementById('ep-fx-tilt')?.checked,
+      intensity: parseInt(document.getElementById('ep-fx-intensity')?.value) || 7,
+      shine:     !!document.getElementById('ep-fx-shine')?.checked,
+      lift:      !!document.getElementById('ep-fx-lift')?.checked,
+      scale:     !!document.getElementById('ep-fx-scale')?.checked,
+      glow:      !!document.getElementById('ep-fx-glow')?.checked,
+      mouseglow: !!document.getElementById('ep-fx-mouseglow')?.checked,
+      parallax:  !!document.getElementById('ep-fx-parallax')?.checked,
     },
   };
+}
+function edHeroImport(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  fileToDataURL(f, d => {
+    const inp = document.getElementById('ep-hero-image'); if (inp) inp.value = d;
+    edUpdatePreview();
+    showToast('Image hero importée & optimisée ✓', '#2e9a63', 2000);
+  });
+  ev.target.value = '';
 }
 
 /* ── Panneau éditeur : accordéon, cartes de thème, jauge de perf ── */
@@ -356,29 +373,32 @@ function edSyncThemeCards() {
 /* Estime la performance localement selon animations/effets/médias — pas d'IA, gratuit */
 function edPerf() {
   const g = (typeof edGetConfig === 'function') ? edGetConfig() : {};
-  const anim = { none: 0, light: 3, smooth: 8, premium: 16 }[g.animLevel] ?? 8;
   const fx = g.fx || {};
-  let load = anim + (fx.tilt ? 8 : 0) + (fx.glow ? 4 : 0) + (fx.parallax ? 7 : 0);
-  let projs = 0; try { projs = JSON.parse(localStorage.getItem('hub_projects') || '[]').length; } catch {}
-  const heavyCovers = (() => { try { return JSON.parse(localStorage.getItem('hub_projects') || '[]').filter(p => (p.cover || '').startsWith('data:')).length; } catch { return 0; } })();
+  // slider d'intensité visible seulement si l'effet 3D est actif
+  const row = document.getElementById('ep-fx-tilt-row'); if (row) row.style.display = fx.tilt ? '' : 'none';
+  const tv = document.getElementById('ep-tilt-val'); if (tv) tv.textContent = fx.intensity || 7;
+  const anim = { none: 0, light: 3, smooth: 8, premium: 16 }[g.animLevel] ?? 8;
+  let load = anim + (fx.tilt ? 8 : 0) + (fx.shine ? 4 : 0) + (fx.lift ? 2 : 0) + (fx.scale ? 2 : 0)
+           + (fx.glow ? 4 : 0) + (fx.mouseglow ? 6 : 0) + (fx.parallax ? 7 : 0);
+  let projs = 0, heavyCovers = 0;
+  try { const P = JSON.parse(localStorage.getItem('hub_projects') || '[]'); projs = P.length; heavyCovers = P.filter(p => (p.cover || '').startsWith('data:')).length; } catch {}
   load += Math.max(0, projs - 12) * 1.5 + heavyCovers * 3 + (g.heroImage ? 4 : 0);
   const score = Math.max(35, Math.round(100 - load));
-  const bar = document.getElementById('ed-perf-bar'), num = document.getElementById('ed-perf-num'),
-        lbl = document.getElementById('ed-perf-label'), ld = document.getElementById('ed-perf-load');
   const col = score >= 85 ? 'var(--green)' : score >= 65 ? 'var(--gold-l)' : 'var(--red)';
+  const bar = document.getElementById('ed-perf-bar'), num = document.getElementById('ed-perf-num'),
+        lbl = document.getElementById('ed-perf-label'), ld = document.getElementById('ed-perf-load'), mob = document.getElementById('ed-perf-mob');
   if (bar) { bar.style.width = score + '%'; bar.style.background = col; }
   if (num) { num.textContent = score + '/100'; num.style.color = col; }
   if (lbl) lbl.textContent = score >= 85 ? 'Ultra rapide' : score >= 65 ? 'Rapide' : 'Animations lourdes';
-  const sec = (0.4 + load / 90).toFixed(1);
-  if (ld) ld.textContent = '~' + sec + 's desktop';
-  // Suggestions locales
+  if (ld)  ld.textContent  = '≈' + (0.4 + load / 90).toFixed(1) + 's desktop';
+  if (mob) mob.textContent = '≈' + (0.6 + load / 55).toFixed(1) + 's mobile';
+  // Suggestions dans la barre (avec bouton Optimiser)
   const tips = [];
-  if (heavyCovers) tips.push('🖼 ' + heavyCovers + ' couverture(s) non optimisée(s) — Stockage → Optimiser');
-  if (g.animLevel === 'premium') tips.push('⚡ Animations Premium : plus jolies mais plus lourdes');
-  if (fx.tilt && fx.glow && fx.parallax) tips.push('🎛 Beaucoup d\'effets actifs — réduis si le score baisse');
-  if (g.layoutStyle === 'sidebar' && !g.heroImage) tips.push('🌄 Ajoute une image hero pour le style latéral');
+  if (heavyCovers) tips.push(`🖼 ${heavyCovers} couverture(s) non optimisée(s) <button onclick="optimizeAllCovers();return false">Optimiser</button>`);
+  if (g.animLevel === 'premium') tips.push('⚡ Animations Premium activées');
+  if (g.layoutStyle === 'sidebar' && !g.heroImage) tips.push('🌄 Hero conseillé pour le thème latéral');
   const box = document.getElementById('ed-tips');
-  if (box) box.innerHTML = tips.slice(0, 3).map(t => `<div class="ed-tip">${t}</div>`).join('');
+  if (box) box.innerHTML = tips.slice(0, 2).map(t => `<span class="ptip">${t}</span>`).join('');
 }
 
 /* ══════════════════════════════════════════════════════
