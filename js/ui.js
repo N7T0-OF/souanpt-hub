@@ -304,6 +304,12 @@ function edLoad() {
   set('ep-layout-style', cfg.layoutStyle||'float');
   set('ep-hero-image', cfg.heroImage||'');
   set('ep-proj-limit', cfg.projectsLimit||0);
+  set('ep-anim', cfg.animLevel||'smooth');
+  const fx = cfg.fx || {};
+  const chk=(id,v)=>{ const el=document.getElementById(id); if(el) el.checked=!!v; };
+  chk('ep-fx-tilt', fx.tilt); chk('ep-fx-glow', fx.glow); chk('ep-fx-parallax', fx.parallax);
+  edSyncThemeCards();
+  edPerf();
   const dot=document.getElementById('ed-gh-dot'); const lbl=document.getElementById('ed-gh-label');
   if (Auth.ok()) { if(dot)dot.style.background='#2e9a63'; if(lbl)lbl.textContent='@'+(Auth.user()?.login||'?')+' · connecté'; }
   else           { if(dot)dot.style.background='var(--muted)'; if(lbl)lbl.textContent='GitHub non connecté — cliquer'; }
@@ -327,7 +333,52 @@ function edGetConfig() {
     layoutStyle:   document.getElementById('ep-layout-style')?.value || 'float',
     heroImage:     document.getElementById('ep-hero-image')?.value.trim() || '',
     projectsLimit: parseInt(document.getElementById('ep-proj-limit')?.value) || 0,
+    animLevel:     document.getElementById('ep-anim')?.value || 'smooth',
+    fx: {
+      tilt:     !!document.getElementById('ep-fx-tilt')?.checked,
+      glow:     !!document.getElementById('ep-fx-glow')?.checked,
+      parallax: !!document.getElementById('ep-fx-parallax')?.checked,
+    },
   };
+}
+
+/* ── Panneau éditeur : accordéon, cartes de thème, jauge de perf ── */
+function edGroup(h) { h.parentElement.classList.toggle('open'); }
+function edPickTheme(v) {
+  const sel = document.getElementById('ep-layout-style'); if (sel) sel.value = v;
+  edSyncThemeCards();
+  edUpdatePreview();
+}
+function edSyncThemeCards() {
+  const v = document.getElementById('ep-layout-style')?.value || 'float';
+  document.querySelectorAll('#ed-theme-cards .th-card').forEach(c => c.classList.toggle('active', c.dataset.v === v));
+}
+/* Estime la performance localement selon animations/effets/médias — pas d'IA, gratuit */
+function edPerf() {
+  const g = (typeof edGetConfig === 'function') ? edGetConfig() : {};
+  const anim = { none: 0, light: 3, smooth: 8, premium: 16 }[g.animLevel] ?? 8;
+  const fx = g.fx || {};
+  let load = anim + (fx.tilt ? 8 : 0) + (fx.glow ? 4 : 0) + (fx.parallax ? 7 : 0);
+  let projs = 0; try { projs = JSON.parse(localStorage.getItem('hub_projects') || '[]').length; } catch {}
+  const heavyCovers = (() => { try { return JSON.parse(localStorage.getItem('hub_projects') || '[]').filter(p => (p.cover || '').startsWith('data:')).length; } catch { return 0; } })();
+  load += Math.max(0, projs - 12) * 1.5 + heavyCovers * 3 + (g.heroImage ? 4 : 0);
+  const score = Math.max(35, Math.round(100 - load));
+  const bar = document.getElementById('ed-perf-bar'), num = document.getElementById('ed-perf-num'),
+        lbl = document.getElementById('ed-perf-label'), ld = document.getElementById('ed-perf-load');
+  const col = score >= 85 ? 'var(--green)' : score >= 65 ? 'var(--gold-l)' : 'var(--red)';
+  if (bar) { bar.style.width = score + '%'; bar.style.background = col; }
+  if (num) { num.textContent = score + '/100'; num.style.color = col; }
+  if (lbl) lbl.textContent = score >= 85 ? 'Ultra rapide' : score >= 65 ? 'Rapide' : 'Animations lourdes';
+  const sec = (0.4 + load / 90).toFixed(1);
+  if (ld) ld.textContent = '~' + sec + 's desktop';
+  // Suggestions locales
+  const tips = [];
+  if (heavyCovers) tips.push('🖼 ' + heavyCovers + ' couverture(s) non optimisée(s) — Stockage → Optimiser');
+  if (g.animLevel === 'premium') tips.push('⚡ Animations Premium : plus jolies mais plus lourdes');
+  if (fx.tilt && fx.glow && fx.parallax) tips.push('🎛 Beaucoup d\'effets actifs — réduis si le score baisse');
+  if (g.layoutStyle === 'sidebar' && !g.heroImage) tips.push('🌄 Ajoute une image hero pour le style latéral');
+  const box = document.getElementById('ed-tips');
+  if (box) box.innerHTML = tips.slice(0, 3).map(t => `<div class="ed-tip">${t}</div>`).join('');
 }
 
 /* ══════════════════════════════════════════════════════
@@ -363,7 +414,7 @@ function edToggleBlock(k){
   edRenderBlocks(); edUpdatePreview();
 }
 
-function edUpdatePreview() { clearTimeout(_edTimer); _edTimer=setTimeout(edRefreshPreview,600); }
+function edUpdatePreview() { try{ edPerf(); }catch{} clearTimeout(_edTimer); _edTimer=setTimeout(edRefreshPreview,600); }
 
 function edRefreshPreview() {
   const frame=document.getElementById('ed-preview-frame');

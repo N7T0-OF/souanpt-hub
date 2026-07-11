@@ -624,6 +624,28 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .conn-name{font-size:13px;font-weight:700}
 .conn-sub{font-size:10px;color:var(--muted2)}
 .conn-sub.on{color:var(--green)}
+
+/* ── ÉDITEUR : panneau catégorisé ── */
+.eg{border-bottom:1px solid var(--border)}
+.eg-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;user-select:none;font-size:11px;font-weight:700;color:var(--text)}
+.eg-h:hover{background:var(--s2)}
+.eg-ar{color:var(--muted2);font-size:10px;transition:transform .2s}
+.eg.open .eg-ar{transform:rotate(180deg)}
+.eg-b{display:none;padding:2px 12px 12px}
+.eg.open .eg-b{display:block}
+.th-cards{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.th-card{border:1px solid var(--border2);border-radius:8px;padding:7px;font-size:9px;font-weight:600;color:var(--muted2);cursor:pointer;text-align:center;transition:all .15s}
+.th-card:hover{border-color:rgba(200,255,0,.35);color:var(--text)}
+.th-card.active{border-color:var(--accent);color:var(--accent);background:rgba(200,255,0,.05)}
+.th-mini{height:34px;border-radius:5px;background:var(--s3);margin-bottom:5px;position:relative;overflow:hidden;display:flex}
+.th-float span{position:absolute;top:4px;left:50%;transform:translateX(-50%);width:60%;height:6px;border-radius:6px;background:var(--muted2)}
+.th-float{display:block}
+.th-side i{width:26%;height:100%;background:var(--muted2);opacity:.5;flex-shrink:0}
+.th-side span{flex:1;margin:4px;border-radius:3px;background:var(--muted2);opacity:.3}
+.th-card.active .th-mini i,.th-card.active .th-mini span{background:var(--accent)}
+.fx-tog{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--text);padding:4px 0;cursor:pointer}
+.fx-tog input{accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.ed-tip{font-size:8px;color:var(--gold-l);line-height:1.5;padding:3px 0;display:flex;gap:5px}
 </style>
 </head>
 <body>
@@ -980,25 +1002,76 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <!-- Props -->
         <div style="width:210px;border-left:1px solid var(--border);background:var(--s1);overflow-y:auto;flex-shrink:0">
           <div style="padding:9px 12px;border-bottom:1px solid var(--border);font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1.5px;font-weight:700">Propriétés</div>
-          <div style="padding:10px 12px">
-            <div class="prop-label" style="margin-bottom:6px">Templates métier</div>
-            <div id="ed-templates" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px"></div>
-            <div class="prop-row"><div class="prop-label">Nom du site</div><input class="prop-input" id="ep-site-name" value="FOLIO" oninput="edUpdatePreview()"></div>
-            <div class="prop-row"><div class="prop-label">Bio / Tagline</div><input class="prop-input" id="ep-bio" value="Designer & Motion" oninput="edUpdatePreview()"></div>
-            <div class="prop-row"><div class="prop-label">Couleur accent</div><input type="color" id="ep-accent-color" value="#C8FF00" oninput="edUpdatePreview()" style="width:100%;height:30px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;padding:2px"></div>
-            <div class="prop-row"><div class="prop-label">Fond</div><select class="prop-input prop-select" id="ep-theme" onchange="edUpdatePreview()"><option value="#060606">Noir profond</option><option value="#0a0a14">Bleu nuit</option><option value="#f8f8f8">Clair</option></select></div>
-            <div class="prop-row"><div class="prop-label">Colonnes</div><select class="prop-input prop-select" id="ep-layout" onchange="edUpdatePreview()"><option value="3">3 cols</option><option value="2">2 cols</option><option value="4">4 cols</option></select></div>
-            <div class="prop-row"><div class="prop-label">Hero text</div><input class="prop-input" id="ep-hero-text" value="Créatif · Designer" oninput="edUpdatePreview()"></div>
-            <div class="prop-row"><div class="prop-label">Behance</div><input class="prop-input" id="ep-behance" placeholder="@pseudo" oninput="edUpdatePreview()"></div>
-            <div class="prop-row"><div class="prop-label">Email</div><input class="prop-input" id="ep-email" placeholder="contact@..." oninput="edUpdatePreview()"></div>
-            <div style="height:1px;background:var(--border);margin:8px 0"></div>
-            <div class="prop-row"><div class="prop-label">Style du site</div><select class="prop-input prop-select" id="ep-layout-style" onchange="edUpdatePreview()"><option value="float">Barre flottante (classique)</option><option value="sidebar">Barre latérale + grande image</option></select></div>
-            <div class="prop-row"><div class="prop-label">Image de couverture / hero (URL)</div><input class="prop-input" id="ep-hero-image" placeholder="https://…/image.jpg (style latéral)" oninput="edUpdatePreview()"></div>
-            <div class="prop-row"><div class="prop-label">Projets affichés (0 = tous, sinon bouton « + »)</div><input class="prop-input" id="ep-proj-limit" type="number" min="0" value="0" oninput="edUpdatePreview()"></div>
-            <div class="prop-row"><div class="prop-label">À propos (vide = section masquée)</div><textarea class="prop-input" id="ep-about" style="height:64px;resize:none" placeholder="Parle de toi, ton parcours, ton style…" oninput="edUpdatePreview()"></textarea></div>
-            <div class="prop-row"><div class="prop-label">Affichage des avis</div><select class="prop-input prop-select" id="ep-avis-mode" onchange="edUpdatePreview()"><option value="defile">Défilement infini</option><option value="grille">Grille</option></select></div>
-            <div style="font-size:8px;color:var(--muted2);margin-bottom:6px;line-height:1.6">Ordre & visibilité des sections : panneau <strong style="color:var(--text)">Blocs</strong> (à gauche) ⋮⋮ 👁</div>
-            <div style="height:1px;background:var(--border);margin:8px 0"></div>
+
+          <!-- Jauge de performance (temps réel) -->
+          <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+              <span class="prop-label" style="margin:0">⚡ Performance</span>
+              <span id="ed-perf-num" style="font-size:11px;font-weight:800;color:var(--green)">98/100</span>
+            </div>
+            <div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden"><div id="ed-perf-bar" style="height:100%;width:98%;background:var(--green);border-radius:3px;transition:width .3s,background .3s"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--muted2);margin-top:5px"><span id="ed-perf-label">Ultra rapide</span><span id="ed-perf-load">~0.6s desktop</span></div>
+            <div id="ed-tips" style="margin-top:6px"></div>
+          </div>
+
+          <div style="padding:6px 0">
+            <!-- 🎨 THÈME -->
+            <div class="eg open">
+              <div class="eg-h" onclick="edGroup(this)"><span>🎨 Thème</span><span class="eg-ar">▾</span></div>
+              <div class="eg-b">
+                <div class="prop-label" style="margin-bottom:6px">Style du site</div>
+                <div class="th-cards" id="ed-theme-cards">
+                  <div class="th-card" data-v="float" onclick="edPickTheme('float')"><div class="th-mini th-float"><span></span></div>Barre flottante</div>
+                  <div class="th-card" data-v="sidebar" onclick="edPickTheme('sidebar')"><div class="th-mini th-side"><i></i><span></span></div>Barre latérale</div>
+                </div>
+                <select id="ep-layout-style" style="display:none"><option value="float"></option><option value="sidebar"></option></select>
+                <div class="prop-label" style="margin:8px 0 6px">Templates métier</div>
+                <div id="ed-templates" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"></div>
+                <div class="prop-row"><div class="prop-label">Couleur accent</div><input type="color" id="ep-accent-color" value="#C8FF00" oninput="edUpdatePreview()" style="width:100%;height:30px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;padding:2px"></div>
+                <div class="prop-row"><div class="prop-label">Fond</div><select class="prop-input prop-select" id="ep-theme" onchange="edUpdatePreview()"><option value="#060606">Noir profond</option><option value="#0a0a14">Bleu nuit</option><option value="#f8f8f8">Clair</option></select></div>
+                <div class="prop-row"><div class="prop-label">Colonnes projets</div><select class="prop-input prop-select" id="ep-layout" onchange="edUpdatePreview()"><option value="3">3 colonnes</option><option value="2">2 colonnes</option><option value="4">4 colonnes</option></select></div>
+              </div>
+            </div>
+
+            <!-- ✍️ CONTENU -->
+            <div class="eg">
+              <div class="eg-h" onclick="edGroup(this)"><span>✍️ Contenu</span><span class="eg-ar">▾</span></div>
+              <div class="eg-b">
+                <div class="prop-row"><div class="prop-label">Nom du site</div><input class="prop-input" id="ep-site-name" value="FOLIO" oninput="edUpdatePreview()"></div>
+                <div class="prop-row"><div class="prop-label">Bio / Tagline</div><input class="prop-input" id="ep-bio" value="Designer & Motion" oninput="edUpdatePreview()"></div>
+                <div class="prop-row"><div class="prop-label">Hero text</div><input class="prop-input" id="ep-hero-text" value="Créatif · Designer" oninput="edUpdatePreview()"></div>
+                <div class="prop-row"><div class="prop-label">Image hero (URL, style latéral)</div><input class="prop-input" id="ep-hero-image" placeholder="https://…/image.jpg" oninput="edUpdatePreview()"></div>
+                <div class="prop-row"><div class="prop-label">À propos (vide = masqué)</div><textarea class="prop-input" id="ep-about" style="height:60px;resize:none" placeholder="Parle de toi, ton style…" oninput="edUpdatePreview()"></textarea></div>
+                <div class="prop-row"><div class="prop-label">Email</div><input class="prop-input" id="ep-email" placeholder="contact@..." oninput="edUpdatePreview()"></div>
+                <div class="prop-row"><div class="prop-label">Behance</div><input class="prop-input" id="ep-behance" placeholder="@pseudo" oninput="edUpdatePreview()"></div>
+              </div>
+            </div>
+
+            <!-- ⭐ PORTFOLIO & AVIS -->
+            <div class="eg">
+              <div class="eg-h" onclick="edGroup(this)"><span>⭐ Portfolio & avis</span><span class="eg-ar">▾</span></div>
+              <div class="eg-b">
+                <div class="prop-row"><div class="prop-label">Projets affichés (0 = tous, sinon « + »)</div><input class="prop-input" id="ep-proj-limit" type="number" min="0" value="0" oninput="edUpdatePreview()"></div>
+                <div class="prop-row"><div class="prop-label">Affichage des avis</div><select class="prop-input prop-select" id="ep-avis-mode" onchange="edUpdatePreview()"><option value="defile">Défilement infini</option><option value="grille">Grille</option></select></div>
+                <div style="font-size:8px;color:var(--muted2);line-height:1.6">Ordre & visibilité des sections : panneau <strong style="color:var(--text)">Blocs</strong> (à gauche) ⋮⋮ 👁</div>
+              </div>
+            </div>
+
+            <!-- 🎞️ ANIMATIONS & EFFETS -->
+            <div class="eg">
+              <div class="eg-h" onclick="edGroup(this)"><span>🎞️ Animations & effets</span><span class="eg-ar">▾</span></div>
+              <div class="eg-b">
+                <div class="prop-row"><div class="prop-label">Niveau d'animation</div><select class="prop-input prop-select" id="ep-anim" onchange="edUpdatePreview()"><option value="none">Aucune — le plus rapide</option><option value="light">Légère — petits fondus</option><option value="smooth" selected>Fluide — recommandé</option><option value="premium">Premium — plus travaillé</option></select></div>
+                <div class="prop-label" style="margin:8px 0 5px">Effets (survol & souris)</div>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-tilt" onchange="edUpdatePreview()"> Inclinaison 3D des projets</label>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-glow" onchange="edUpdatePreview()"> Reflet lumineux au survol</label>
+                <label class="fx-tog"><input type="checkbox" id="ep-fx-parallax" onchange="edUpdatePreview()"> Parallaxe du hero</label>
+                <div class="hintbox" style="margin-top:8px">💡 Chaque effet ajoute un peu de charge — surveille la jauge de perf en haut.</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:10px 12px;border-top:1px solid var(--border)">
             <div id="ed-last-save" style="font-size:8px;color:var(--muted2);text-align:center;margin-bottom:6px">Non sauvegardé · auto-save 30 s</div>
             <button class="btn btn-ghost" style="font-size:10px;width:100%;justify-content:center;margin-bottom:6px" onclick="edSaveConfig()">Sauvegarder config</button>
             <button class="btn btn-accent" style="font-size:10px;width:100%;justify-content:center" id="ed-deploy-btn2" onclick="edDeploy()">🚀 Publier</button>

@@ -182,6 +182,7 @@ const SiteConfig = {
     avisMode: 'defile',
     about: '', goatcounter: '',
     layoutStyle: 'float', heroImage: '', projectsLimit: 0,
+    animLevel: 'smooth', fx: { tilt: false, glow: false, parallax: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
   save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); },
@@ -228,6 +229,10 @@ function generateSite(cfg, projects, reviews) {
   const heroImage   = String(cfg.heroImage || '').trim();
   const projLimit   = parseInt(cfg.projectsLimit) || 0;   // 0 = tous
   const hiddenCount = projLimit && projects.length > projLimit ? projects.length - projLimit : 0;
+  const animLevel   = cfg.animLevel || 'smooth';
+  const fx          = cfg.fx || {};
+  const revDur      = { none: 0, light: .3, smooth: .6, premium: .8 }[animLevel] ?? .6;
+  const revY        = animLevel === 'none' ? 0 : animLevel === 'premium' ? 26 : 18;
 
   const cards = projects.map((p, i) => `
     <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
@@ -351,7 +356,9 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 .made b{color:var(--a)}
 @media(max-width:640px){.made{bottom:12px;right:12px;padding:6px 10px 6px 8px;font-size:10px}}
 @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.pc{animation:fu .4s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}
+${animLevel==='none'?'':`.pc{animation:fu ${revDur*.7}s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}`}
+${fx.tilt?`.pc{transform-style:preserve-3d;transition:transform .12s ease,box-shadow .25s}`:''}
+${fx.glow?`.pc:hover{box-shadow:0 14px 40px color-mix(in srgb,var(--a) 32%,transparent)!important}`:''}
 /* ── À PROPOS ── */
 .about-p{font-size:14px;color:var(--m);line-height:1.95}
 /* ── AVIS DÉFILEMENT INFINI ── */
@@ -362,7 +369,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 .mq .rc{width:280px;flex-shrink:0}
 @keyframes mqs{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 /* ── APPARITION AU SCROLL ── */
-.rev{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+.rev{opacity:${animLevel==='none'?1:0};transform:translateY(${revY}px);transition:opacity ${revDur}s ease,transform ${revDur}s ease}
 .rev.in{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){.rev{opacity:1;transform:none;transition:none}.mqtrack{animation:none}}
 /* ── MENU MOBILE ── */
@@ -475,12 +482,23 @@ function filterTag(t){
   return false;
 }
 /* Apparition au scroll */
+${animLevel==='none'?`document.querySelectorAll('.rev').forEach(function(el){el.classList.add('in');});`:`
 if ('IntersectionObserver' in window) {
   var _io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){en.target.classList.add('in');_io.unobserve(en.target);}});},{threshold:.12});
   document.querySelectorAll('.rev').forEach(function(el){_io.observe(el);});
 } else {
   document.querySelectorAll('.rev').forEach(function(el){el.classList.add('in');});
-}
+}`}
+${fx.tilt?`
+// Inclinaison 3D des projets au survol
+document.querySelectorAll('.pc').forEach(function(c){
+  c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(700px) rotateY('+(x*7)+'deg) rotateX('+(-y*7)+'deg) translateY(-3px)';});
+  c.addEventListener('mouseleave',function(){c.style.transform='';});
+});`:''}
+${fx.parallax?`
+// Parallaxe du hero suivant la souris
+var _h=document.querySelector('.sb-hero, .hero');
+if(_h) window.addEventListener('mousemove',function(e){var x=(e.clientX/window.innerWidth-.5),y=(e.clientY/window.innerHeight-.5);_h.style.backgroundPosition='calc(50% + '+(x*18)+'px) calc(50% + '+(y*18)+'px)';});`:''}
 </script>
 ${cfg.goatcounter?`<script data-goatcounter="https://${esc(String(cfg.goatcounter).trim())}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>`:''}
 </body></html>`;
