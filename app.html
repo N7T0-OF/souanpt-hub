@@ -606,6 +606,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .int-card.open .int-arrow{transform:rotate(180deg)}
 .int-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border)}
 .int-card.open .int-body{display:block;animation:fadeIn .2s ease}
+
+/* ── COMPTE (bannière façon Discord) ── */
+.acc-banner{border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:20px;background:var(--s1)}
+.acc-cover{height:96px;background:linear-gradient(120deg,#1a0533,#6B21A8 55%,var(--accent))}
+.acc-row{display:flex;align-items:flex-end;gap:14px;padding:0 18px 16px;margin-top:-30px}
+.acc-av{width:72px;height:72px;border-radius:50%;background:var(--s3);border:4px solid var(--s1);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:var(--accent);overflow:hidden;flex-shrink:0}
+.acc-av img{width:100%;height:100%;object-fit:cover}
+.acc-id{flex:1;min-width:0;padding-bottom:4px}
+.acc-name{font-size:17px;font-weight:800}
+.acc-handle{font-size:11px;color:var(--muted2)}
+.acc-plan{font-size:9px;font-weight:800;padding:4px 12px;border-radius:999px;background:var(--s3);color:var(--muted2);margin-bottom:6px}
+.acc-plan.pro{background:var(--gold-dim);color:var(--gold-l)}
+.conn-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--s1);border:1px solid var(--border);border-radius:12px;margin-bottom:8px}
+.conn-ic{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.conn-info{flex:1;min-width:0}
+.conn-name{font-size:13px;font-weight:700}
+.conn-sub{font-size:10px;color:var(--muted2)}
+.conn-sub.on{color:var(--green)}
 </style>
 </head>
 <body>
@@ -1269,14 +1287,68 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     <div class="page" id="page-settings">
       <div class="settings-grid">
         <div class="settings-nav">
-          <div class="settings-nav-item active" onclick="settingsTab('general',this)">Général</div>
+          <div class="settings-nav-item active" onclick="settingsTab('compte',this)">👤 Compte</div>
+          <div class="settings-nav-item" onclick="settingsTab('general',this)">Général</div>
           <div class="settings-nav-item" onclick="settingsTab('integrations',this)">🔗 Intégrations</div>
           <div class="settings-nav-item" onclick="settingsTab('premium',this)">⭐ Premium</div>
           <div class="settings-nav-item" onclick="settingsTab('domain',this)">Domaine</div>
           <div class="settings-nav-item" onclick="settingsTab('privacy',this)">Confidentialité</div>
         </div>
         <div class="settings-content">
-          <div id="set-tab-general" class="set-tab">
+          <div id="set-tab-compte" class="set-tab">
+            <!-- Bannière profil façon Discord -->
+            <div class="acc-banner">
+              <div class="acc-cover"></div>
+              <div class="acc-row">
+                <div class="acc-av" id="acc-av">S</div>
+                <div class="acc-id">
+                  <div class="acc-name" id="acc-name">—</div>
+                  <div class="acc-handle" id="acc-handle">@—</div>
+                </div>
+                <span class="acc-plan" id="acc-plan">Gratuit</span>
+              </div>
+            </div>
+
+            <div class="setting-group">
+              <div class="setting-group-title">Profil</div>
+              <div class="prop-row"><div class="prop-label">Pseudo <span style="color:var(--muted2)">· souanpt.hub/@…</span></div>
+                <div style="display:flex;gap:8px"><input class="prop-input" id="acc-pseudo" placeholder="tonpseudo" oninput="accPseudoInput()" style="flex:1"><button class="btn btn-ghost" style="font-size:10px" onclick="accSavePseudo()">Renommer</button></div>
+              </div>
+              <div class="prop-row"><div class="prop-label">Nom affiché</div>
+                <div style="display:flex;gap:8px"><input class="prop-input" id="acc-display" placeholder="Ton nom" style="flex:1"><button class="btn btn-ghost" style="font-size:10px" onclick="accSaveDisplay()">Enregistrer</button></div>
+              </div>
+              <div class="prop-row"><div class="prop-label">Email</div><input class="prop-input" id="acc-email" readonly style="color:var(--muted2)"></div>
+              <div id="acc-msg" style="font-size:10px;min-height:14px;text-align:center;color:var(--muted2)"></div>
+            </div>
+
+            <div class="setting-group">
+              <div class="setting-group-title">Connexions</div>
+              <div class="hintbox" style="margin-bottom:12px">Lie plusieurs comptes pour te connecter comme tu veux — ils pointent tous vers le même espace souanpt.hub.</div>
+              <div class="conn-row" id="conn-google">
+                <div class="conn-ic" style="background:#fff"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.2-8l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.2 5.3C40.9 36 44 30.6 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg></div>
+                <div class="conn-info"><div class="conn-name">Google</div><div class="conn-sub" id="conn-google-sub">Non connecté</div></div>
+                <button class="btn btn-ghost" id="conn-google-btn" style="font-size:10px" onclick="intGoogleConnect()">Connecter</button>
+              </div>
+              <div class="conn-row" id="conn-discord">
+                <div class="conn-ic" style="background:#5865F2"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.2.5c1.7.4 2.5.9 3.4 1.6a13.6 13.6 0 0 0-10-.4c-.5.2-.8.3-.8.3.9-.7 1.8-1.2 3.4-1.6L11 3a19.8 19.8 0 0 0-5 1.4C2.8 9.1 2 13.7 2.3 18.2a20 20 0 0 0 6 3l.5-.7c-1-.3-1.9-.7-2.7-1.3l.6-.4a14.2 14.2 0 0 0 12 0l.6.4c-.8.6-1.7 1-2.7 1.3l.5.7a20 20 0 0 0 6-3c.4-5.2-.7-9.8-2.8-13.8ZM8.9 15.3c-1 0-1.7-.9-1.7-2s.8-2 1.7-2 1.7.9 1.7 2-.8 2-1.7 2Zm6.2 0c-1 0-1.7-.9-1.7-2s.8-2 1.7-2 1.7.9 1.7 2-.7 2-1.7 2Z"/></svg></div>
+                <div class="conn-info"><div class="conn-name">Discord</div><div class="conn-sub" id="conn-discord-sub">Non connecté</div></div>
+                <button class="btn btn-ghost" id="conn-discord-btn" style="font-size:10px" onclick="Cloud.startDiscord()">Connecter</button>
+              </div>
+              <div class="conn-row" id="conn-github">
+                <div class="conn-ic" style="background:#161b22"><svg viewBox="0 0 16 16" width="18" height="18" fill="#fff"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 014 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></div>
+                <div class="conn-info"><div class="conn-name">GitHub</div><div class="conn-sub" id="conn-github-sub">Non connecté</div></div>
+                <button class="btn btn-ghost" id="conn-github-btn" style="font-size:10px" onclick="settingsTab('integrations',[...document.querySelectorAll('.settings-nav-item')].find(n=>n.textContent.includes('Intégrations')));intOpen('github')">Gérer</button>
+              </div>
+            </div>
+
+            <div class="setting-group">
+              <div class="setting-group-title">Sécurité</div>
+              <div id="acc-login-log" style="margin-bottom:12px"></div>
+              <button class="btn btn-ghost" style="font-size:10px;color:var(--red);border-color:rgba(192,57,43,.25)" onclick="hubSignOut()">Se déconnecter</button>
+            </div>
+          </div>
+
+          <div id="set-tab-general" class="set-tab" style="display:none">
             <div class="setting-group">
               <div class="setting-group-title">Site</div>
               <div class="prop-row"><div class="prop-label">Nom du portfolio</div><input class="prop-input" id="set-site-name" placeholder="FOLIO"></div>
@@ -1495,10 +1567,82 @@ function settingsTab(name, el) {
   if (tab) tab.style.display = '';
   if (el) el.classList.add('active');
   if (name === 'premium' && typeof renderPremium === 'function') renderPremium();
+  if (name === 'compte') renderCompte();
   if (name === 'integrations') {
     renderIntegrations(); renderBehancePage?.(); renderLoginLog?.();
     setTimeout(() => GHPage.init(), 50);
   }
+}
+
+/* ═══ COMPTE — bannière profil + connexions ═══ */
+function renderCompte() {
+  const g = window.Cloud && Cloud.enabled && Cloud.user() ? Cloud.user() : null;
+  const p = _myProfile || {};
+  const pseudo = p.pseudo || localStorage.getItem('souanpt_pseudo') || '';
+  const name = p.name || g?.displayName || pseudo || 'Moi';
+  const email = p.email || g?.email || '';
+  const avatar = p.avatar || g?.photoURL || '';
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('acc-name', name);
+  set('acc-handle', pseudo ? '@' + pseudo : '@—');
+  const av = document.getElementById('acc-av');
+  if (av) av.innerHTML = avatar ? `<img src="${esc(avatar)}" alt="">` : esc((name || '?')[0].toUpperCase());
+  const plan = document.getElementById('acc-plan');
+  const pro = typeof isPremium === 'function' && isPremium();
+  if (plan) { plan.textContent = pro ? '⭐ Premium' : 'Gratuit'; plan.classList.toggle('pro', pro); }
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  setVal('acc-pseudo', pseudo); setVal('acc-display', name === pseudo ? '' : name); setVal('acc-email', email);
+  // Connexions
+  const conn = (id, ok, sub) => {
+    const s = document.getElementById('conn-' + id + '-sub'); const b = document.getElementById('conn-' + id + '-btn');
+    if (s) { s.textContent = sub; s.classList.toggle('on', ok); }
+    if (b) b.textContent = ok ? (id === 'github' ? 'Gérer' : 'Connecté ✓') : (id === 'github' ? 'Connecter' : 'Connecter');
+  };
+  const provider = g && (g.providerData?.[0]?.providerId || '');
+  const viaGoogle = !!g && provider === 'google.com';
+  const viaDiscord = !!g && provider !== 'google.com'; // custom token Discord
+  conn('google', viaGoogle, viaGoogle ? '✓ ' + (g.email || 'connecté') : 'Non connecté');
+  conn('discord', viaDiscord, viaDiscord ? '✓ ' + (g.displayName || 'connecté') : (Cloud?.discordReady?.() ? 'Prêt à connecter' : 'Non connecté'));
+  conn('github', Auth.ok(), Auth.ok() ? '✓ @' + (Auth.owner() || '') : 'Non connecté (déploiement)');
+  // Journal de connexion
+  const log = document.getElementById('acc-login-log');
+  if (log) {
+    let l = []; try { l = JSON.parse(localStorage.getItem('souanpt_login_log') || '[]'); } catch {}
+    log.innerHTML = l.length
+      ? '<div style="font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:700">Dernières connexions</div>' + l.slice(0, 5).map(x => `<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)"><span>${esc(x.ua || 'Navigateur')}</span><span>${new Date(x.ts).toLocaleString('fr-FR')}</span></div>`).join('')
+      : '<div style="font-size:9px;color:var(--muted2)">Aucune connexion enregistrée</div>';
+  }
+}
+function accPseudoInput() {
+  const inp = document.getElementById('acc-pseudo');
+  const clean = (inp.value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 20);
+  if (inp.value !== clean) inp.value = clean;
+  const h = document.getElementById('acc-handle'); if (h) h.textContent = '@' + (clean || '—');
+}
+async function accSavePseudo() {
+  const msg = document.getElementById('acc-msg'); const say = (t, c) => { if (msg) { msg.style.color = c || 'var(--muted2)'; msg.textContent = t; } };
+  const pseudo = (document.getElementById('acc-pseudo')?.value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  if (pseudo.length < 2) { say('Au moins 2 caractères', '#c0392b'); return; }
+  if (pseudo === (_myProfile?.pseudo || '')) { say('C\'est déjà ton pseudo', '#e4b24a'); return; }
+  if (!(window.Cloud && Cloud.enabled && Cloud.user())) { say('Connecte-toi avec Google/Discord d\'abord', '#c0392b'); return; }
+  say('Vérification…');
+  try {
+    if (!(await Cloud.pseudoAvailable(pseudo))) { say('✗ « ' + pseudo + ' » est déjà pris', '#c0392b'); return; }
+    await Cloud.saveProfile(Cloud.user().uid, { pseudo });
+    _myProfile = { ...(_myProfile || {}), pseudo };
+    localStorage.setItem('souanpt_pseudo', pseudo);
+    renderCompte(); say('✓ Pseudo mis à jour', '#2e9a63');
+  } catch (e) { say('✗ ' + (e.message || 'Erreur'), '#c0392b'); }
+}
+async function accSaveDisplay() {
+  const msg = document.getElementById('acc-msg'); const say = (t, c) => { if (msg) { msg.style.color = c || 'var(--muted2)'; msg.textContent = t; } };
+  const name = (document.getElementById('acc-display')?.value || '').trim().slice(0, 60);
+  if (!(window.Cloud && Cloud.enabled && Cloud.user())) { say('Connecte-toi d\'abord', '#c0392b'); return; }
+  try {
+    await Cloud.saveProfile(Cloud.user().uid, { name });
+    _myProfile = { ...(_myProfile || {}), name };
+    renderCompte(); say('✓ Nom affiché mis à jour', '#2e9a63');
+  } catch (e) { say('✗ ' + (e.message || 'Erreur'), '#c0392b'); }
 }
 
 /* ═══ INTÉGRATIONS — cartes dépliables ═══ */
