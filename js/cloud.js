@@ -150,6 +150,25 @@ const Cloud = {
     try { await this._db.collection('users').doc(this._user.uid).collection('data').doc('config').set({ cfg, updatedAt: Date.now() }); } catch {}
   },
 
+  /* ── Analytics natif : lit les agrégats users/{uid}/analytics/* ──
+     Alimentés par le mouchard des sites publiés (via le Worker souanpt-analytics).
+     Retourne un objet normalisé, ou null si non connecté / rien encore. */
+  async loadAnalytics(uid) {
+    uid = uid || (this._user && this._user.uid);
+    if (!this.enabled || !uid) return null;
+    try {
+      const col = this._db.collection('users').doc(uid).collection('analytics');
+      const names = ['summary', 'daily', 'referrers', 'devices', 'browsers', 'countries', 'projects'];
+      const snaps = await Promise.all(names.map(n => col.doc(n).get().catch(() => null)));
+      const g = s => (s && s.exists ? s.data() : {}) || {};
+      const [sum, daily, ref, dev, br, co, pr] = snaps.map(g);
+      return {
+        summary: sum || {}, days: daily.days || {}, referrers: ref.map || {},
+        devices: dev.map || {}, browsers: br.map || {}, countries: co.map || {}, projects: pr.map || {},
+      };
+    } catch (e) { console.warn('[cloud] loadAnalytics', e); return null; }
+  },
+
   /* ── Portails sur Firestore (lecture publique → instantané, sans 404) ── */
   async savePortalDoc(p) {
     if (!this._user) throw new Error('Non connecté');

@@ -625,6 +625,7 @@ function showPage(id) {
   document.querySelector('.scroll-area')?.scrollTo({top:0});
   if(id==='github') setTimeout(()=>GHPage.init(),50);
   if(id==='editor') { edLoad(); setTimeout(edRefreshPreview,100); }
+  if(id==='analytics') window.Analytics?.refresh();
 }
 
 async function syncBehance(){

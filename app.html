@@ -659,6 +659,32 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .edperf-tips .ptip{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--gold-l);white-space:nowrap}
 .edperf-tips .ptip button{font-size:8px;padding:2px 8px;border-radius:5px;border:1px solid rgba(200,255,0,.3);background:var(--accent-dim,rgba(200,255,0,.1));color:var(--accent);cursor:pointer;font-family:inherit}
 @media(max-width:1100px){.edperf-tips{display:none}}
+
+/* ═══ ANALYTICS ═══ */
+.an-empty{text-align:center;padding:56px 24px}
+.an-empty-ic{font-size:44px;margin-bottom:10px;opacity:.85}
+.an-live{display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);margin-right:auto}
+.an-live b{color:var(--accent3,#7dd3fc);font-weight:800}
+.an-live-dot{width:7px;height:7px;border-radius:50%;background:#2ecc71;animation:anpulse 1.8s infinite}
+@keyframes anpulse{0%{box-shadow:0 0 0 0 rgba(46,204,113,.5)}70%{box-shadow:0 0 0 7px rgba(46,204,113,0)}100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
+.an-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+.an-kpi{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+.an-kpi-l{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);margin-bottom:7px}
+.an-kpi-v{font-size:23px;font-weight:800;font-family:'Syne',sans-serif;letter-spacing:-1px;color:var(--text)}
+.an-card{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px}
+.an-card-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px;font-size:12px;font-weight:700;color:var(--text)}
+.an-card-sub{font-size:9px;color:var(--muted2);font-weight:400}
+.an-2col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.an-bar-row{display:grid;grid-template-columns:120px 1fr 60px;gap:10px;align-items:center;margin-bottom:9px;font-size:11px}
+.an-bar-row .lbl{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.an-bar-track{height:8px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
+.an-bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--accent3,#7dd3fc));transition:width .5s ease}
+.an-bar-val{text-align:right;color:var(--text);font-weight:700}
+.an-empty-mini{font-size:10px;color:var(--muted2);padding:8px 0}
+#an-trend svg .an-line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+#an-trend svg .an-grid{stroke:rgba(255,255,255,.06);stroke-width:1}
+#an-trend svg .an-dot{fill:var(--accent)}
+@media(max-width:900px){.an-kpis{grid-template-columns:repeat(2,1fr)}.an-2col{grid-template-columns:1fr}.an-bar-row{grid-template-columns:100px 1fr 52px}}
 </style>
 </head>
 <body>
@@ -1076,28 +1102,48 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
     <!-- ══ PAGE: ANALYTICS ══ -->
     <div class="page" id="page-analytics">
-      <div class="section-header"><div class="section-title">Analytics</div><div class="section-line"></div></div>
-      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
-        <div class="kpi-card k1"><div class="kpi-label">Vues</div><div class="kpi-val" id="an-views">—</div></div>
-        <div class="kpi-card k2"><div class="kpi-label">Visiteurs</div><div class="kpi-val" id="an-visitors">—</div></div>
-        <div class="kpi-card k3"><div class="kpi-label">Clics</div><div class="kpi-val" id="an-clicks">—</div></div>
-        <div class="kpi-card k4"><div class="kpi-label">Revenus</div><div class="kpi-val" id="an-revenue">0 €</div></div>
+      <div class="section-header">
+        <div class="section-title">Analytics</div><div class="section-line"></div>
+        <span id="an-live" class="an-live" style="display:none"><span class="an-live-dot"></span><b id="an-live-n">0</b>&nbsp;en ligne</span>
+        <select id="an-range" class="prop-input" style="width:auto;font-size:10px;padding:6px 10px" onchange="Analytics.render()">
+          <option value="7">7 jours</option>
+          <option value="30" selected>30 jours</option>
+          <option value="90">90 jours</option>
+        </select>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="Analytics.refresh()">↻ Actualiser</button>
+        <button class="btn btn-ghost" style="font-size:10px" id="an-demo-btn" onclick="Analytics.toggleDemo()">👁 Aperçu démo</button>
       </div>
-      <div class="gc" style="padding:16px;max-width:640px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-          <div style="width:34px;height:34px;background:rgba(200,255,0,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">📊</div>
-          <div style="flex:1">
-            <div style="font-size:12px;font-weight:700">Statistiques réelles — GoatCounter</div>
-            <div style="font-size:9px;color:var(--muted2)" id="gc-status">Non configuré</div>
-          </div>
-          <button onclick="refreshRealStats(false)" class="btn btn-ghost" style="font-size:10px">↻ Actualiser</button>
-          <a id="gc-open" href="#" target="_blank" class="btn btn-accent" style="display:none;font-size:10px">↗ Détails</a>
+
+      <div id="an-empty" class="an-empty" style="display:none">
+        <div class="an-empty-ic">📊</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text)">Aucune donnée pour l'instant</div>
+        <div style="font-size:11px;color:var(--muted);max-width:440px;margin:8px auto 0;line-height:1.7">Les statistiques s'affichent ici <b>automatiquement</b> dès que ton site publié reçoit des visites. Aucun compte externe, aucune clé — tout est intégré à Souanpt Hub.<br>En attendant, clique <b>« 👁 Aperçu démo »</b> en haut à droite pour voir le rendu.</div>
+      </div>
+
+      <div id="an-dash">
+        <div class="an-kpis">
+          <div class="an-kpi"><div class="an-kpi-l">Vues totales</div><div class="an-kpi-v" id="an-k-views">—</div></div>
+          <div class="an-kpi"><div class="an-kpi-l">Visiteurs uniques</div><div class="an-kpi-v" id="an-k-uniq">—</div></div>
+          <div class="an-kpi"><div class="an-kpi-l">Aujourd'hui</div><div class="an-kpi-v" id="an-k-today">—</div></div>
+          <div class="an-kpi"><div class="an-kpi-l">7 jours</div><div class="an-kpi-v" id="an-k-7">—</div></div>
+          <div class="an-kpi"><div class="an-kpi-l">30 jours</div><div class="an-kpi-v" id="an-k-30">—</div></div>
         </div>
-        <div class="hintbox" style="margin-bottom:10px">Gratuit, sans cookie, compatible GitHub Pages : <strong style="color:var(--text)">1.</strong> compte sur <a href="https://www.goatcounter.com" target="_blank" style="color:var(--accent3)">goatcounter.com →</a> · <strong style="color:var(--text)">2.</strong> code (ex : <code style="color:var(--accent)">souanpt</code>) collé ici · <strong style="color:var(--text)">3.</strong> dans GoatCounter → <strong style="color:var(--text)">Settings → coche « Allow using the visitor counter »</strong> (indispensable pour afficher les stats ici) · <strong style="color:var(--text)">4.</strong> 🚀 Publie. Les <strong style="color:var(--accent)">Vues</strong> et <strong style="color:var(--accent)">Visiteurs</strong> remontent dans les cartes ci-dessus et l'onglet Vue d'ensemble.</div>
-        <div style="display:flex;gap:8px">
-          <input class="prop-input" id="gc-code" placeholder="ton-code (→ ton-code.goatcounter.com)" style="flex:1" onkeydown="if(event.key==='Enter')saveGoat()">
-          <button class="btn btn-ghost" onclick="saveGoat()" style="white-space:nowrap">Sauvegarder</button>
+
+        <div class="an-card">
+          <div class="an-card-h"><span>Évolution des vues</span><span id="an-trend-sub" class="an-card-sub"></span></div>
+          <div id="an-trend"></div>
         </div>
+
+        <div class="an-2col">
+          <div class="an-card"><div class="an-card-h"><span>Référents</span><span class="an-card-sub">d'où viennent les visiteurs</span></div><div id="an-ref"></div></div>
+          <div class="an-card"><div class="an-card-h"><span>Appareils</span></div><div id="an-dev"></div></div>
+        </div>
+        <div class="an-2col">
+          <div class="an-card"><div class="an-card-h"><span>Navigateurs</span></div><div id="an-br"></div></div>
+          <div class="an-card"><div class="an-card-h"><span>Pays</span></div><div id="an-co"></div></div>
+        </div>
+
+        <div class="an-card"><div class="an-card-h"><span>Projets les plus consultés</span><span class="an-card-sub">vues · clics · CTR</span></div><div id="an-proj"></div></div>
       </div>
     </div>
 
@@ -1624,6 +1670,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/cloud.js"></script>
 <script src="js/core.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/analytics.js"></script>
 <script>
 /* ═══ SETTINGS ═══ */
 function settingsTab(name, el) {
