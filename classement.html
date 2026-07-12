@@ -49,6 +49,10 @@ h1{font-size:clamp(34px,6vw,56px);font-weight:800;letter-spacing:-2px;margin-bot
 .av img{width:100%;height:100%;object-fit:cover}
 .uname{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700}
 .uhandle{font-size:11px;color:var(--m2)}
+.ustats{display:flex;gap:10px;flex-wrap:wrap;margin-top:3px;font-size:10px;color:var(--m2)}
+.ustats b{color:var(--m);font-weight:700}
+.row .ext{opacity:0;font-size:11px;color:var(--m2);transition:.15s}
+.row:hover .ext{opacity:.7}
 .vbadge{font-size:9px;background:var(--a-dim);color:var(--a);padding:2px 8px;border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
 .score{font-size:15px;font-weight:800;white-space:nowrap}
 .score span{font-size:11px;color:var(--m2);font-weight:400}
@@ -115,6 +119,14 @@ let _users = [];
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function num(n){return (Number(n)||0).toLocaleString('fr-FR');}
 
+/* URL publique du créateur : domaine perso > site déployé (Pages/GitHub) */
+function userSite(u){
+  if(u.customDomain) return /^https?:\/\//.test(u.customDomain)? u.customDomain : 'https://'+u.customDomain;
+  if(u.siteUrl) return u.siteUrl;
+  if(u.repo){ const p=String(u.repo).split('/'); return 'https://'+(p[0]||'').toLowerCase()+'.github.io/'+(p[1]||'')+'/'; }
+  return '#';
+}
+
 /* Score Souanpt : pondération (anti-triche : les vues seules ne suffisent pas) */
 function souanptScore(u){
   if (typeof u.score === 'number' && u.score > 0) return u.score;
@@ -145,18 +157,30 @@ function renderBoard(users, cat){
   }
   list.innerHTML = ranked.map((u,i)=>{
     const rank=i+1, top=rank<=3?' top'+rank:'';
-    const site = u.siteUrl || (u.repo? 'https://'+String(u.repo).split('/')[0].toLowerCase()+'.github.io/'+String(u.repo).split('/')[1]+'/' : '#');
+    const site = userSite(u);
     const initial=esc((u.pseudo||'?')[0].toUpperCase());
-    return `<div class="row${top}" onclick="window.open('${esc(site)}','_blank')">
+    const isPro = u.plan==='pro'||u.plan==='premium';
+    const stats = [
+      `<span>👁 <b>${num(u.views)}</b> vues</span>`,
+      `<span>📁 <b>${num(u.projects)}</b> projets</span>`,
+      (Number(u.reviewsCount)||0) ? `<span>⭐ <b>${(Number(u.reviewsAvg)||0).toFixed(1)}</b></span>` : '',
+      u.country ? `<span>🌍 ${esc(u.country)}</span>` : ''
+    ].filter(Boolean).join('');
+    const clickable = site && site !== '#';
+    return `<div class="row${top}"${clickable?` onclick="window.open('${esc(site)}','_blank','noopener')" title="Ouvrir le site de @${esc(u.pseudo)}"`:''} style="${clickable?'':'cursor:default'}">
       <div class="rank">#${rank}</div>
       <div class="usr">
         <div class="av">${u.avatar?`<img src="${esc(u.avatar)}" alt="">`:initial}</div>
         <div style="min-width:0">
-          <div class="uname">${esc(u.name||u.pseudo)}${u.verified?'<span class="vbadge">✔ Vérifié</span>':''}${u.plan==='pro'||u.plan==='premium'?'<span class="vbadge" style="color:var(--gold);background:rgba(228,178,74,.12)">★ Premium</span>':''}</div>
-          <div class="uhandle">@${esc(u.pseudo)}${u.country?' · '+esc(u.country):''}</div>
+          <div class="uname">${esc(u.name||u.pseudo)}${u.verified?'<span class="vbadge">✔ Vérifié</span>':''}${isPro?'<span class="vbadge" style="color:var(--gold);background:rgba(228,178,74,.12)">★ Premium</span>':''}</div>
+          <div class="uhandle">@${esc(u.pseudo)}</div>
+          <div class="ustats">${stats}</div>
         </div>
       </div>
-      <div class="score">${scoreLabel(u,cat)}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="score">${scoreLabel(u,cat)}</div>
+        ${clickable?'<span class="ext">↗</span>':''}
+      </div>
     </div>`;
   }).join('');
 }

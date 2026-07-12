@@ -587,6 +587,21 @@ const BubbleWidget = {
 /* ══════════════════════════════════════════════════════
    NAVIGATION
 ══════════════════════════════════════════════════════ */
+/* Menu latéral repliable (accordéon) — une seule catégorie ouverte à la fois,
+   remise à zéro à chaque changement de page (aucun état mémorisé). */
+function toggleNavCat(label) {
+  const sec = label.parentElement;
+  const wasOpen = sec.classList.contains('open');
+  document.querySelectorAll('.sidebar .nav-section').forEach(s => s.classList.remove('open'));
+  if (!wasOpen) sec.classList.add('open');
+}
+function syncNavCat() {
+  const active = document.querySelector('.sidebar .ni.active');
+  document.querySelectorAll('.sidebar .nav-section').forEach(s => s.classList.remove('open'));
+  active?.closest('.nav-section')?.classList.add('open');
+}
+window.toggleNavCat = toggleNavCat;
+
 function showPage(id) {
   // Behance & GitHub ont déménagé dans Paramètres → Intégrations
   if (id === 'github' || id === 'behance') {
@@ -602,6 +617,9 @@ function showPage(id) {
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   const page=document.getElementById('page-'+id); if(page)page.classList.add('active');
   const navBtn=document.querySelector(`.ni[data-page="${id}"]`); if(navBtn)navBtn.classList.add('active');
+  // n'ouvrir que la catégorie de la page active, replier les autres
+  document.querySelectorAll('.sidebar .nav-section').forEach(s=>s.classList.remove('open'));
+  navBtn?.closest('.nav-section')?.classList.add('open');
   const titles={overview:"Vue d'ensemble",analytics:'Analytics',portfolio:'Portfolio',links:'Profil Links',editor:'Éditeur de site',clients:'Clients',facturation:'Facturation',avis:'Avis',portals:'Portails Clients',media:'Médias',storage:'Stockage',behance:'Behance Sync',github:'GitHub & Déploiement',settings:'Paramètres'};
   const t=document.getElementById('topbar-title'); if(t)t.textContent=titles[id]||id;
   document.querySelector('.scroll-area')?.scrollTo({top:0});
@@ -616,6 +634,7 @@ async function syncBehance(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
+  syncNavCat();
   if(document.getElementById('page-github')?.classList.contains('active')) GHPage.init();
   if(document.getElementById('page-editor')?.classList.contains('active'))  { edLoad(); setTimeout(edRefreshPreview,200); }
   if(Auth.ok()) BubbleWidget.init();
