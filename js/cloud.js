@@ -20,6 +20,8 @@ const Cloud = {
       this.enabled = true;
       this._auth.onAuthStateChanged(u => {
         this._user = u; this._resolved = true;
+        // mémorise l'uid dans la config du site → le mouchard analytics l'embarque au déploiement
+        if (u) { try { window.SiteConfig && SiteConfig.set('ownerUid', u.uid); } catch (e) {} }
         this._cbs.forEach(cb => { try { cb(u); } catch (e) { console.error('[cloud] cb', e); } });
       });
     } catch (e) { console.error('[cloud] init', e); this.enabled = false; }

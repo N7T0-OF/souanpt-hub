@@ -144,6 +144,7 @@ const Auth = {
 const REPO_DATA_SUFFIX = '-hub-data';  // {username}-hub-data (backup privé)
 const HUB_REPO_NAME    = 'souanpt-hub'; // repo du dashboard — jamais utilisé comme cible de déploiement
 const HUB_HOME_URL     = 'https://souanptjub.pages.dev/'; // accueil souanpt.hub V2 (Cloudflare Pages — cible du badge des sites publiés)
+const ANALYTICS_URL    = 'https://souanpt-analytics.titaneolinne13.workers.dev/hit'; // mouchard des sites publiés → agrégats Firestore (Worker gratuit)
 const SITE_REPO_NAME   = 'souanpt-folio'; // repo par défaut du site public
 
 async function connectGitHub(token) {
@@ -235,7 +236,7 @@ function generateSite(cfg, projects, reviews) {
   const revY        = animLevel === 'none' ? 0 : animLevel === 'premium' ? 26 : 18;
 
   const cards = projects.map((p, i) => `
-    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
+    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
@@ -514,7 +515,7 @@ ${fx.mouseglow?`
   });`:''}
 }`:''}
 </script>
-${cfg.goatcounter?`<script data-goatcounter="https://${esc(String(cfg.goatcounter).trim())}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>`:''}
+${cfg.ownerUid ? `<script>(function(){var U=${JSON.stringify(String(cfg.ownerUid))},EP=${JSON.stringify(ANALYTICS_URL)};if(!U||location.protocol.indexOf('http')!==0||location.hostname==='localhost'||location.hostname==='127.0.0.1'){return;}var td=new Date().toISOString().slice(0,10),vid,ld,uq=true;try{vid=localStorage.getItem('_shv');if(!vid){vid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('_shv',vid);}ld=localStorage.getItem('_shd');uq=ld!==td;localStorage.setItem('_shd',td);}catch(e){}function S(p){p.uid=U;try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon(EP,b);}else{fetch(EP,{method:'POST',body:b,keepalive:true,mode:'no-cors'});}}catch(e){}}S({t:'pv',u:uq?1:0,ref:document.referrer||'',ua:navigator.userAgent});var seen={};try{var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){var t=en.target.getAttribute('data-p');if(t){seen[t]=1;}io.unobserve(en.target);}});},{threshold:.5});document.querySelectorAll('[data-p]').forEach(function(el){io.observe(el);});}catch(e){}function F(){var ps=Object.keys(seen);if(ps.length){S({t:'pj',projects:ps});seen={};}}setTimeout(F,4500);addEventListener('pagehide',F);document.querySelectorAll('[data-p]').forEach(function(el){el.addEventListener('click',function(){var t=el.getAttribute('data-p');if(t){S({t:'click',project:t});}});});})();</script>` : ''}
 </body></html>`;
 }
 

@@ -1,0 +1,10 @@
+# Déploiement du Worker Analytics (collecte des visites → Firestore).
+#   cd cloudflare
+#   wrangler deploy -c wrangler.analytics.toml
+# Secrets (mêmes valeurs que le Worker Discord) :
+#   wrangler secret put FIREBASE_CLIENT_EMAIL -c wrangler.analytics.toml
+#   wrangler secret put FIREBASE_PRIVATE_KEY  -c wrangler.analytics.toml
+
+name = "souanpt-analytics"
+main = "analytics-worker.js"
+compatibility_date = "2026-07-01"
