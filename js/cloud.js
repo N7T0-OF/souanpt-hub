@@ -158,13 +158,13 @@ const Cloud = {
     if (!this.enabled || !uid) return null;
     try {
       const col = this._db.collection('users').doc(uid).collection('analytics');
-      const names = ['summary', 'daily', 'referrers', 'devices', 'browsers', 'countries', 'projects'];
+      const names = ['summary', 'daily', 'referrers', 'devices', 'countries', 'projects'];
       const snaps = await Promise.all(names.map(n => col.doc(n).get().catch(() => null)));
       const g = s => (s && s.exists ? s.data() : {}) || {};
-      const [sum, daily, ref, dev, br, co, pr] = snaps.map(g);
+      const [sum, daily, ref, dev, co, pr] = snaps.map(g);
       return {
         summary: sum || {}, days: daily.days || {}, referrers: ref.map || {},
-        devices: dev.map || {}, browsers: br.map || {}, countries: co.map || {}, projects: pr.map || {},
+        devices: dev.map || {}, countries: co.map || {}, projects: pr.map || {},
       };
     } catch (e) { console.warn('[cloud] loadAnalytics', e); return null; }
   },
