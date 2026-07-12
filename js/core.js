@@ -182,7 +182,7 @@ const SiteConfig = {
     avisMode: 'defile',
     about: '', goatcounter: '',
     layoutStyle: 'float', heroImage: '', projectsLimit: 0,
-    animLevel: 'smooth', fx: { tilt: false, intensity: 7, shine: false, lift: false, scale: false, glow: false, mouseglow: false, parallax: false },
+    animLevel: 'smooth', fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
   save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); },
@@ -356,15 +356,17 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 .made b{color:var(--a)}
 @media(max-width:640px){.made{bottom:12px;right:12px;padding:6px 10px 6px 8px;font-size:10px}}
 @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-${animLevel==='none'?'':`.pc{animation:fu ${revDur*.7}s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}`}
-/* Effets premium (survol & souris) */
+@keyframes fuo{from{opacity:0}to{opacity:1}}
+${animLevel==='none'?'':`.pc{animation:${fx.tilt?'fuo':'fu'} ${revDur*.7}s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}`}
 .pc{transition:transform .18s ease,box-shadow .25s ease}
-${fx.tilt?`.pc{transform-style:preserve-3d;transition:transform .1s ease,box-shadow .25s}`:''}
+/* Effets premium — UNIQUEMENT sur ordinateur (souris/trackpad détectés) */
+@media (hover:hover) and (pointer:fine){
+${fx.tilt?`.pc{transform-style:preserve-3d;transition:transform .1s ease,box-shadow .25s;will-change:transform}`:''}
 ${fx.lift&&!fx.tilt?`.pc:hover{transform:translateY(-7px)}`:''}
-${fx.scale&&!fx.tilt&&!fx.lift?`.pc:hover{transform:scale(1.03)}`:''}
 ${fx.glow?`.pc:hover{box-shadow:0 16px 42px color-mix(in srgb,var(--a) 32%,transparent)!important}`:''}
 ${fx.shine?`.pc{position:relative}.pc::before{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.22) 48%,transparent 60%);transform:translateX(-130%);transition:transform .7s ease}.pc:hover::before{transform:translateX(130%)}`:''}
 ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(180px circle at var(--mx,50%) var(--my,50%),color-mix(in srgb,var(--a) 22%,transparent),transparent 60%)}.pc:hover::after{opacity:1}`:''}
+}
 /* ── À PROPOS ── */
 .about-p{font-size:14px;color:var(--m);line-height:1.95}
 /* ── AVIS DÉFILEMENT INFINI ── */
@@ -398,7 +400,7 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .sb-side{width:230px;flex-shrink:0;position:sticky;top:14px;height:calc(100vh - 28px);padding:24px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow-y:auto}
 .sb-logo{display:flex;align-items:center;gap:9px;font-size:18px;font-weight:800;letter-spacing:-.5px;margin-bottom:20px}
 .sb-logo .ic{width:28px;height:28px;border-radius:9px;background:var(--a);color:#060606;display:inline-flex;align-items:center;justify-content:center;font-size:15px}
-.sb-nav{display:flex;flex-direction:column;gap:2px}
+.sb-nav{display:flex;flex-direction:column;gap:2px;background:none;border:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;border-radius:14px;max-width:none;width:100%}
 .sb-nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:600;color:var(--m);transition:.15s}
 .sb-nav a:hover{background:rgba(128,128,128,.1);color:var(--t)}
 .sb-nav .sbi{width:18px;text-align:center;opacity:.8}
@@ -495,22 +497,22 @@ if ('IntersectionObserver' in window) {
 } else {
   document.querySelectorAll('.rev').forEach(function(el){el.classList.add('in');});
 }`}
+${(fx.tilt||fx.mouseglow)?`
+// Effets souris — UNIQUEMENT sur un vrai pointeur (PC/trackpad), jamais sur mobile
+if (window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches) {
 ${fx.tilt?`
-// Effet 3D interactif (Gun.lol / Haunt.gg) — la carte s'incline vers la souris
-var _ti=${Math.max(3,Math.min(16,Number(fx.intensity)||7))};
-document.querySelectorAll('.pc').forEach(function(c){
-  c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(700px) rotateY('+(x*_ti)+'deg) rotateX('+(-y*_ti)+'deg) translateY(-4px)';});
-  c.addEventListener('mouseleave',function(){c.style.transform='';});
-});`:''}
+  // Effet 3D interactif (Gun.lol / Haunt.gg) — la carte suit la souris, retour doux au centre
+  var _ti=${Math.max(3,Math.min(16,Number(fx.intensity)||7))};
+  document.querySelectorAll('.pc').forEach(function(c){
+    c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(700px) rotateY('+(x*_ti)+'deg) rotateX('+(-y*_ti)+'deg) translateY(-4px)';});
+    c.addEventListener('mouseleave',function(){c.style.transform='';});
+  });`:''}
 ${fx.mouseglow?`
-// Halo lumineux qui suit le curseur
-document.querySelectorAll('.pc').forEach(function(c){
-  c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px');});
-});`:''}
-${fx.parallax?`
-// Parallaxe du hero suivant la souris
-var _h=document.querySelector('.sb-hero, .hero');
-if(_h) window.addEventListener('mousemove',function(e){var x=(e.clientX/window.innerWidth-.5),y=(e.clientY/window.innerHeight-.5);_h.style.backgroundPosition='calc(50% + '+(x*18)+'px) calc(50% + '+(y*18)+'px)';});`:''}
+  // Halo lumineux qui suit le curseur
+  document.querySelectorAll('.pc').forEach(function(c){
+    c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px');});
+  });`:''}
+}`:''}
 </script>
 ${cfg.goatcounter?`<script data-goatcounter="https://${esc(String(cfg.goatcounter).trim())}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>`:''}
 </body></html>`;

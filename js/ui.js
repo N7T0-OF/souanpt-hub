@@ -253,37 +253,8 @@ function ghOpenSite() {
 ══════════════════════════════════════════════════════ */
 let _edTimer=null, _edBlobUrl=null;
 
-/* ══════════════════════════════════════════════════════
-   TEMPLATES PAR MÉTIER — préréglages complets en 1 clic
-══════════════════════════════════════════════════════ */
-const SITE_TEMPLATES = [
-  { id:'designer',  name:'Designer',      accent:'#C8FF00', theme:'#060606', layout:'3', hero:'Créatif · Designer · Motion',       avisMode:'defile' },
-  { id:'photo',     name:'Photographe',   accent:'#E4B24A', theme:'#060606', layout:'2', hero:'Photographe · Lumière · Histoires', avisMode:'grille' },
-  { id:'minecraft', name:'Minecraft',     accent:'#4ADE80', theme:'#0a0a14', layout:'3', hero:'Builds · Textures · Mods',          avisMode:'defile' },
-  { id:'dev',       name:'Développeur',   accent:'#00D4FF', theme:'#060606', layout:'3', hero:'Code · Web · Apps',                 avisMode:'defile' },
-  { id:'illu',      name:'Illustrateur',  accent:'#FF6B9D', theme:'#0a0a14', layout:'4', hero:'Illustration · Character Design',   avisMode:'defile' },
-  { id:'clair',     name:'Clair minimal', accent:'#6B21A8', theme:'#f8f8f8', layout:'3', hero:'Portfolio · Minimal · Élégant',     avisMode:'grille' },
-];
-function renderTemplates() {
-  const box = document.getElementById('ed-templates'); if (!box) return;
-  box.innerHTML = SITE_TEMPLATES.map(t =>
-    `<div class="tpl-card" data-tpl="${t.id}" onclick="applyTemplate('${t.id}')" title="Appliquer le template ${t.name}">
-      <span class="tpl-dot" style="background:${t.accent}"></span><span class="tpl-dot" style="background:${t.theme};border:1px solid rgba(255,255,255,.2);margin-left:-4px"></span>${t.name}
-    </div>`).join('');
-}
-function applyTemplate(id) {
-  const t = SITE_TEMPLATES.find(x => x.id === id); if (!t) return;
-  const set = (i,v) => { const el = document.getElementById(i); if (el) el.value = v; };
-  set('ep-accent-color', t.accent); set('ep-theme', t.theme); set('ep-layout', t.layout);
-  set('ep-hero-text', t.hero); set('ep-avis-mode', t.avisMode);
-  document.querySelectorAll('.tpl-card').forEach(c => c.classList.toggle('active', c.dataset.tpl === id));
-  edRefreshPreview();
-  showToast('Template « ' + t.name + ' » appliqué — ↑ Sauver pour le garder', '#2e9a63', 3000);
-}
-
 function edLoad() {
   const cfg = SiteConfig.get();
-  renderTemplates();
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
   set('ep-site-name', cfg.siteName);
   set('ep-bio',       cfg.bio);
@@ -308,8 +279,7 @@ function edLoad() {
   const fx = cfg.fx || {};
   const chk=(id,v)=>{ const el=document.getElementById(id); if(el) el.checked=!!v; };
   chk('ep-fx-tilt', fx.tilt); chk('ep-fx-shine', fx.shine); chk('ep-fx-lift', fx.lift);
-  chk('ep-fx-scale', fx.scale); chk('ep-fx-glow', fx.glow); chk('ep-fx-mouseglow', fx.mouseglow);
-  chk('ep-fx-parallax', fx.parallax);
+  chk('ep-fx-glow', fx.glow); chk('ep-fx-mouseglow', fx.mouseglow);
   const intv=document.getElementById('ep-fx-intensity'); if(intv){intv.value=fx.intensity||7; const tv=document.getElementById('ep-tilt-val'); if(tv)tv.textContent=fx.intensity||7;}
   edSyncThemeCards();
   edPerf();
@@ -342,10 +312,8 @@ function edGetConfig() {
       intensity: parseInt(document.getElementById('ep-fx-intensity')?.value) || 7,
       shine:     !!document.getElementById('ep-fx-shine')?.checked,
       lift:      !!document.getElementById('ep-fx-lift')?.checked,
-      scale:     !!document.getElementById('ep-fx-scale')?.checked,
       glow:      !!document.getElementById('ep-fx-glow')?.checked,
       mouseglow: !!document.getElementById('ep-fx-mouseglow')?.checked,
-      parallax:  !!document.getElementById('ep-fx-parallax')?.checked,
     },
   };
 }
@@ -378,8 +346,8 @@ function edPerf() {
   const row = document.getElementById('ep-fx-tilt-row'); if (row) row.style.display = fx.tilt ? '' : 'none';
   const tv = document.getElementById('ep-tilt-val'); if (tv) tv.textContent = fx.intensity || 7;
   const anim = { none: 0, light: 3, smooth: 8, premium: 16 }[g.animLevel] ?? 8;
-  let load = anim + (fx.tilt ? 8 : 0) + (fx.shine ? 4 : 0) + (fx.lift ? 2 : 0) + (fx.scale ? 2 : 0)
-           + (fx.glow ? 4 : 0) + (fx.mouseglow ? 6 : 0) + (fx.parallax ? 7 : 0);
+  let load = anim + (fx.tilt ? 8 : 0) + (fx.shine ? 4 : 0) + (fx.lift ? 2 : 0)
+           + (fx.glow ? 4 : 0) + (fx.mouseglow ? 6 : 0);
   let projs = 0, heavyCovers = 0;
   try { const P = JSON.parse(localStorage.getItem('hub_projects') || '[]'); projs = P.length; heavyCovers = P.filter(p => (p.cover || '').startsWith('data:')).length; } catch {}
   load += Math.max(0, projs - 12) * 1.5 + heavyCovers * 3 + (g.heroImage ? 4 : 0);
