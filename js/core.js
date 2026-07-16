@@ -199,10 +199,113 @@ function esc(str) {
 }
 function getProjects() { try { return JSON.parse(localStorage.getItem('hub_projects') || '[]'); } catch { return []; } }
 function getReviews()  { try { return JSON.parse(localStorage.getItem('hub_reviews')  || '[]'); } catch { return []; } }
+function getLinks()    { try { return JSON.parse(localStorage.getItem('hub_links')    || '[]'); } catch { return []; } }
+
+/* ══════════════════════════════════════════════════════
+   MODÈLE DE BLOCS — source unique du contenu public.
+   Un bloc = une PLACE (w/h sur la grille) + une PRÉSENTATION.
+   Les données restent dans hub_projects / hub_links (via `ref`) pour ne rien
+   casser (sync Behance, analytics, classement) ; les blocs libres (texte…)
+   portent leurs données dans `props`.
+   Même modèle pour TOUS les styles : la grille Bento le rend en grille,
+   les styles flottant/latéral le regroupent en sections. Changer de style
+   n'efface donc jamais un bloc.
+     { id, type, w, h, ref?, props?, hidden?, locked? }
+     type : profile | project | link | text | reviews | contact
+══════════════════════════════════════════════════════ */
+const BLOCK_COLS = 4;                       // colonnes de la grille (desktop)
+const blockUid = t => 'b_' + t + '_' + Math.random().toString(36).slice(2, 8);
+
+/** Renvoie les blocs du site : ceux enregistrés, sinon migrés depuis l'existant. */
+function getBlocks(cfg, projects, links) {
+  cfg = cfg || SiteConfig.get();
+  if (Array.isArray(cfg.blocks) && cfg.blocks.length) return cfg.blocks;
+  return migrateBlocks(cfg, projects, links);
+}
+
+/** Migration : projets → blocs Projet, liens → blocs Réseau, à propos → bloc Texte…
+    Non destructif : ne touche à aucune donnée, construit seulement la disposition. */
+function migrateBlocks(cfg, projects, links) {
+  cfg      = cfg || SiteConfig.get();
+  projects = projects || getProjects();
+  links    = links || getLinks();
+  const sec = { projects: true, avis: true, contact: true, about: true, ...(cfg.sections || {}) };
+  const out = [{ id: 'b_profile', type: 'profile', w: 2, h: 2 }];
+  if (String(cfg.about || '').trim() && sec.about)
+    out.push({ id: 'b_about', type: 'text', w: 2, h: 1, props: { title: 'À propos', text: String(cfg.about) } });
+  links.forEach(l => out.push({ id: blockUid('link'), type: 'link', ref: l.id, w: 1, h: 1 }));
+  if (sec.projects) projects.forEach((p, i) =>
+    out.push({ id: blockUid('proj'), type: 'project', ref: p.id, w: i === 0 ? 2 : 1, h: i === 0 ? 2 : 1 }));
+  if (sec.avis)    out.push({ id: 'b_reviews', type: 'reviews', w: 2, h: 1 });
+  if (sec.contact) out.push({ id: 'b_contact', type: 'contact', w: 1, h: 1 });
+  return out;
+}
+
+/** Résumé de migration (affiché à l'utilisateur) */
+function migrateBlocksSummary(cfg, projects, links) {
+  const b = migrateBlocks(cfg, projects, links);
+  const n = t => b.filter(x => x.type === t).length;
+  return { total: b.length, projects: n('project'), links: n('link'), text: n('text'), reviews: n('reviews'), contact: n('contact') };
+}
 
 /* ══════════════════════════════════════════════════════
    SITE GENERATOR — navbar style haunt.gg + projets cliquables + avis visiteurs
 ══════════════════════════════════════════════════════ */
+/** Rendu de la grille Bento depuis les blocs. Conserve data-p / data-l pour l'analytics. */
+function renderBentoGrid(blocks, ctx) {
+  const { cfg, projects, links, approved, GRADS } = ctx;
+  const P = id => projects.find(p => String(p.id) === String(id));
+  const L = id => links.find(l => String(l.id) === String(id));
+  const platIcon = (t, u) => {
+    const s = (t + ' ' + u).toLowerCase();
+    if (s.includes('discord')) return '🎮';   if (s.includes('instagram')) return '📸';
+    if (s.includes('behance')) return '🎨';   if (s.includes('github')) return '🐙';
+    if (s.includes('linkedin')) return '💼';  if (s.includes('tiktok')) return '🎵';
+    if (s.includes('youtube')) return '▶';    if (s.includes('twitch')) return '🟣';
+    if (s.includes('kofi') || s.includes('ko-fi')) return '☕';
+    if (s.includes('mailto') || s.includes('@')) return '✉';
+    return '🔗';
+  };
+  const cell = (b, inner, extra) =>
+    `<article class="bn bn-${esc(b.type)}" data-b="${esc(b.id)}" style="--w:${Math.max(1, Math.min(BLOCK_COLS, b.w || 1))};--h:${Math.max(1, b.h || 1)}"${extra || ''}>${inner}</article>`;
+
+  const html = blocks.filter(b => !b.hidden).map(b => {
+    if (b.type === 'profile')
+      return cell(b, `<div class="bn-av">${esc(String(cfg.siteName || 'S')[0].toUpperCase())}</div>
+        ${cfg.heroText ? `<div class="bn-htag">${esc(cfg.heroText)}</div>` : ''}
+        <h1 class="bn-name">${esc(cfg.siteName || '')}</h1>
+        ${cfg.bio ? `<p class="bn-bio">${esc(cfg.bio)}</p>` : ''}`);
+    if (b.type === 'text') {
+      const pr = b.props || {};
+      return cell(b, `${pr.title ? `<div class="bn-t">${esc(pr.title)}</div>` : ''}<p class="bn-txt">${esc(pr.text || '').replace(/\n/g, '<br>')}</p>`);
+    }
+    if (b.type === 'link') {
+      const l = L(b.ref); if (!l) return '';
+      return cell(b, `<span class="bn-ic">${platIcon(l.title || '', l.url || '')}</span><div class="bn-t">${esc(l.title || 'Lien')}</div><div class="bn-sub">${esc(String(l.url || '').replace(/^https?:\/\//, '').slice(0, 30))}</div>`,
+        ` data-l="${esc(l.title || 'Lien')}" onclick="window.open('${esc(l.url)}','_blank')"`);
+    }
+    if (b.type === 'project') {
+      const p = P(b.ref); if (!p) return '';
+      const i = Math.max(0, projects.indexOf(p));
+      return cell(b, `<div class="bn-cov" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i % 6]}`}"></div>
+        <div class="bn-pb"><div class="bn-t">${esc(p.title || 'Projet')}</div><div class="ptags">${(p.tags || []).slice(0, 2).map(t => `<span class="ptag">${esc(t)}</span>`).join('')}</div></div>`,
+        ` data-p="${esc(p.title || 'Projet')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')"` : ''}`);
+    }
+    if (b.type === 'reviews') {
+      if (!approved.length) return '';
+      return cell(b, `<div class="bn-t">★ Avis</div><div class="bn-rv">${approved.slice(0, 3).map(r =>
+        `<div class="bn-rvi"><b>${esc(r.author)}</b> <span class="bn-st">${'★'.repeat(r.rating || 5)}</span><p>${esc(r.text)}</p></div>`).join('')}</div>`);
+    }
+    if (b.type === 'contact') {
+      if (!cfg.email) return '';
+      return cell(b, `<span class="bn-ic">✉</span><div class="bn-t">Me contacter</div><div class="bn-sub">${esc(cfg.email)}</div>`,
+        ` onclick="location.href='mailto:${esc(cfg.email)}'"`);
+    }
+    return '';
+  }).join('');
+  return `<div class="bn-grid">${html}</div>`;
+}
+
 function generateSite(cfg, projects, reviews) {
   if (!cfg)      cfg      = SiteConfig.get();
   if (!projects) projects = getProjects();
@@ -226,7 +329,9 @@ function generateSite(cfg, projects, reviews) {
   const repoFull = cfg.repo || '';
   const behanceUser = (cfg.behance || '').replace('@','');
   const GRADS  = ['linear-gradient(135deg,#1a0533,#6B21A8)','linear-gradient(135deg,#0a1628,#1e40af)','linear-gradient(135deg,#0d1f0d,#166534)','linear-gradient(135deg,#2d0a0a,#991b1b)','linear-gradient(135deg,#1a1400,#854d0e)','linear-gradient(135deg,#0a0a1f,#1e1b4b)'];
-  const layoutStyle = cfg.layoutStyle === 'sidebar' ? 'sidebar' : 'float';
+  const layoutStyle = ['sidebar', 'bento'].includes(cfg.layoutStyle) ? cfg.layoutStyle : 'float';
+  const links       = getLinks();
+  const blocks      = getBlocks(cfg, projects, links);   // même modèle pour tous les styles
   const heroImage   = String(cfg.heroImage || '').trim();
   const projLimit   = parseInt(cfg.projectsLimit) || 0;   // 0 = tous
   const hiddenCount = projLimit && projects.length > projLimit ? projects.length - projLimit : 0;
@@ -397,6 +502,29 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .seeall{background:var(--a);color:#060606;border:none;border-radius:999px;padding:9px 18px;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;transition:.2s;white-space:nowrap}
 .seeall:hover{opacity:.85}
 /* ── STYLE BARRE LATÉRALE ── */
+/* ── Style Bento : tout le corps est une grille de blocs ── */
+.bn-page{max-width:1080px;margin:0 auto;padding:0 16px 60px}
+.bn-grid{display:grid;grid-template-columns:repeat(${BLOCK_COLS},1fr);gap:14px;margin:34px 0;align-items:stretch}
+.bn{grid-column:span var(--w,1);grid-row:span var(--h,1);position:relative;display:flex;flex-direction:column;gap:6px;justify-content:center;
+    min-height:150px;padding:18px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow:hidden}
+.bn[onclick]{cursor:pointer}
+.bn-t{font-size:14px;font-weight:800;letter-spacing:-.2px;color:var(--t)}
+.bn-sub{font-size:11px;color:${mutedC};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bn-txt{font-size:12px;line-height:1.7;color:${mutedC}}
+.bn-ic{font-size:22px;line-height:1}
+.bn-av{width:52px;height:52px;border-radius:50%;background:var(--a);color:#060606;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;font-family:'Syne',sans-serif}
+.bn-htag{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--a)}
+.bn-name{font-size:clamp(20px,3vw,30px);font-weight:800;letter-spacing:-1px;color:var(--t)}
+.bn-bio{font-size:12px;line-height:1.7;color:${mutedC}}
+.bn-project{padding:0;justify-content:flex-start}
+.bn-cov{flex:1;min-height:70px;width:100%}
+.bn-pb{padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.bn-rv{display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.bn-rvi{font-size:11px;color:${mutedC};line-height:1.5}
+.bn-rvi b{color:var(--t)}
+.bn-st{color:var(--a);font-size:10px}
+@media(max-width:900px){.bn-grid{grid-template-columns:repeat(2,1fr)}.bn{grid-column:span min(var(--w,1),2)}}
+@media(max-width:560px){.bn-grid{grid-template-columns:1fr}.bn{grid-column:span 1;grid-row:span 1}}
 .sb-wrap{display:flex;min-height:100vh;gap:14px;padding:14px}
 .sb-side{width:230px;flex-shrink:0;position:sticky;top:14px;height:calc(100vh - 28px);padding:24px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow-y:auto}
 .sb-logo{display:flex;align-items:center;gap:9px;font-size:18px;font-weight:800;letter-spacing:-.5px;margin-bottom:20px}
@@ -422,7 +550,16 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 @media(max-width:820px){.sb-side{position:fixed;left:-260px;top:14px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{left:14px}.sb-main{padding:0}}
 @media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}.navcta{display:none}.burger{display:flex}}
 </style></head><body>
-${layoutStyle === 'sidebar' ? `
+${layoutStyle === 'bento' ? `
+<div class="bn-page">
+  <div class="navwrap"><nav>
+    <a href="#" class="logo"><span class="ic">✳</span>${esc(cfg.siteName)}<span class="d">.</span></a>
+    <div class="nl"></div>
+    ${cfg.email ? `<a class="ncta" href="mailto:${esc(cfg.email)}">Me contacter</a>` : ''}
+  </nav></div>
+  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS })}
+  <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
+</div>` : layoutStyle === 'sidebar' ? `
 <div class="sb-wrap" id="sbw">
   <aside class="sb-side">
     <a href="#" class="sb-logo"><span class="ic">✳</span>${esc(cfg.siteName)}</a>
