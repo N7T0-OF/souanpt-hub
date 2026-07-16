@@ -85,6 +85,15 @@ const Analytics = {
     this.render();
   },
 
+  /* Message d'état vide : dit précisément CE QU'IL MANQUE (sinon échec silencieux) */
+  _emptyMsg() {
+    const logged = !!(window.Cloud && Cloud.enabled && Cloud.user());
+    const uid = (() => { try { return SiteConfig.get().ownerUid || ''; } catch (e) { return ''; } })();
+    if (!logged) return '⚠️ <b>Connecte-toi avec Google ou Discord</b> pour activer les statistiques : elles sont rattachées à ton compte. Ensuite, republie ton site (🚀 Publier) — le suivi des visites démarrera automatiquement.';
+    if (!uid) return '⚠️ Ton compte est connecté mais la config du site n\'a pas encore ton identifiant. Ouvre l\'<b>Éditeur de site</b>, clique <b>↑ Sauver</b>, puis <b>🚀 Publier</b>.';
+    return 'Aucune visite enregistrée pour l\'instant. Si tu viens d\'activer le suivi, <b>republie ton site (🚀 Publier)</b> : c\'est la publication qui installe le compteur. Les stats arrivent ensuite toutes seules. En attendant, clique <b>« 👁 Aperçu démo »</b> pour voir le rendu.';
+  },
+
   _fmt(n) { return (Number(n) || 0).toLocaleString('fr-FR'); },
   _esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
   _cap(s) { s = String(s); return s.charAt(0).toUpperCase() + s.slice(1); },
@@ -122,7 +131,7 @@ const Analytics = {
     set('ov-uniq', has ? this._fmt(d.summary.visitors) : '—');
 
     if (!has) {
-      if (empty) empty.style.display = 'block';
+      if (empty) { empty.style.display = 'block'; empty.innerHTML = this._emptyMsg(); }
       if (live) live.style.display = 'none';
       html('an-trend', '');
       const t0 = document.getElementById('an-trend-sub'); if (t0) t0.textContent = '';

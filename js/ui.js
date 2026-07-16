@@ -299,6 +299,9 @@ function edGetConfig() {
     behance:     document.getElementById('ep-behance')?.value      || '',
     email:       document.getElementById('ep-email')?.value        || '',
     repo:        SiteConfig.get().repo || '',
+    // uid du propriétaire : indispensable pour que le site publié embarque le
+    // mouchard analytics (perdu sinon, edGetConfig ne lit que le formulaire)
+    ownerUid:    SiteConfig.get().ownerUid || (window.Cloud && Cloud.user() ? Cloud.user().uid : '') || '',
     sections: { ...(_edVis || { projects:true, avis:true, contact:true, about:true }) },
     sectionOrder: (_edOrder || ['about','projects','avis','contact']).slice(),
     about:    document.getElementById('ep-about')?.value || '',
