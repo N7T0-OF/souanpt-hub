@@ -256,7 +256,7 @@ function migrateBlocksSummary(cfg, projects, links) {
 ══════════════════════════════════════════════════════ */
 /** Rendu de la grille Bento depuis les blocs. Conserve data-p / data-l pour l'analytics. */
 function renderBentoGrid(blocks, ctx) {
-  const { cfg, projects, links, approved, GRADS } = ctx;
+  const { cfg, projects, links, approved, GRADS, editor } = ctx;
   const P = id => projects.find(p => String(p.id) === String(id));
   const L = id => links.find(l => String(l.id) === String(id));
   const platIcon = (t, u) => {
@@ -270,9 +270,11 @@ function renderBentoGrid(blocks, ctx) {
     return '🔗';
   };
   const cell = (b, inner, extra) =>
-    `<article class="bn bn-${esc(b.type)}" data-b="${esc(b.id)}" style="--w:${Math.max(1, Math.min(BLOCK_COLS, b.w || 1))};--h:${Math.max(1, b.h || 1)}"${extra || ''}>${inner}</article>`;
+    `<article class="bn bn-${esc(b.type)}${b.hidden ? ' bl-hidden' : ''}" data-b="${esc(b.id)}" style="--w:${Math.max(1, Math.min(BLOCK_COLS, b.w || 1))};--h:${Math.max(1, b.h || 1)}"${extra || ''}>${inner}</article>`;
 
-  const html = blocks.filter(b => !b.hidden).map(b => {
+  // En mode éditeur les blocs masqués sont RENDUS (grisés par la couche d'édition) ;
+  // à la publication ils ne sont pas émis du tout.
+  const html = blocks.filter(b => editor || !b.hidden).map(b => {
     if (b.type === 'profile')
       return cell(b, `<div class="bn-av">${esc(String(cfg.siteName || 'S')[0].toUpperCase())}</div>
         ${cfg.heroText ? `<div class="bn-htag">${esc(cfg.heroText)}</div>` : ''}
@@ -309,7 +311,10 @@ function renderBentoGrid(blocks, ctx) {
   return `<div class="bn-grid">${html}</div>`;
 }
 
-function generateSite(cfg, projects, reviews) {
+/** opts.editor = true → rend AUSSI les blocs masqués (grisés par la couche d'édition).
+    La publication ne passe jamais cette option : les blocs masqués y sont donc absents. */
+function generateSite(cfg, projects, reviews, opts) {
+  const editor = !!(opts && opts.editor);
   if (!cfg)      cfg      = SiteConfig.get();
   if (!projects) projects = getProjects();
   if (!reviews)  reviews  = getReviews();
@@ -343,8 +348,9 @@ function generateSite(cfg, projects, reviews) {
   const revDur      = { none: 0, light: .3, smooth: .6, premium: .8 }[animLevel] ?? .6;
   const revY        = animLevel === 'none' ? 0 : animLevel === 'premium' ? 26 : 18;
 
-  const cards = projects.map((p, i) => `
-    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}" data-b="${esc((blocks.find(b => b.type === 'project' && String(b.ref) === String(p.id)) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
+  const blkOf = p => blocks.find(b => b.type === 'project' && String(b.ref) === String(p.id)) || {};
+  const cards = projects.filter(p => editor || !blkOf(p).hidden).map((p, i) => `
+    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${blkOf(p).hidden ? ' bl-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}" data-b="${esc(blkOf(p).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
@@ -505,6 +511,11 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .seeall{background:var(--a);color:#060606;border:none;border-radius:999px;padding:9px 18px;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;transition:.2s;white-space:nowrap}
 .seeall:hover{opacity:.85}
 /* ── STYLE BARRE LATÉRALE ── */
+/* Bloc masqué : invisible par défaut (= rendu public exact, et mode Aperçu).
+   !important car .bn/.pc déclarent leur propre display plus bas (spécificité égale
+   → sinon la dernière règle gagnerait et le bloc resterait visible).
+   La couche d'édition (canvas.js) le ré-affiche en gris quand body.ed-on. */
+.bl-hidden{display:none!important}
 /* ── Style Bento : tout le corps est une grille de blocs ── */
 .bn-page{max-width:1080px;margin:0 auto;padding:0 16px 60px}
 .bn-grid{display:grid;grid-template-columns:repeat(${BLOCK_COLS},1fr);gap:14px;margin:34px 0;align-items:stretch}
@@ -560,7 +571,7 @@ ${layoutStyle === 'bento' ? `
     <div class="nl"></div>
     ${cfg.email ? `<a class="ncta" href="mailto:${esc(cfg.email)}">Me contacter</a>` : ''}
   </nav></div>
-  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS })}
+  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor })}
   <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
 </div>` : layoutStyle === 'sidebar' ? `
 <div class="sb-wrap" id="sbw">

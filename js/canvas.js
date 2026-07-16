@@ -79,6 +79,17 @@ const EdCanvas = {
 .ed-on [data-b]{cursor:default}
 .ed-on [data-b]:hover{outline:1px dashed rgba(200,255,0,.55);outline-offset:2px}
 .ed-on [data-b].ed-sel{outline:2px solid #C8FF00;outline-offset:2px}
+/* Bloc masqué : visible mais grisé EN ÉDITION (déplaçable/modifiable), absent en Aperçu.
+   La transition joue dans les deux sens → retour immédiat des couleurs au réaffichage. */
+.ed-on .bn.bl-hidden{display:flex!important}
+.ed-on .pc.bl-hidden{display:block!important}
+.ed-on .bl-hidden{opacity:.42;filter:grayscale(1);border-style:dashed!important}
+[data-b]{transition:opacity .2s ease,filter .2s ease}
+.ed-on .bl-hidden::after{content:'Masqué sur le site public';position:absolute;top:6px;right:6px;z-index:59;
+  background:rgba(15,15,15,.9);color:#f0ece4;border:1px solid rgba(255,255,255,.18);border-radius:5px;
+  padding:2px 6px;font:700 8px system-ui;letter-spacing:.4px;filter:grayscale(0);pointer-events:none}
+.ed-on .bl-hidden *{pointer-events:none}
+.ed-on .bl-hidden>.ed-h{pointer-events:auto}
 .ed-h{display:none;position:absolute;top:6px;left:6px;z-index:60;background:rgba(15,15,15,.88);color:#f0ece4;
       border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:3px 5px;cursor:grab;font:600 11px/1 system-ui;align-items:center;letter-spacing:-1px}
 .ed-h:active{cursor:grabbing}
@@ -183,8 +194,14 @@ const EdCanvas = {
       blocks.splice(i + 1, 0, c); this.commit(blocks); this.rerender();
       showToast?.('Bloc dupliqué ✓', '#2e9a63', 1800);
     } else if (a === 'hide') {
-      blocks[i].hidden = !blocks[i].hidden; this.commit(blocks); this.rerender();
-      showToast?.(blocks[i].hidden ? 'Bloc masqué' : 'Bloc affiché', '#666', 1600);
+      blocks[i].hidden = !blocks[i].hidden;
+      this.commit(blocks);
+      // bascule la classe en local : pas de reconstruction du canvas (la transition
+      // CSS fait le gris ↔ couleurs en ~200 ms), la sélection est conservée.
+      const el = this.doc.querySelector('[data-b="' + (window.CSS && CSS.escape ? CSS.escape(this.sel) : this.sel) + '"]');
+      if (el) el.classList.toggle('bl-hidden', !!blocks[i].hidden);
+      this._toolbar(el);
+      showToast?.(blocks[i].hidden ? 'Bloc masqué — grisé ici, absent du site public' : 'Bloc réaffiché ✓', '#666', 2200);
     } else if (a === 'del') {
       blocks.splice(i, 1); this.commit(blocks); this.sel = null; this.rerender();
       showToast?.('Bloc supprimé — Ctrl+Z pour annuler', '#666', 2600);

@@ -428,7 +428,7 @@ function edRefreshPreview() {
   if (!frame) return;
   if (loading) loading.style.display='flex';
   const cfg = edGetConfig();
-  const siteHtml = generateSite(cfg);
+  const siteHtml = generateSite(cfg, null, null, { editor: true });  // rend les blocs masqués (grisés)
   if (_edBlobUrl) URL.revokeObjectURL(_edBlobUrl);
   const blob = new Blob([siteHtml],{type:'text/html'});
   _edBlobUrl = URL.createObjectURL(blob);
