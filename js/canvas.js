@@ -68,7 +68,90 @@ const EdCanvas = {
     }, true);
     doc.addEventListener('keydown', e => this._key(e));
     doc.addEventListener('scroll', () => { if (this.sel) this._place(); }, true);
+    // Clic droit : menu Souanpt DANS LE CANVAS UNIQUEMENT (le reste du navigateur
+    // garde son menu natif — on ne bloque rien ailleurs). En Aperçu : menu natif.
+    doc.addEventListener('contextmenu', e => this._ctx(e));
+    // Appui long = clic droit sur mobile/tablette
+    let lp = null;
+    doc.addEventListener('touchstart', e => {
+      if (this.mode !== 'edit') return;
+      const t = e.target.closest && e.target.closest('[data-b]');
+      lp = setTimeout(() => { const to = e.touches[0];
+        this._ctx({ preventDefault(){}, clientX: to.clientX, clientY: to.clientY, target: e.target }); }, 480);
+    }, { passive: true });
+    ['touchend', 'touchmove', 'touchcancel'].forEach(ev => doc.addEventListener(ev, () => clearTimeout(lp), { passive: true }));
     this._btns();
+  },
+
+  /* ══ Menu contextuel personnalisé ══ */
+  _clip: null,
+  _ctx(e) {
+    if (this.mode !== 'edit') return;          // Aperçu → menu natif du navigateur
+    if (this._dragging) return;                // jamais pendant un déplacement
+    e.preventDefault();
+    const doc = this.doc;
+    const el = e.target.closest && e.target.closest('[data-b]');
+    const id = el && el.getAttribute('data-b');
+    if (id) this.select(id); else this.deselect();
+    const b = id ? this.blocks().find(x => x.id === id) : null;
+    const items = b ? [
+      ['edit', '✎ Modifier', ''], ['dup', '⧉ Dupliquer', 'Ctrl+D'], ['copy', '⧉ Copier', 'Ctrl+C'],
+      ['paste', '📋 Coller', 'Ctrl+V'], null,
+      ['front', '↑ Déplacer vers l\'avant', ''], ['back', '↓ Déplacer vers l\'arrière', ''], null,
+      ['lock', b.locked ? '🔓 Déverrouiller' : '🔒 Verrouiller', ''],
+      ['hide', b.hidden ? '👁 Réafficher' : '👁 Masquer', ''],
+      ['del', '🗑 Supprimer', 'Suppr'],
+    ] : [
+      ['add', '＋ Ajouter un bloc', ''], ['paste', '📋 Coller', 'Ctrl+V'], null,
+      ['undo', '↶ Annuler', 'Ctrl+Z'], ['redo', '↷ Rétablir', 'Ctrl+Maj+Z'], null,
+      ['struct', '☰ Afficher la structure', ''],
+    ];
+    doc.getElementById('ed-ctx')?.remove();
+    const m = doc.createElement('div'); m.id = 'ed-ctx'; m.className = 'ed-ctx';
+    m.innerHTML = items.map(it => it
+      ? `<button data-a="${it[0]}"><span>${it[1]}</span><i>${it[2]}</i></button>`
+      : '<div class="ed-ctx-sep"></div>').join('');
+    doc.body.appendChild(m);
+    const sx = doc.documentElement.scrollLeft || 0, sy = doc.documentElement.scrollTop || 0;
+    const vw = doc.documentElement.clientWidth, vh = doc.documentElement.clientHeight;
+    m.style.left = Math.min(e.clientX, vw - m.offsetWidth - 6) + sx + 'px';
+    m.style.top = Math.min(e.clientY, vh - m.offsetHeight - 6) + sy + 'px';
+    m.onclick = ev => { const btn = ev.target.closest('button'); if (!btn) return;
+      ev.stopPropagation(); m.remove(); this._ctxAct(btn.dataset.a); };
+    const close = () => { m.remove(); doc.removeEventListener('mousedown', close); };
+    setTimeout(() => doc.addEventListener('mousedown', close), 0);
+  },
+  _ctxAct(a) {
+    const blocks = this.blocks();
+    const i = blocks.findIndex(b => b.id === this.sel);
+    if (a === 'copy') { if (i >= 0) { this._clip = JSON.parse(JSON.stringify(blocks[i])); showToast?.('Bloc copié', '#666', 1400); } return; }
+    if (a === 'paste') { return this.paste(); }
+    if (a === 'undo') return this.undo();
+    if (a === 'redo') return this.redo();
+    if (a === 'add') return showToast?.('Palette « + » : étape 3c 🚧', '#e4b24a', 2400);
+    if (a === 'struct') return showToast?.('Fenêtre Structure : étape 3c 🚧', '#e4b24a', 2400);
+    if (i < 0) return;
+    if (a === 'lock') {
+      blocks[i].locked = !blocks[i].locked; this.commit(blocks);
+      showToast?.(blocks[i].locked ? '🔒 Bloc verrouillé' : '🔓 Bloc déverrouillé', '#666', 1600);
+      this.select(this.sel); return;
+    }
+    if (a === 'front' || a === 'back') {
+      const j = a === 'front' ? i - 1 : i + 1;
+      if (j < 0 || j >= blocks.length) return;
+      [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+      this.commit(blocks); this.rerender(); return;
+    }
+    this._act(a);   // edit / dup / hide / del
+  },
+  paste() {
+    if (!this._clip) return showToast?.('Rien à coller', '#666', 1400);
+    const blocks = this.blocks();
+    const c = JSON.parse(JSON.stringify(this._clip)); c.id = blockUid(c.type || 'b');
+    const i = blocks.findIndex(b => b.id === this.sel);
+    blocks.splice(i >= 0 ? i + 1 : blocks.length, 0, c);
+    this.commit(blocks); this.rerender();
+    showToast?.('Bloc collé ✓', '#2e9a63', 1600);
   },
   _ui(t) { return !!(t && t.closest && t.closest('#ed-tb,.ed-rz,.ed-h')); },
 
@@ -76,6 +159,12 @@ const EdCanvas = {
     if (doc.getElementById('ed-canvas-css')) return;
     const s = doc.createElement('style'); s.id = 'ed-canvas-css';
     s.textContent = `
+/* Même scrollbar que le Hub (l'aperçu est un document séparé : la scrollbar du
+   dashboard ne s'y applique pas, on voyait celle native du navigateur). */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:2px}
+html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 .ed-on [data-b]{cursor:default}
 .ed-on [data-b]:hover{outline:1px dashed rgba(200,255,0,.55);outline-offset:2px}
 .ed-on [data-b].ed-sel{outline:2px solid #C8FF00;outline-offset:2px}
@@ -105,6 +194,20 @@ const EdCanvas = {
 .ed-rz{position:absolute;z-index:9998;width:11px;height:11px;background:#C8FF00;border-radius:3px;
       box-shadow:0 0 0 2px rgba(0,0,0,.4);cursor:nwse-resize}
 .ed-size{position:absolute;z-index:10000;background:#C8FF00;color:#060606;font:800 10px system-ui;padding:3px 7px;border-radius:6px;pointer-events:none}
+/* Menu contextuel (clic droit) — canvas uniquement */
+.ed-ctx{position:absolute;z-index:10001;min-width:196px;padding:5px;background:rgba(18,18,18,.96);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.14);
+  border-radius:11px;box-shadow:0 18px 50px rgba(0,0,0,.6);animation:edCtx .18s cubic-bezier(.2,.9,.3,1)}
+@keyframes edCtx{from{opacity:0;transform:scale(.96) translateY(-4px)}to{opacity:1;transform:none}}
+.ed-ctx button{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;background:none;border:none;
+  color:#f0ece4;font:600 11px system-ui;padding:7px 9px;border-radius:7px;cursor:pointer;text-align:left}
+.ed-ctx button:hover{background:rgba(255,255,255,.09);color:#C8FF00}
+.ed-ctx button i{font-style:normal;font-size:9px;color:rgba(240,236,228,.4)}
+.ed-ctx-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
+/* Déplacement : le bloc flotte (soulevé + agrandi + ombre), retour élastique */
+.ed-drag{opacity:.92!important;transform:scale(1.04);box-shadow:0 26px 60px rgba(0,0,0,.6)!important;z-index:50;cursor:grabbing}
+[data-b]{transition:transform .22s cubic-bezier(.2,.9,.3,1),box-shadow .22s ease}
+.ed-lock{position:absolute;top:6px;right:6px;z-index:59;font-size:10px;opacity:.75;pointer-events:none}
 @media (hover:hover) and (pointer:fine){}`;
     doc.head.appendChild(s);
   },
@@ -153,11 +256,13 @@ const EdCanvas = {
     if (!tb) { tb = doc.createElement('div'); tb.id = 'ed-tb'; tb.className = 'ed-tb'; doc.body.appendChild(tb); }
     const b = this.blocks().find(x => x.id === this.sel) || {};
     const url = this._linkOf(b);
-    tb.innerHTML = `<span class="ed-ty">${this._TYPES[b.type] || 'Bloc'}</span><span class="sep"></span>` +
+    const inGrid = el.parentElement && el.parentElement.classList.contains('bn-grid');
+    tb.innerHTML = `<span class="ed-ty">${this._TYPES[b.type] || 'Bloc'}${b.locked ? ' 🔒' : ''}</span><span class="sep"></span>` +
       `<button data-a="move">⋮⋮ Déplacer</button><button data-a="edit">✎ Modifier</button>` +
+      (inGrid ? `<button data-a="size">⤢ Taille</button>` : '') +
       `<button data-a="style">🎨 Style</button><button data-a="fx">⚡ Effets</button>` +
       `<button data-a="dup">⧉ Dupliquer</button><button data-a="hide">${b.hidden ? '👁 Afficher' : '👁 Masquer'}</button>` +
-      `<button data-a="del" title="Supprimer">🗑</button>` +
+      `<button data-a="lock">${b.locked ? '🔓' : '🔒'}</button><button data-a="del" title="Supprimer">🗑</button>` +
       // Le lien est neutralisé en Édition : on le signale et on offre de le tester.
       (url ? `<span class="sep"></span><button data-a="testlink" title="${_eesc(url)}">🔗 Tester le lien</button>` : '');
     tb.onclick = e => { const btn = e.target.closest('button'); if (btn) { e.stopPropagation(); this._act(btn.dataset.a); } };
@@ -220,6 +325,10 @@ const EdCanvas = {
       showToast?.('Glisse la poignée ⋮⋮ en haut à gauche du bloc', '#666', 2600);
     } else if (a === 'edit') {
       edWinEdit(this.sel);
+    } else if (a === 'size') {
+      this._winSize();
+    } else if (a === 'lock') {
+      this._ctxAct('lock');
     } else if (a === 'style') {
       edWinTheme(null);
     } else if (a === 'fx') {
@@ -233,9 +342,12 @@ const EdCanvas = {
   /* ══ déplacement (grille magnétique, réorganisation en direct) ══ */
   _drag(e, el) {
     if (!this.fine() || this.mode !== 'edit') return;
+    const bl = this.blocks().find(x => x.id === el.getAttribute('data-b'));
+    if (bl && bl.locked) return showToast?.('🔒 Bloc verrouillé — clic droit pour déverrouiller', '#e4b24a', 2400);
     e.preventDefault(); e.stopPropagation();
     const doc = this.doc;
     const grid = el.parentElement;
+    this._dragging = true;
     el.classList.add('ed-drag');
     this.deselect();
     const move = ev => {
@@ -249,10 +361,40 @@ const EdCanvas = {
     const up = () => {
       doc.removeEventListener('pointermove', move); doc.removeEventListener('pointerup', up);
       el.classList.remove('ed-drag');
+      this._dragging = false;
       this._order(grid);
       this.select(el.getAttribute('data-b'));
     };
     doc.addEventListener('pointermove', move); doc.addEventListener('pointerup', up);
+  },
+
+  /* ══ Tailles Bento : 3 formats seulement (pas de redimensionnement libre) ══ */
+  SIZES: [{ k: 'S', n: 'Petit', w: 1, h: 1 }, { k: 'M', n: 'Moyen', w: 2, h: 1 }, { k: 'L', n: 'Grand', w: 2, h: 2 }],
+  _nearestSize(w, h) {
+    let best = this.SIZES[0], d = 1e9;
+    this.SIZES.forEach(s => { const x = Math.abs(s.w - w) + Math.abs(s.h - h); if (x < d) { d = x; best = s; } });
+    return best;
+  },
+  setSize(k) {
+    const s = this.SIZES.find(x => x.k === k); if (!s) return;
+    const blocks = this.blocks();
+    const b = blocks.find(x => x.id === this.sel); if (!b) return;
+    if (b.locked) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 2000);
+    b.w = s.w; b.h = s.h; this.commit(blocks);
+    const el = this.doc.querySelector('[data-b="' + (window.CSS && CSS.escape ? CSS.escape(this.sel) : this.sel) + '"]');
+    if (el) { el.style.setProperty('--w', s.w); el.style.setProperty('--h', s.h); }
+    this.select(this.sel);
+  },
+  _winSize(anchorRect) {
+    const b = this.blocks().find(x => x.id === this.sel) || {};
+    const cur = this._nearestSize(b.w || 1, b.h || 1).k;
+    EdWin.open(null, '⤢ Taille du bloc',
+      '<div class="edw-row">' + this.SIZES.map(s =>
+        `<button class="edw-st${s.k === cur ? ' on' : ''}" data-s="${s.k}">${s.n}<br><span style="opacity:.5">${s.w}×${s.h}</span></button>`).join('') + '</div>',
+      w => w.querySelectorAll('[data-s]').forEach(x => x.onclick = () => {
+        w.querySelectorAll('[data-s]').forEach(y => y.classList.toggle('on', y === x));
+        this.setSize(x.dataset.s);
+      }));
   },
   _order(grid) {
     const ids = [...grid.querySelectorAll(':scope>[data-b]')].map(e => e.getAttribute('data-b'));
@@ -290,10 +432,14 @@ const EdCanvas = {
     const up = () => {
       doc.removeEventListener('pointermove', move); doc.removeEventListener('pointerup', up);
       tip.remove();
+      // aimante au format le plus proche parmi Petit / Moyen / Grand
+      const s = this._nearestSize(+el.style.getPropertyValue('--w') || 1, +el.style.getPropertyValue('--h') || 1);
+      el.style.setProperty('--w', s.w); el.style.setProperty('--h', s.h);
       const blocks = this.blocks();
       const b = blocks.find(x => x.id === el.getAttribute('data-b'));
-      if (b) { b.w = +el.style.getPropertyValue('--w') || 1; b.h = +el.style.getPropertyValue('--h') || 1; this.commit(blocks); }
+      if (b) { b.w = s.w; b.h = s.h; this.commit(blocks); }
       this.select(el.getAttribute('data-b'));
+      showToast?.('Taille : ' + s.n, '#666', 1200);
     };
     doc.addEventListener('pointermove', move); doc.addEventListener('pointerup', up);
   },
@@ -308,10 +454,18 @@ const EdCanvas = {
   },
 
   _key(e) {
-    const z = (e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'z';
-    if (!z) return;
-    e.preventDefault();
-    if (e.shiftKey) this.redo(); else this.undo();
+    // jamais pendant une saisie dans un champ
+    const t = e.target, tag = t && t.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable)) return;
+    const k = String(e.key).toLowerCase(), mod = e.ctrlKey || e.metaKey;
+    if (mod && k === 'z') { e.preventDefault(); return e.shiftKey ? this.redo() : this.undo(); }
+    if (this.mode !== 'edit') return;
+    if (k === 'escape') { e.preventDefault(); window.EdWin && EdWin.close(); return this.deselect(); }
+    if (!this.sel) return;
+    if (mod && k === 'c') { e.preventDefault(); return this._ctxAct('copy'); }
+    if (mod && k === 'v') { e.preventDefault(); return this.paste(); }
+    if (mod && k === 'd') { e.preventDefault(); return this._act('dup'); }
+    if (k === 'delete' || k === 'backspace') { e.preventDefault(); return this._act('del'); }
   },
 };
 window.EdCanvas = EdCanvas;
@@ -362,10 +516,16 @@ function edSet(k, v, live) { SiteConfig.set(k, v); live ? edUpdatePreview() : ed
 /* ── 🎨 Thème (ex-groupe « Thème » du panneau) ── */
 function edWinTheme(btn) {
   const c = SiteConfig.get();
-  const styles = [['float', 'Barre flottante'], ['sidebar', 'Barre latérale'], ['bento', 'Bento — blocs libres']];
+  // aperçus miniatures : on voit la structure du style, pas seulement son nom
+  const styles = [
+    ['float', '📱 Barre flottante', '<b class="p1"></b><b class="p2"></b><b class="p2"></b>'],
+    ['sidebar', '🖥 Barre latérale', '<b class="s1"></b><b class="s2"></b><b class="s3"></b>'],
+    ['bento', '🧩 Bento', '<b class="b1"></b><b class="b2"></b><b class="b3"></b><b class="b4"></b>'],
+  ];
   const html = `
     <div class="edw-l">Style du site</div>
-    <div class="edw-row">${styles.map(([v, n]) => `<button class="edw-st${c.layoutStyle === v ? ' on' : ''}" data-v="${v}">${n}</button>`).join('')}</div>
+    <div class="edw-styles">${styles.map(([v, n, mini]) =>
+      `<button class="edw-sty${c.layoutStyle === v ? ' on' : ''}" data-v="${v}"><span class="edw-mini m-${v}">${mini}</span>${n}</button>`).join('')}</div>
     <div class="edw-l">Couleur d'accent</div>
     <input type="color" class="edw-color" id="edw-accent" value="${_eesc(c.accentColor || '#C8FF00')}">
     <div class="edw-l">Fond</div>
