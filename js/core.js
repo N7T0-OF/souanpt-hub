@@ -216,11 +216,22 @@ function getLinks()    { try { return JSON.parse(localStorage.getItem('hub_links
 const BLOCK_COLS = 4;                       // colonnes de la grille (desktop)
 const blockUid = t => 'b_' + t + '_' + Math.random().toString(36).slice(2, 8);
 
-/** Renvoie les blocs du site : ceux enregistrés, sinon migrés depuis l'existant. */
+/** Renvoie les blocs du site : ceux enregistrés, sinon migrés depuis l'existant.
+    RÉCONCILIATION : tout projet/lien qui n'a pas encore de bloc en reçoit un.
+    Indispensable — sinon un projet ajouté après coup (import Behance, bulle « + »)
+    n'aurait aucun bloc et resterait invisible sur le site. */
 function getBlocks(cfg, projects, links) {
   cfg = cfg || SiteConfig.get();
-  if (Array.isArray(cfg.blocks) && cfg.blocks.length) return cfg.blocks;
-  return migrateBlocks(cfg, projects, links);
+  if (!Array.isArray(cfg.blocks) || !cfg.blocks.length) return migrateBlocks(cfg, projects, links);
+  const out = cfg.blocks.slice();
+  const have = new Set(out.filter(b => b.ref != null).map(b => b.type + ':' + b.ref));
+  (projects || getProjects()).forEach(p => {
+    if (!have.has('project:' + p.id)) out.push({ id: 'b_proj_' + p.id, type: 'project', ref: p.id, w: 1, h: 1 });
+  });
+  (links || getLinks()).forEach(l => {
+    if (!have.has('link:' + l.id)) out.push({ id: 'b_link_' + l.id, type: 'link', ref: l.id, w: 1, h: 1 });
+  });
+  return out;
 }
 
 /** Migration : projets → blocs Projet, liens → blocs Réseau, à propos → bloc Texte…
@@ -274,7 +285,8 @@ function renderBentoGrid(blocks, ctx) {
 
   // En mode éditeur les blocs masqués sont RENDUS (grisés par la couche d'édition) ;
   // à la publication ils ne sont pas émis du tout.
-  const html = blocks.filter(b => editor || !b.hidden).map(b => {
+  const shown = blocks.filter(b => editor || !b.hidden);
+  const parts = shown.map(b => {
     if (b.type === 'profile')
       return cell(b, `<div class="bn-av">${esc(String(cfg.siteName || 'S')[0].toUpperCase())}</div>
         ${cfg.heroText ? `<div class="bn-htag">${esc(cfg.heroText)}</div>` : ''}
@@ -307,8 +319,16 @@ function renderBentoGrid(blocks, ctx) {
         ` onclick="location.href='mailto:${esc(cfg.email)}'"`);
     }
     return '';
-  }).join('');
-  return `<div class="bn-grid">${html}</div>`;
+  });
+  // Bulle « + Ajouter un projet » : uniquement dans l'éditeur (jamais publiée,
+  // jamais en mode Aperçu), placée juste après le dernier folio existant.
+  if (editor) {
+    let last = -1;
+    shown.forEach((b, i) => { if (b.type === 'project' && parts[i]) last = i; });
+    parts.splice(last + 1, 0,
+      `<article class="bn bn-add" data-add="1" title="Ajouter un projet"><span class="bn-add-i">＋</span><span>Ajouter un projet</span></article>`);
+  }
+  return `<div class="bn-grid">${parts.join('')}</div>`;
 }
 
 /** opts.editor = true → rend AUSSI les blocs masqués (grisés par la couche d'édition).
@@ -530,6 +550,12 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .bn-htag{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--a)}
 .bn-name{font-size:clamp(20px,3vw,30px);font-weight:800;letter-spacing:-1px;color:var(--t)}
 .bn-bio{font-size:12px;line-height:1.7;color:${mutedC}}
+/* Bulle « + Ajouter un projet » — éditeur uniquement (jamais publiée) */
+.bn-add{align-items:center;justify-content:center;gap:8px;border-style:dashed!important;
+  border-color:rgba(128,128,128,.4)!important;background:transparent!important;cursor:pointer;
+  color:${mutedC};font-size:11px;font-weight:700;transition:transform .18s cubic-bezier(.2,.9,.3,1),border-color .18s,color .18s}
+.bn-add:hover{border-color:var(--a)!important;color:var(--a);transform:translateY(-2px)}
+.bn-add-i{font-size:26px;line-height:1;font-weight:400}
 .bn-project{padding:0;justify-content:flex-start}
 .bn-cov{flex:1;min-height:70px;width:100%}
 .bn-pb{padding:12px 14px;display:flex;flex-direction:column;gap:6px}

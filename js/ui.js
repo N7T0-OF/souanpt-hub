@@ -589,6 +589,8 @@ const BubbleWidget = {
    NAVIGATION
 ══════════════════════════════════════════════════════ */
 function showPage(id) {
+  // Le Portfolio a fusionné dans l'Éditeur de site : les projets y sont des blocs.
+  if (id === 'portfolio') { showPage('editor'); return; }
   // Behance & GitHub ont déménagé dans Paramètres → Intégrations
   if (id === 'github' || id === 'behance') {
     showPage('settings');

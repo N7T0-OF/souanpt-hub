@@ -63,6 +63,7 @@ const EdCanvas = {
       if (this.mode !== 'edit') return;
       if (this._ui(e.target)) return;
       e.preventDefault(); e.stopPropagation();
+      if (e.target.closest && e.target.closest('[data-add]')) { this.deselect(); return edAddProject(); }
       const t = e.target.closest && e.target.closest('[data-b]');
       if (t && t.getAttribute('data-b')) this.select(t.getAttribute('data-b')); else this.deselect();
     }, true);
@@ -208,6 +209,9 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
    transform est piloté en inline par _follow → pas de transition dessus ici. */
 .ed-drag{box-shadow:0 30px 70px rgba(0,0,0,.65)!important;cursor:grabbing;pointer-events:none;transition:none!important;will-change:transform}
 .ed-drag::after{display:none!important}
+/* La bulle « + » n'existe que pendant l'ÉDITION : en Aperçu elle disparaît
+   totalement (comme sur le site publié, où elle n'est même pas générée). */
+body:not(.ed-on) [data-add]{display:none!important}
 /* Fantôme laissé à l'ancienne place */
 .ed-ph{border:1px dashed rgba(200,255,0,.5)!important;border-radius:14px;background:rgba(200,255,0,.05)!important;pointer-events:none}
 /* Pendant le déplacement : plus aucune sélection de texte ni interaction publique */
@@ -340,8 +344,21 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
       this._toolbar(el);
       showToast?.(blocks[i].hidden ? 'Bloc masqué — grisé ici, absent du site public' : 'Bloc réaffiché ✓', '#666', 2200);
     } else if (a === 'del') {
+      const b = blocks[i];
+      // Un bloc projet/lien référence une donnée réelle : la supprimer aussi,
+      // sinon la réconciliation de getBlocks recréerait le bloc aussitôt.
+      if (b.type === 'project' || b.type === 'link') {
+        const key = b.type === 'project' ? 'hub_projects' : 'hub_links';
+        const list = b.type === 'project' ? getProjects() : getLinks();
+        const item = list.find(x => String(x.id) === String(b.ref));
+        const nom = item ? (item.title || 'sans titre') : '';
+        if (!confirm('Supprimer définitivement ' + (b.type === 'project' ? 'le projet' : 'le lien') + ' « ' + nom + ' » ?\n\nCette donnée sera retirée du Hub, pas seulement du site.')) return;
+        localStorage.setItem(key, JSON.stringify(list.filter(x => String(x.id) !== String(b.ref))));
+        if (typeof renderProjects === 'function') renderProjects();
+        if (typeof syncKPIs === 'function') syncKPIs();
+      }
       blocks.splice(i, 1); this.commit(blocks); this.sel = null; this.rerender();
-      showToast?.('Bloc supprimé — Ctrl+Z pour annuler', '#666', 2600);
+      showToast?.('Supprimé — Ctrl+Z pour annuler', '#666', 2600);
     } else if (a === 'move') {
       showToast?.('Glisse la poignée ⋮⋮ en haut à gauche du bloc', '#666', 2600);
     } else if (a === 'edit') {
@@ -585,6 +602,23 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 window.EdCanvas = EdCanvas;
 document.addEventListener('keydown', e => EdCanvas._key(e));
 
+/* Résumé de migration : affiché UNE fois, quand les projets de l'ancienne page
+   Portfolio deviennent des blocs de l'éditeur. Aucune donnée n'est touchée. */
+function edMigrationNotice() {
+  try {
+    if (localStorage.getItem('hub_migr_portfolio')) return;
+    const projs = getProjects(); if (!projs.length) return;
+    const gifs = projs.filter(p => /^data:image\/gif|\.gif($|\?)/i.test(p.cover || '')).length;
+    const covers = projs.filter(p => p.cover).length;
+    localStorage.setItem('hub_migr_portfolio', '1');
+    setTimeout(() => showToast?.(
+      '✓ Portfolio migré dans l\'Éditeur — ' + projs.length + ' projet' + (projs.length > 1 ? 's' : '') +
+      ' · ' + covers + ' couverture' + (covers > 1 ? 's' : '') + ' conservée' + (covers > 1 ? 's' : '') +
+      (gifs ? ' · ' + gifs + ' GIF' : '') + ' · 0 donnée perdue', '#2e9a63', 6000), 1200);
+  } catch (e) {}
+}
+document.addEventListener('DOMContentLoaded', edMigrationNotice);
+
 /* ══════════════════════════════════════════════════════════════
    EdWin — micro-fenêtres flottantes (remplacent le panneau Propriétés).
    Ancrées au bouton déclencheur, jamais hors écran, Échap + clic extérieur.
@@ -753,4 +787,81 @@ function edWinEdit(blockId) {
     if (ok) ok.onclick = () => { save(w); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
   });
 }
+/* ── ＋ Ajouter un projet (remplace toute l'ancienne page Portfolio) ── */
+function edAddProject() {
+  const projs = getProjects();
+  const html = `
+    <div class="edw-l">Couverture</div>
+    <div class="edw-drop" id="ap-drop">
+      <input type="file" id="ap-file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" hidden>
+      <div id="ap-dz"><b>Glisse une image ou un GIF ici</b><span>ou clique pour choisir</span></div>
+      <img id="ap-prev" alt="">
+    </div>
+    <div id="ap-info" class="edw-fileinfo"></div>
+    <div class="edw-l">…ou coller une URL d'image</div>
+    <input class="edw-in" id="ap-url" placeholder="https://…/image.jpg">
+    <div class="edw-l">Titre</div>
+    <input class="edw-in" id="ap-title" placeholder="Nom du projet">
+    <div class="edw-l">Tags (séparés par une virgule)</div>
+    <input class="edw-in" id="ap-tags" placeholder="branding, motion">
+    <div class="edw-l">Lien du projet</div>
+    <input class="edw-in" id="ap-link" placeholder="https://behance.net/…">
+    ${projs.length ? `<div class="edw-l">…ou dupliquer un projet existant</div>
+      <select class="edw-in" id="ap-dup"><option value="">— choisir —</option>${projs.map(p => `<option value="${_eesc(p.id)}">${_eesc(p.title || 'Sans titre')}</option>`).join('')}</select>` : ''}
+    <button class="edw-ok" id="ap-ok">Créer le projet</button>`;
+  EdWin.open(null, '＋ Nouveau projet', html, w => {
+    let cover = '';
+    const dz = w.querySelector('#ap-dz'), prev = w.querySelector('#ap-prev'),
+          info = w.querySelector('#ap-info'), drop = w.querySelector('#ap-drop'), file = w.querySelector('#ap-file');
+    const ko = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.round(n / 1024) + ' Ko';
+    const take = f => {
+      if (!f || !/^image\//.test(f.type)) return showToast?.('Format non supporté', '#c0392b', 2200);
+      const gif = f.type === 'image/gif';
+      info.textContent = f.name + ' · ' + ko(f.size) + ' · ' + f.type.replace('image/', '').toUpperCase() + ' · lecture…';
+      const rd = new FileReader();
+      rd.onload = e => {
+        const raw = e.target.result;
+        const done = (src, note) => {
+          cover = src; prev.src = src; drop.classList.add('has');
+          info.textContent = f.name + ' · ' + ko(f.size) + ' → ' + ko(Math.round(src.length * 0.75)) + ' · ' + note;
+        };
+        // ⚠ Un GIF ne doit JAMAIS passer par la compression WebP : elle le figerait.
+        if (gif) return done(raw, 'GIF conservé animé (non compressé)');
+        compressImageSrc(raw, out => done(out || raw, out ? 'optimisé en WebP' : 'original conservé'));
+      };
+      rd.readAsDataURL(f);
+    };
+    dz.onclick = () => file.click();
+    file.onchange = e => take(e.target.files[0]);
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => take(e.dataTransfer.files[0]));
+    const dup = w.querySelector('#ap-dup');
+    if (dup) dup.onchange = () => {
+      const p = projs.find(x => String(x.id) === dup.value); if (!p) return;
+      w.querySelector('#ap-title').value = (p.title || '') + ' (copie)';
+      w.querySelector('#ap-tags').value = (p.tags || []).join(', ');
+      w.querySelector('#ap-link').value = p.url || '';
+      if (p.cover) { cover = p.cover; prev.src = p.cover; drop.classList.add('has'); info.textContent = 'Couverture reprise du projet dupliqué'; }
+    };
+    w.querySelector('#ap-ok').onclick = () => {
+      const title = w.querySelector('#ap-title').value.trim();
+      if (!title) return showToast?.('Donne un titre au projet', '#c0392b', 2000);
+      const src = cover || w.querySelector('#ap-url').value.trim();
+      const p = { id: Date.now().toString(), title,
+        tags: w.querySelector('#ap-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+        url: w.querySelector('#ap-link').value.trim(), cover: src, views: 0, createdAt: Date.now() };
+      const ps = getProjects(); ps.push(p);
+      try { localStorage.setItem('hub_projects', JSON.stringify(ps)); }
+      catch (err) { return showToast?.('⚠ Image trop lourde pour le stockage local — utilise une URL', '#c0392b', 4000); }
+      // getBlocks réconcilie → le bloc du nouveau projet apparaît tout seul
+      EdWin.close();
+      if (typeof renderProjects === 'function') renderProjects();
+      if (typeof syncKPIs === 'function') syncKPIs();
+      edRefreshPreview();
+      showToast?.('Projet « ' + title + ' » ajouté ✓', '#2e9a63', 2200);
+    };
+  });
+}
+window.edAddProject = edAddProject;
 window.edWinTheme = edWinTheme; window.edWinFx = edWinFx; window.edWinEdit = edWinEdit;
