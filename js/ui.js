@@ -311,6 +311,9 @@ function edGetConfig() {
     // uid du propriétaire : indispensable pour que le site publié embarque le
     // mouchard analytics (perdu sinon, edGetConfig ne lit que le formulaire)
     ownerUid:    SiteConfig.get().ownerUid || (window.Cloud && Cloud.user() ? Cloud.user().uid : '') || '',
+    // disposition des blocs : idem, absente du formulaire → à transporter
+    // explicitement, sinon chaque rafraîchissement de l'aperçu l'effacerait
+    blocks:      SiteConfig.get().blocks,
     sections: { ...(_edVis || { projects:true, avis:true, contact:true, about:true }) },
     sectionOrder: (_edOrder || ['about','projects','avis','contact']).slice(),
     about:    document.getElementById('ep-about')?.value || '',
@@ -429,7 +432,11 @@ function edRefreshPreview() {
   if (_edBlobUrl) URL.revokeObjectURL(_edBlobUrl);
   const blob = new Blob([siteHtml],{type:'text/html'});
   _edBlobUrl = URL.createObjectURL(blob);
-  frame.onload = ()=>{ if(loading)loading.style.display='none'; };
+  frame.onload = ()=>{
+    if(loading)loading.style.display='none';
+    // l'aperçu devient l'éditeur : on injecte la couche d'édition dans l'iframe
+    try { window.EdCanvas && EdCanvas.attach(frame.contentDocument); } catch(e){ console.warn('[canvas]', e); }
+  };
   frame.src = _edBlobUrl;
   setTimeout(()=>{ if(loading)loading.style.display='none'; },2000);
   const u=Auth.owner()||'souanpt'; const repo=cfg.repo||(u+'/'+SITE_REPO_NAME);

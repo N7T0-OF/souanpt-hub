@@ -659,6 +659,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .edperf-tips .ptip{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--gold-l);white-space:nowrap}
 .edperf-tips .ptip button{font-size:8px;padding:2px 8px;border-radius:5px;border:1px solid rgba(200,255,0,.3);background:var(--accent-dim,rgba(200,255,0,.1));color:var(--accent);cursor:pointer;font-family:inherit}
 @media(max-width:1100px){.edperf-tips{display:none}}
+/* Bascule Édition / Aperçu du canvas */
+.ed-modes{display:flex;background:var(--s3);border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px}
+.ed-modes button{background:none;border:none;color:var(--muted2);font-family:inherit;font-size:10px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.ed-modes button:hover{color:var(--text)}
+.ed-modes button.active{background:var(--accent);color:#060606}
 
 /* ═══ ANALYTICS ═══ */
 .an-empty{text-align:center;padding:56px 24px}
@@ -1060,8 +1065,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div class="edperf-tips" id="ed-tips"></div>
         </div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0">
+          <span id="ed-canvas-status" style="font-size:9px;color:var(--muted2);min-width:54px;text-align:right"></span>
+          <button class="btn btn-ghost" id="ed-undo" style="font-size:11px;padding:5px 8px" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" disabled>↶</button>
+          <button class="btn btn-ghost" id="ed-redo" style="font-size:11px;padding:5px 8px" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" disabled>↷</button>
+          <div class="ed-modes">
+            <button id="ed-mode-edit" class="active" onclick="EdCanvas.setMode('edit')" title="Modifier les blocs">✎ Édition</button>
+            <button id="ed-mode-prev" onclick="EdCanvas.setMode('preview')" title="Voir le site comme un visiteur">👁 Aperçu</button>
+          </div>
           <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edSaveConfig()">↑ Sauver</button>
-          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edPreviewExternal()">⬚ Aperçu</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edPreviewExternal()">⬚ Ouvrir</button>
         </div>
       </div>
       <!-- Body -->
@@ -1687,6 +1699,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/cloud.js"></script>
 <script src="js/core.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/canvas.js"></script>
 <script src="js/analytics.js"></script>
 <script>
 /* ═══ SETTINGS ═══ */

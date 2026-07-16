@@ -230,12 +230,15 @@ function migrateBlocks(cfg, projects, links) {
   projects = projects || getProjects();
   links    = links || getLinks();
   const sec = { projects: true, avis: true, contact: true, about: true, ...(cfg.sections || {}) };
+  // ⚠ identifiants DÉTERMINISTES (dérivés de la donnée référencée) : migrateBlocks
+  // peut être rappelé à tout moment (getBlocks est un accesseur) et doit toujours
+  // rendre les mêmes ids, sinon la sélection/le glisser-déposer ciblent des blocs fantômes.
   const out = [{ id: 'b_profile', type: 'profile', w: 2, h: 2 }];
   if (String(cfg.about || '').trim() && sec.about)
     out.push({ id: 'b_about', type: 'text', w: 2, h: 1, props: { title: 'À propos', text: String(cfg.about) } });
-  links.forEach(l => out.push({ id: blockUid('link'), type: 'link', ref: l.id, w: 1, h: 1 }));
+  links.forEach(l => out.push({ id: 'b_link_' + l.id, type: 'link', ref: l.id, w: 1, h: 1 }));
   if (sec.projects) projects.forEach((p, i) =>
-    out.push({ id: blockUid('proj'), type: 'project', ref: p.id, w: i === 0 ? 2 : 1, h: i === 0 ? 2 : 1 }));
+    out.push({ id: 'b_proj_' + p.id, type: 'project', ref: p.id, w: i === 0 ? 2 : 1, h: i === 0 ? 2 : 1 }));
   if (sec.avis)    out.push({ id: 'b_reviews', type: 'reviews', w: 2, h: 1 });
   if (sec.contact) out.push({ id: 'b_contact', type: 'contact', w: 1, h: 1 });
   return out;
@@ -341,7 +344,7 @@ function generateSite(cfg, projects, reviews) {
   const revY        = animLevel === 'none' ? 0 : animLevel === 'premium' ? 26 : 18;
 
   const cards = projects.map((p, i) => `
-    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
+    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}" data-b="${esc((blocks.find(b => b.type === 'project' && String(b.ref) === String(p.id)) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
