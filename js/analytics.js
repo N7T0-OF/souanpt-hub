@@ -69,6 +69,7 @@ const NAME_TO_CC = (() => { const m = {}; for (const cc in COUNTRY_NAMES) m[COUN
 
 const Analytics = {
   data: null, demo: false, _loaded: false,
+  _lastSync: 0, _live: null, _tick: null,
 
   async refresh() {
     if (this.demo) { this.render(); return; }
@@ -76,13 +77,47 @@ const Analytics = {
     try { d = await (window.Cloud && Cloud.loadAnalytics ? Cloud.loadAnalytics() : null); }
     catch (e) { console.warn('[analytics]', e); }
     this.data = d; this._loaded = true;
+    this._lastSync = Date.now();
     this.render();
+    this._syncLabel();
+  },
+
+  /* ══ Mise à jour automatique (plus de bouton « Actualiser ») ══
+     Sondage UNIQUEMENT si l'onglet est visible ET qu'on est sur Vue d'ensemble :
+     chaque rafraîchissement = ~6 lectures Firestore, il faut ménager le quota
+     gratuit (Spark). Retour sur l'onglet → rafraîchissement immédiat. */
+  _onOverview() { return !!document.getElementById('page-overview')?.classList.contains('active'); },
+  startLive() {
+    this.stopLive();
+    this._live = setInterval(() => {
+      if (document.hidden || !this._onOverview() || this.demo) return;
+      this.refresh();
+    }, 60000);
+    this._tick = setInterval(() => this._syncLabel(), 5000);
+    document.addEventListener('visibilitychange', this._onVis = () => {
+      if (!document.hidden && this._onOverview() && !this.demo) this.refresh();
+      else this._syncLabel();
+    });
+  },
+  stopLive() {
+    clearInterval(this._live); clearInterval(this._tick);
+    if (this._onVis) document.removeEventListener('visibilitychange', this._onVis);
+  },
+  _syncLabel() {
+    const e = document.getElementById('an-sync'); if (!e) return;
+    if (this.demo) { e.classList.add('off'); e.innerHTML = '<i></i><b>Aperçu démo</b>'; return; }
+    if (!this._lastSync) { e.classList.add('off'); e.innerHTML = '<i></i><b>En attente…</b>'; return; }
+    e.classList.remove('off');
+    const s = Math.round((Date.now() - this._lastSync) / 1000);
+    const ago = s < 10 ? 'à l\'instant' : s < 60 ? 'il y a ' + s + ' s' : 'il y a ' + Math.round(s / 60) + ' min';
+    e.innerHTML = '<i></i><b>En direct</b> · synchronisé ' + ago;
   },
   toggleDemo() {
     this.demo = !this.demo;
     const b = document.getElementById('an-demo-btn');
     if (b) b.textContent = this.demo ? '✕ Quitter la démo' : '👁 Aperçu démo';
-    this.render();
+    if (!this.demo) { this.refresh(); return; }   // sortie de démo → vraies données
+    this.render(); this._syncLabel();
   },
 
   /* Message d'état vide : dit précisément CE QU'IL MANQUE (sinon échec silencieux) */
@@ -234,3 +269,4 @@ const Analytics = {
   }
 };
 window.Analytics = Analytics;
+document.addEventListener('DOMContentLoaded', () => Analytics.startLive());

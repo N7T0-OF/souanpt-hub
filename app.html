@@ -666,6 +666,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .ed-modes button.active{background:var(--accent);color:#060606}
 
 /* ═══ ANALYTICS ═══ */
+/* Indicateur « stats en direct » (remplace le bouton Actualiser) */
+.an-sync{display:inline-flex;align-items:center;gap:6px;font-size:9px;color:var(--muted2);white-space:nowrap}
+.an-sync b{font-weight:700;color:var(--muted)}
+.an-sync i{width:6px;height:6px;border-radius:50%;background:#2ecc71;flex-shrink:0;animation:anpulse 2.2s infinite}
+.an-sync.off i{background:var(--muted2);animation:none}
 .an-empty{text-align:center;padding:56px 24px}
 .an-empty-ic{font-size:44px;margin-bottom:10px;opacity:.85}
 .an-live{display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);margin-right:auto}
@@ -937,7 +942,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <option value="30" selected>30 jours</option>
           <option value="365">Total</option>
         </select>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="Analytics.refresh()">↻ Actualiser</button>
+        <span class="an-sync" id="an-sync" title="Les statistiques se mettent à jour toutes seules"><i></i><b>En direct</b></span>
         <button class="btn btn-ghost" style="font-size:10px" id="an-demo-btn" onclick="Analytics.toggleDemo()">👁 Aperçu démo</button>
       </div>
 
