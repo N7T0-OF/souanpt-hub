@@ -88,10 +88,22 @@ const Analytics = {
   /* Message d'état vide : dit précisément CE QU'IL MANQUE (sinon échec silencieux) */
   _emptyMsg() {
     const logged = !!(window.Cloud && Cloud.enabled && Cloud.user());
-    const uid = (() => { try { return SiteConfig.get().ownerUid || ''; } catch (e) { return ''; } })();
-    if (!logged) return '⚠️ <b>Connecte-toi avec Google ou Discord</b> pour activer les statistiques : elles sont rattachées à ton compte. Ensuite, republie ton site (🚀 Publier) — le suivi des visites démarrera automatiquement.';
-    if (!uid) return '⚠️ Ton compte est connecté mais la config du site n\'a pas encore ton identifiant. Ouvre l\'<b>Éditeur de site</b>, clique <b>↑ Sauver</b>, puis <b>🚀 Publier</b>.';
-    return 'Aucune visite enregistrée pour l\'instant. Si tu viens d\'activer le suivi, <b>republie ton site (🚀 Publier)</b> : c\'est la publication qui installe le compteur. Les stats arrivent ensuite toutes seules. En attendant, clique <b>« 👁 Aperçu démo »</b> pour voir le rendu.';
+    if (!logged) return '⚠️ <b>Connecte-toi avec Google ou Discord</b> pour activer les statistiques : elles sont rattachées à ton compte. Tout le reste est automatique.';
+    const btn = '<button class="btn btn-accent" style="margin-top:10px" onclick="Analytics.activate()">⚡ Activer les statistiques sur mon site</button>';
+    return 'Aucune visite enregistrée pour l\'instant.<br>Un site déjà en ligne ne peut pas installer le compteur tout seul : il faut le <b>republier une fois</b>. Un clic suffit — ensuite tout est automatique, à vie.<br>' + btn;
+  },
+
+  /* Installe le compteur : republie le site avec la config ENREGISTRÉE.
+     Sûr même hors éditeur (edGetConfig renvoie SiteConfig tant que le formulaire
+     n'a pas été chargé) → aucun risque de publier un site vide. */
+  async activate() {
+    if (!(window.Cloud && Cloud.enabled && Cloud.user())) { showToast('Connecte-toi d\'abord (Google ou Discord)', '#e4b24a', 3500); return; }
+    if (!window.Auth || !Auth.ok()) { showToast('Connecte GitHub (Paramètres → Intégrations) pour publier', '#e4b24a', 4000); showPage('settings'); return; }
+    try { SiteConfig.set('ownerUid', Cloud.user().uid); } catch (e) {}
+    showToast('⚡ Installation du compteur — publication en cours…', '#666', 3000);
+    try { await edDeploy(); showToast('✓ Statistiques activées — les visites vont remonter ici', '#2e9a63', 4000); }
+    catch (e) { showToast('✗ ' + (e.message || 'Publication impossible'), '#c0392b', 4000); }
+    setTimeout(() => this.refresh(), 1500);
   },
 
   _fmt(n) { return (Number(n) || 0).toLocaleString('fr-FR'); },

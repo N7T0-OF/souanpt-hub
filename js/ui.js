@@ -252,9 +252,13 @@ function ghOpenSite() {
    ÉDITEUR
 ══════════════════════════════════════════════════════ */
 let _edTimer=null, _edBlobUrl=null;
+// true dès que les champs de l'éditeur ont été remplis depuis SiteConfig.
+// Tant que c'est false, edGetConfig() NE DOIT PAS lire le formulaire (vide).
+let _edLoaded = false;
 
 function edLoad() {
   const cfg = SiteConfig.get();
+  _edLoaded = true;
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
   set('ep-site-name', cfg.siteName);
   set('ep-bio',       cfg.bio);
@@ -289,6 +293,11 @@ function edLoad() {
 }
 
 function edGetConfig() {
+  // SÉCURITÉ : si l'éditeur n'a jamais été ouvert, ses champs sont VIDES.
+  // Lire le formulaire renverrait des valeurs par défaut ('FOLIO', etc.) et
+  // publierait un site vide en écrasant la vraie config. On rend la config
+  // enregistrée telle quelle (elle contient déjà ownerUid, repo, fx…).
+  if (!_edLoaded) return SiteConfig.get();
   return {
     siteName:    document.getElementById('ep-site-name')?.value    || 'FOLIO',
     bio:         document.getElementById('ep-bio')?.value          || '',
