@@ -292,45 +292,24 @@ function edLoad() {
   else           { if(dot)dot.style.background='var(--muted)'; if(lbl)lbl.textContent='GitHub non connecté — cliquer'; }
 }
 
+/**
+ * SiteConfig est la SOURCE DE VÉRITÉ UNIQUE.
+ * Avant, cette fonction reconstruisait la config en lisant les champs du panneau
+ * Propriétés — d'où une famille entière de bugs : toute clé absente du formulaire
+ * (ownerUid, blocks…) était SILENCIEUSEMENT effacée à la publication, et publier
+ * sans avoir ouvert l'éditeur écrasait le site par des valeurs par défaut.
+ * Les menus flottants écrivent désormais directement dans SiteConfig → plus aucun
+ * formulaire permanent à lire, et le panneau peut disparaître sans risque.
+ */
 function edGetConfig() {
-  // SÉCURITÉ : si l'éditeur n'a jamais été ouvert, ses champs sont VIDES.
-  // Lire le formulaire renverrait des valeurs par défaut ('FOLIO', etc.) et
-  // publierait un site vide en écrasant la vraie config. On rend la config
-  // enregistrée telle quelle (elle contient déjà ownerUid, repo, fx…).
-  if (!_edLoaded) return SiteConfig.get();
-  return {
-    siteName:    document.getElementById('ep-site-name')?.value    || 'FOLIO',
-    bio:         document.getElementById('ep-bio')?.value          || '',
-    accentColor: document.getElementById('ep-accent-color')?.value || '#C8FF00',
-    theme:       document.getElementById('ep-theme')?.value        || '#060606',
-    layout:      document.getElementById('ep-layout')?.value       || '3',
-    heroText:    document.getElementById('ep-hero-text')?.value    || '',
-    behance:     document.getElementById('ep-behance')?.value      || '',
-    email:       document.getElementById('ep-email')?.value        || '',
-    repo:        SiteConfig.get().repo || '',
-    // uid du propriétaire : indispensable pour que le site publié embarque le
-    // mouchard analytics (perdu sinon, edGetConfig ne lit que le formulaire)
-    ownerUid:    SiteConfig.get().ownerUid || (window.Cloud && Cloud.user() ? Cloud.user().uid : '') || '',
-    // disposition des blocs : idem, absente du formulaire → à transporter
-    // explicitement, sinon chaque rafraîchissement de l'aperçu l'effacerait
-    blocks:      SiteConfig.get().blocks,
-    sections: { ...(_edVis || { projects:true, avis:true, contact:true, about:true }) },
-    sectionOrder: (_edOrder || ['about','projects','avis','contact']).slice(),
-    about:    document.getElementById('ep-about')?.value || '',
-    avisMode: document.getElementById('ep-avis-mode')?.value || 'defile',
-    layoutStyle:   document.getElementById('ep-layout-style')?.value || 'float',
-    heroImage:     document.getElementById('ep-hero-image')?.value.trim() || '',
-    projectsLimit: parseInt(document.getElementById('ep-proj-limit')?.value) || 0,
-    animLevel:     document.getElementById('ep-anim')?.value || 'smooth',
-    fx: {
-      tilt:      !!document.getElementById('ep-fx-tilt')?.checked,
-      intensity: parseInt(document.getElementById('ep-fx-intensity')?.value) || 7,
-      shine:     !!document.getElementById('ep-fx-shine')?.checked,
-      lift:      !!document.getElementById('ep-fx-lift')?.checked,
-      glow:      !!document.getElementById('ep-fx-glow')?.checked,
-      mouseglow: !!document.getElementById('ep-fx-mouseglow')?.checked,
-    },
-  };
+  const cfg = SiteConfig.get();   // objet frais à chaque appel
+  // Le panneau « Blocs » (à gauche) pilote encore l'ordre/visibilité des sections.
+  if (_edLoaded) {
+    if (_edVis)   cfg.sections     = { ...cfg.sections, ..._edVis };
+    if (_edOrder) cfg.sectionOrder = _edOrder.slice();
+  }
+  if (!cfg.ownerUid && window.Cloud && Cloud.user()) cfg.ownerUid = Cloud.user().uid;
+  return cfg;
 }
 function edHeroImport(ev) {
   const f = ev.target.files[0]; if (!f) return;

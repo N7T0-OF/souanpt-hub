@@ -537,7 +537,9 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .bn-rvi{font-size:11px;color:${mutedC};line-height:1.5}
 .bn-rvi b{color:var(--t)}
 .bn-st{color:var(--a);font-size:10px}
-@media(max-width:900px){.bn-grid{grid-template-columns:repeat(2,1fr)}.bn{grid-column:span min(var(--w,1),2)}}
+/* 820px : au-dessus la grille garde ses 4 colonnes (~200px/carte, lisible) —
+   ça couvre aussi l'aperçu de l'éditeur (~876px) qui doit montrer le vrai desktop. */
+@media(max-width:820px){.bn-grid{grid-template-columns:repeat(2,1fr)}.bn{grid-column:span min(var(--w,1),2)}}
 @media(max-width:560px){.bn-grid{grid-template-columns:1fr}.bn{grid-column:span 1;grid-row:span 1}}
 .sb-wrap{display:flex;min-height:100vh;gap:14px;padding:14px}
 .sb-side{width:230px;flex-shrink:0;position:sticky;top:14px;height:calc(100vh - 28px);padding:24px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow-y:auto}

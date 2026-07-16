@@ -139,16 +139,27 @@ const EdCanvas = {
   },
 
   _TYPES: { profile: 'Profil', project: 'Projet', link: 'Lien', text: 'Texte', reviews: 'Avis', contact: 'Contact' },
+  /** URL configurée sur un bloc (neutralisée en Édition, mais testable) */
+  _linkOf(b) {
+    if (!b) return '';
+    if (b.type === 'link')    return (getLinks().find(x => String(x.id) === String(b.ref)) || {}).url || '';
+    if (b.type === 'project') return (getProjects().find(x => String(x.id) === String(b.ref)) || {}).url || '';
+    if (b.type === 'contact') { const e = SiteConfig.get().email; return e ? 'mailto:' + e : ''; }
+    return '';
+  },
   _toolbar(el) {
     const doc = this.doc;
     let tb = doc.getElementById('ed-tb');
     if (!tb) { tb = doc.createElement('div'); tb.id = 'ed-tb'; tb.className = 'ed-tb'; doc.body.appendChild(tb); }
     const b = this.blocks().find(x => x.id === this.sel) || {};
+    const url = this._linkOf(b);
     tb.innerHTML = `<span class="ed-ty">${this._TYPES[b.type] || 'Bloc'}</span><span class="sep"></span>` +
       `<button data-a="move">⋮⋮ Déplacer</button><button data-a="edit">✎ Modifier</button>` +
       `<button data-a="style">🎨 Style</button><button data-a="fx">⚡ Effets</button>` +
       `<button data-a="dup">⧉ Dupliquer</button><button data-a="hide">${b.hidden ? '👁 Afficher' : '👁 Masquer'}</button>` +
-      `<button data-a="del" title="Supprimer">🗑</button>`;
+      `<button data-a="del" title="Supprimer">🗑</button>` +
+      // Le lien est neutralisé en Édition : on le signale et on offre de le tester.
+      (url ? `<span class="sep"></span><button data-a="testlink" title="${_eesc(url)}">🔗 Tester le lien</button>` : '');
     tb.onclick = e => { const btn = e.target.closest('button'); if (btn) { e.stopPropagation(); this._act(btn.dataset.a); } };
     this._place();
   },
@@ -207,8 +218,15 @@ const EdCanvas = {
       showToast?.('Bloc supprimé — Ctrl+Z pour annuler', '#666', 2600);
     } else if (a === 'move') {
       showToast?.('Glisse la poignée ⋮⋮ en haut à gauche du bloc', '#666', 2600);
-    } else {
-      showToast?.('Menus Contenu / Style / Effets : étape 3 🚧', '#e4b24a', 2600);
+    } else if (a === 'edit') {
+      edWinEdit(this.sel);
+    } else if (a === 'style') {
+      edWinTheme(null);
+    } else if (a === 'fx') {
+      edWinFx(null);
+    } else if (a === 'testlink') {
+      const u = this._linkOf(blocks[i]);
+      if (u) window.open(u, '_blank', 'noopener');
     }
   },
 
@@ -298,3 +316,167 @@ const EdCanvas = {
 };
 window.EdCanvas = EdCanvas;
 document.addEventListener('keydown', e => EdCanvas._key(e));
+
+/* ══════════════════════════════════════════════════════════════
+   EdWin — micro-fenêtres flottantes (remplacent le panneau Propriétés).
+   Ancrées au bouton déclencheur, jamais hors écran, Échap + clic extérieur.
+══════════════════════════════════════════════════════════════ */
+const EdWin = {
+  el: null, _out: null, _esc: null,
+  open(anchor, title, html, onMount) {
+    this.close();
+    const w = document.createElement('div');
+    w.className = 'edwin';
+    w.innerHTML = `<div class="edwin-h"><span>${title}</span><button class="edwin-x" title="Fermer (Échap)">✕</button></div><div class="edwin-b">${html}</div>`;
+    document.body.appendChild(w);
+    this.el = w;
+    const ww = w.offsetWidth, wh = w.offsetHeight;
+    let left, top;
+    if (anchor) {
+      const r = anchor.getBoundingClientRect();
+      left = Math.min(Math.max(8, r.right - ww), innerWidth - ww - 8);
+      top = r.bottom + 8;
+      if (top + wh > innerHeight - 8) top = Math.max(8, r.top - wh - 8);
+    } else { left = (innerWidth - ww) / 2; top = (innerHeight - wh) / 2; }
+    w.style.left = Math.max(8, left) + 'px'; w.style.top = Math.max(8, top) + 'px';
+    w.querySelector('.edwin-x').onclick = () => this.close();
+    setTimeout(() => document.addEventListener('mousedown', this._out = e => {
+      if (!w.contains(e.target) && !(anchor && anchor.contains(e.target))) this.close();
+    }), 0);
+    document.addEventListener('keydown', this._esc = e => { if (e.key === 'Escape') this.close(); });
+    if (onMount) onMount(w);
+    return w;
+  },
+  close() {
+    if (this._out) { document.removeEventListener('mousedown', this._out); this._out = null; }
+    if (this._esc) { document.removeEventListener('keydown', this._esc); this._esc = null; }
+    if (this.el) { this.el.remove(); this.el = null; }
+  },
+};
+window.EdWin = EdWin;
+
+const _eesc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+/** applique une clé de config + rafraîchit (debounce pour les saisies continues) */
+function edSet(k, v, live) { SiteConfig.set(k, v); live ? edUpdatePreview() : edRefreshPreview(); }
+
+/* ── 🎨 Thème (ex-groupe « Thème » du panneau) ── */
+function edWinTheme(btn) {
+  const c = SiteConfig.get();
+  const styles = [['float', 'Barre flottante'], ['sidebar', 'Barre latérale'], ['bento', 'Bento — blocs libres']];
+  const html = `
+    <div class="edw-l">Style du site</div>
+    <div class="edw-row">${styles.map(([v, n]) => `<button class="edw-st${c.layoutStyle === v ? ' on' : ''}" data-v="${v}">${n}</button>`).join('')}</div>
+    <div class="edw-l">Couleur d'accent</div>
+    <input type="color" class="edw-color" id="edw-accent" value="${_eesc(c.accentColor || '#C8FF00')}">
+    <div class="edw-l">Fond</div>
+    <div class="edw-row"><button class="edw-st${c.theme !== '#f8f8f8' ? ' on' : ''}" data-t="#060606">Sombre</button><button class="edw-st${c.theme === '#f8f8f8' ? ' on' : ''}" data-t="#f8f8f8">Clair</button></div>
+    <div class="edw-l">Colonnes de projets</div>
+    <div class="edw-row">${['2', '3', '4'].map(n => `<button class="edw-st${String(c.layout) === n ? ' on' : ''}" data-c="${n}">${n}</button>`).join('')}</div>`;
+  EdWin.open(btn, '🎨 Thème', html, w => {
+    const pick = (sel, key) => w.querySelectorAll(sel).forEach(b => b.onclick = () => {
+      w.querySelectorAll(sel).forEach(x => x.classList.toggle('on', x === b));
+      edSet(key, b.dataset.v || b.dataset.t || b.dataset.c);
+    });
+    pick('[data-v]', 'layoutStyle'); pick('[data-t]', 'theme'); pick('[data-c]', 'layout');
+    const a = w.querySelector('#edw-accent');
+    a.oninput = () => edSet('accentColor', a.value, true);
+  });
+}
+
+/* ── ⚡ Effets (ex-groupe « Animations & effets ») ── */
+function edWinFx(btn) {
+  const c = SiteConfig.get(), fx = c.fx || {};
+  const lv = [['none', 'Aucune'], ['light', 'Légères'], ['smooth', 'Fluides'], ['premium', 'Premium']];
+  const tg = [['tilt', '✨ Effet 3D interactif'], ['shine', '🌟 Brillance'], ['lift', '↑ Hover Lift'], ['glow', '💡 Reflet lumineux'], ['mouseglow', '🔦 Halo qui suit la souris']];
+  const html = `
+    <div class="edw-l">Animations d'apparition</div>
+    <div class="edw-row">${lv.map(([v, n]) => `<button class="edw-st${(c.animLevel || 'smooth') === v ? ' on' : ''}" data-a="${v}">${n}</button>`).join('')}</div>
+    <div class="edw-l">Effets au survol <span class="edw-hint">ordinateur uniquement</span></div>
+    ${tg.map(([k, n]) => `<label class="edw-tog"><input type="checkbox" data-f="${k}"${fx[k] ? ' checked' : ''}> ${n}</label>`).join('')}
+    <div class="edw-l" id="edw-int-l" style="${fx.tilt ? '' : 'display:none'}">Intensité 3D — <b id="edw-int-v">${fx.intensity || 7}</b>°</div>
+    <input type="range" id="edw-int" min="3" max="16" value="${fx.intensity || 7}" style="${fx.tilt ? '' : 'display:none'};width:100%">`;
+  EdWin.open(btn, '⚡ Animations & effets', html, w => {
+    w.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+      w.querySelectorAll('[data-a]').forEach(x => x.classList.toggle('on', x === b));
+      edSet('animLevel', b.dataset.a);
+    });
+    const sync = () => {
+      const f = { ...(SiteConfig.get().fx || {}) };
+      w.querySelectorAll('[data-f]').forEach(i => f[i.dataset.f] = i.checked);
+      f.intensity = parseInt(w.querySelector('#edw-int').value) || 7;
+      edSet('fx', f);
+      const on = !!f.tilt;
+      w.querySelector('#edw-int-l').style.display = on ? '' : 'none';
+      w.querySelector('#edw-int').style.display = on ? '' : 'none';
+    };
+    w.querySelectorAll('[data-f]').forEach(i => i.onchange = sync);
+    const r = w.querySelector('#edw-int');
+    r.oninput = () => { w.querySelector('#edw-int-v').textContent = r.value; };
+    r.onchange = sync;
+  });
+}
+
+/* ── ✎ Modifier : contenu du bloc sélectionné (ex-groupes « Contenu » / « Portfolio ») ── */
+function edWinEdit(blockId) {
+  const b = getBlocks(SiteConfig.get()).find(x => x.id === blockId);
+  if (!b) return;
+  const c = SiteConfig.get();
+  const F = (id, label, val, type) => `<div class="edw-l">${label}</div>` +
+    (type === 'area' ? `<textarea class="edw-in" id="${id}" rows="3">${_eesc(val)}</textarea>`
+                     : `<input class="edw-in" id="${id}" value="${_eesc(val)}">`);
+  let title = 'Modifier', html = '', save = null;
+
+  if (b.type === 'profile') {
+    title = '✎ Profil';
+    html = F('e1', 'Nom du site', c.siteName) + F('e2', 'Accroche (hero)', c.heroText) + F('e3', 'Bio', c.bio, 'area');
+    save = w => { const g = i => w.querySelector('#' + i).value;
+      SiteConfig.set('siteName', g('e1')); SiteConfig.set('heroText', g('e2')); SiteConfig.set('bio', g('e3')); };
+  } else if (b.type === 'text') {
+    title = '✎ Texte';
+    html = F('e1', 'Titre', (b.props || {}).title || '') + F('e2', 'Texte', (b.props || {}).text || '', 'area');
+    save = w => { const bl = getBlocks(SiteConfig.get()); const x = bl.find(y => y.id === blockId);
+      x.props = { ...(x.props || {}), title: w.querySelector('#e1').value, text: w.querySelector('#e2').value };
+      SiteConfig.set('blocks', bl);
+      if (x.props.title === 'À propos') SiteConfig.set('about', x.props.text); };
+  } else if (b.type === 'contact') {
+    title = '✎ Contact';
+    html = F('e1', 'Adresse e-mail', c.email);
+    save = w => SiteConfig.set('email', w.querySelector('#e1').value);
+  } else if (b.type === 'link') {
+    const l = getLinks().find(x => String(x.id) === String(b.ref)) || {};
+    title = '✎ Lien';
+    html = F('e1', 'Libellé', l.title || '') + F('e2', 'URL', l.url || '');
+    save = w => { const ls = getLinks(); const x = ls.find(y => String(y.id) === String(b.ref));
+      if (x) { x.title = w.querySelector('#e1').value; x.url = w.querySelector('#e2').value;
+               localStorage.setItem('hub_links', JSON.stringify(ls)); } };
+  } else if (b.type === 'project') {
+    const p = getProjects().find(x => String(x.id) === String(b.ref)) || {};
+    title = '✎ Projet';
+    html = F('e1', 'Titre', p.title || '') + F('e2', 'Tags (séparés par une virgule)', (p.tags || []).join(', '))
+         + F('e3', 'Lien du projet', p.url || '') + F('e4', 'Couverture — URL image', p.cover || '');
+    save = w => { const ps = getProjects(); const x = ps.find(y => String(y.id) === String(b.ref));
+      if (x) { x.title = w.querySelector('#e1').value;
+               x.tags = w.querySelector('#e2').value.split(',').map(t => t.trim()).filter(Boolean);
+               x.url = w.querySelector('#e3').value; x.cover = w.querySelector('#e4').value;
+               localStorage.setItem('hub_projects', JSON.stringify(ps));
+               if (typeof renderProjects === 'function') renderProjects(); } };
+  } else if (b.type === 'reviews') {
+    title = '✎ Avis';
+    const m = c.avisMode || 'defile';
+    html = `<div class="edw-l">Affichage</div><div class="edw-row">
+      <button class="edw-st${m === 'defile' ? ' on' : ''}" data-m="defile">Défilement</button>
+      <button class="edw-st${m === 'grille' ? ' on' : ''}" data-m="grille">Grille</button></div>`;
+    save = null;
+  }
+
+  html += save ? `<button class="edw-ok" id="edw-save">Appliquer</button>` : '';
+  EdWin.open(null, title, html, w => {
+    w.querySelectorAll('[data-m]').forEach(x => x.onclick = () => {
+      w.querySelectorAll('[data-m]').forEach(y => y.classList.toggle('on', y === x));
+      edSet('avisMode', x.dataset.m);
+    });
+    const ok = w.querySelector('#edw-save');
+    if (ok) ok.onclick = () => { save(w); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
+  });
+}
+window.edWinTheme = edWinTheme; window.edWinFx = edWinFx; window.edWinEdit = edWinEdit;
