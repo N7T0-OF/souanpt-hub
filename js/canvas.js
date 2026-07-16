@@ -204,9 +204,16 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 .ed-ctx button:hover{background:rgba(255,255,255,.09);color:#C8FF00}
 .ed-ctx button i{font-style:normal;font-size:9px;color:rgba(240,236,228,.4)}
 .ed-ctx-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
-/* Déplacement : le bloc flotte (soulevé + agrandi + ombre), retour élastique */
-.ed-drag{opacity:.92!important;transform:scale(1.04);box-shadow:0 26px 60px rgba(0,0,0,.6)!important;z-index:50;cursor:grabbing}
-[data-b]{transition:transform .22s cubic-bezier(.2,.9,.3,1),box-shadow .22s ease}
+/* Déplacement façon écran d'accueil : la carte décolle et suit le curseur.
+   transform est piloté en inline par _follow → pas de transition dessus ici. */
+.ed-drag{box-shadow:0 30px 70px rgba(0,0,0,.65)!important;cursor:grabbing;pointer-events:none;transition:none!important;will-change:transform}
+.ed-drag::after{display:none!important}
+/* Fantôme laissé à l'ancienne place */
+.ed-ph{border:1px dashed rgba(200,255,0,.5)!important;border-radius:14px;background:rgba(200,255,0,.05)!important;pointer-events:none}
+/* Pendant le déplacement : plus aucune sélection de texte ni interaction publique */
+.ed-dragging,.ed-dragging *{user-select:none!important;-webkit-user-select:none!important;cursor:grabbing!important}
+[data-b]{touch-action:none}
+[data-b]{transition:box-shadow .22s ease}
 .ed-lock{position:absolute;top:6px;right:6px;z-index:59;font-size:10px;opacity:.75;pointer-events:none}
 @media (hover:hover) and (pointer:fine){}`;
     doc.head.appendChild(s);
@@ -217,8 +224,22 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
     doc.querySelectorAll('[data-b]').forEach(el => {
       if (!el.getAttribute('data-b') || el.querySelector(':scope>.ed-h')) return;
       if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+      // maintien n'importe où sur la carte → déplacement (sauf zones éditables)
+      el.addEventListener('pointerdown', e => this._press(e, el));
+      // la poignée reste comme repère visuel, mais décolle immédiatement
       const h = doc.createElement('div'); h.className = 'ed-h'; h.textContent = '⋮⋮'; h.title = 'Glisser pour déplacer';
-      h.addEventListener('pointerdown', e => this._drag(e, el));
+      h.addEventListener('pointerdown', e => {
+        if (this.mode !== 'edit') return;
+        const bl = this.blocks().find(x => x.id === el.getAttribute('data-b'));
+        if (bl && bl.locked) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 2000);
+        e.preventDefault(); e.stopPropagation();
+        const doc2 = this.doc;
+        this._lift(el, e.clientX, e.clientY);
+        const mv = ev => { ev.preventDefault(); this._follow(ev); };
+        const up = () => { this._drop(); doc2.removeEventListener('pointermove', mv); doc2.removeEventListener('pointerup', up); };
+        doc2.addEventListener('pointermove', mv, { passive: false });
+        doc2.addEventListener('pointerup', up);
+      });
       el.insertBefore(h, el.firstChild);
     });
   },
@@ -339,33 +360,123 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
     }
   },
 
-  /* ══ déplacement (grille magnétique, réorganisation en direct) ══ */
-  _drag(e, el) {
-    if (!this.fine() || this.mode !== 'edit') return;
+  /* ══════════════════════════════════════════════════════════
+     DÉPLACEMENT — maintien puis décollage, façon écran d'accueil mobile.
+     Clic court = sélection. Maintien ~200 ms sans bouger = la carte décolle,
+     se détache du flux, suit le curseur ; un fantôme garde sa place et les
+     voisines se réorganisent avec une animation FLIP.
+  ══════════════════════════════════════════════════════════ */
+  HOLD_MS: 200, MOVE_TOL: 5,
+  /** éléments où le maintien ne doit PAS lancer un déplacement */
+  _editable(t) {
+    return !!(t && t.closest && t.closest('input,textarea,select,[contenteditable="true"],#ed-tb,.ed-rz,.ed-ctx'));
+  },
+  _press(e, el) {
+    if (this.mode !== 'edit' || e.button === 2) return;
+    if (this._ui(e.target) || this._editable(e.target)) return;
     const bl = this.blocks().find(x => x.id === el.getAttribute('data-b'));
-    if (bl && bl.locked) return showToast?.('🔒 Bloc verrouillé — clic droit pour déverrouiller', '#e4b24a', 2400);
-    e.preventDefault(); e.stopPropagation();
-    const doc = this.doc;
-    const grid = el.parentElement;
-    this._dragging = true;
-    el.classList.add('ed-drag');
-    this.deselect();
+    if (bl && bl.locked) return;
+    // stoppe net la sélection de texte du navigateur (cause du bug signalé)
+    e.preventDefault();
+    const doc = this.doc, sx = e.clientX, sy = e.clientY;
+    let live = false;
+    const tmr = setTimeout(() => { live = true; this._lift(el, sx, sy); }, this.HOLD_MS);
     const move = ev => {
-      const under = doc.elementFromPoint(ev.clientX, ev.clientY);
-      const t = under && under.closest ? under.closest('[data-b]') : null;
-      if (!t || t === el || t.parentElement !== grid) return;
-      const r = t.getBoundingClientRect();
-      const after = (ev.clientX - r.left) > r.width / 2;
-      grid.insertBefore(el, after ? t.nextSibling : t);   // les voisins se replacent tout seuls (CSS grid)
+      if (!live) {           // bouge trop tôt → ce n'est pas un maintien, on annule
+        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > this.MOVE_TOL) { clearTimeout(tmr); done(); }
+        return;
+      }
+      ev.preventDefault();   // une fois décollé, on bloque le scroll tactile
+      this._follow(ev);
     };
-    const up = () => {
-      doc.removeEventListener('pointermove', move); doc.removeEventListener('pointerup', up);
-      el.classList.remove('ed-drag');
-      this._dragging = false;
-      this._order(grid);
-      this.select(el.getAttribute('data-b'));
-    };
-    doc.addEventListener('pointermove', move); doc.addEventListener('pointerup', up);
+    const up = () => { clearTimeout(tmr); if (live) this._drop(); done(); };
+    const done = () => { doc.removeEventListener('pointermove', move); doc.removeEventListener('pointerup', up); doc.removeEventListener('pointercancel', up); };
+    doc.addEventListener('pointermove', move, { passive: false });
+    doc.addEventListener('pointerup', up); doc.addEventListener('pointercancel', up);
+  },
+
+  /** la carte décolle : sortie du flux + fantôme à sa place */
+  _lift(el, sx, sy) {
+    const doc = this.doc, grid = el.parentElement;
+    const r = el.getBoundingClientRect();
+    this._dragging = true;
+    this.deselect();
+    doc.body.classList.add('ed-dragging');           // coupe user-select partout
+    try { navigator.vibrate && navigator.vibrate(20); } catch (err) {}
+    const ph = doc.createElement('article');          // fantôme = même empreinte
+    ph.className = 'ed-ph'; ph.style.cssText = el.getAttribute('style') || '';
+    grid.insertBefore(ph, el);
+    Object.assign(el.style, {
+      position: 'fixed', left: r.left + 'px', top: r.top + 'px',
+      width: r.width + 'px', height: r.height + 'px', margin: '0', zIndex: '9997',
+    });
+    el.classList.add('ed-drag');
+    this._d = { el, ph, grid, sx, sy, dx: 0, dy: 0 };
+  },
+  _follow(ev) {
+    const d = this._d; if (!d) return;
+    d.dx = ev.clientX - d.sx; d.dy = ev.clientY - d.sy;
+    const tilt = Math.max(-2, Math.min(2, d.dx / 40));   // rotation très légère
+    d.el.style.transform = `translate(${d.dx}px,${d.dy}px) scale(1.02) rotate(${tilt}deg)`;
+    // cible sous le curseur (la carte portée est pointer-events:none)
+    const under = this.doc.elementFromPoint(ev.clientX, ev.clientY);
+    const t = under && under.closest ? under.closest('[data-b]') : null;
+    if (!t || t === d.el || t.parentElement !== d.grid) return;
+    const r = t.getBoundingClientRect();
+    const after = (ev.clientX - r.left) > r.width / 2;
+    const next = after ? t.nextSibling : t;
+    if (next === d.ph) return;
+    this._flip(d.grid, () => d.grid.insertBefore(d.ph, next));
+  },
+  /** FLIP : réorganisation animée des voisines (sinon la grille saute) */
+  _flip(grid, mutate) {
+    const cells = [...grid.children].filter(c => c !== this._d.el);
+    const before = new Map(cells.map(c => [c, c.getBoundingClientRect()]));
+    mutate();
+    cells.forEach(c => {
+      const a = before.get(c), b = c.getBoundingClientRect();
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if (!dx && !dy) return;
+      c.style.transition = 'none';
+      c.style.transform = `translate(${dx}px,${dy}px)`;
+      requestAnimationFrame(() => {
+        c.style.transition = 'transform .26s cubic-bezier(.2,.9,.3,1)';
+        c.style.transform = '';
+      });
+    });
+  },
+  /** dépose la carte à la place du fantôme */
+  _drop() {
+    const d = this._d; if (!d) return;
+    const { el, ph, grid } = d;
+    grid.insertBefore(el, ph); ph.remove();
+    ['position', 'left', 'top', 'width', 'height', 'margin', 'zIndex', 'transform'].forEach(p => el.style.removeProperty(p.replace(/[A-Z]/g, m => '-' + m.toLowerCase())));
+    el.classList.remove('ed-drag');
+    this.doc.body.classList.remove('ed-dragging');
+    this._dragging = false; this._d = null;
+    this._order(grid);
+    this.select(el.getAttribute('data-b'));
+    this._say('Bloc déplacé');
+  },
+  /** annonce pour lecteurs d'écran */
+  _say(msg) {
+    const doc = this.doc; if (!doc) return;
+    let l = doc.getElementById('ed-live');
+    if (!l) { l = doc.createElement('div'); l.id = 'ed-live'; l.setAttribute('aria-live', 'polite');
+      l.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)'; doc.body.appendChild(l); }
+    l.textContent = msg;
+  },
+  /** déplacement au clavier : Alt + flèches */
+  _moveKey(dir) {
+    const blocks = this.blocks();
+    const i = blocks.findIndex(b => b.id === this.sel);
+    if (i < 0) return;
+    if (blocks[i].locked) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 1800);
+    const j = i + dir;
+    if (j < 0 || j >= blocks.length) return;
+    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+    this.commit(blocks); this.rerender();
+    this._say('Bloc déplacé en position ' + (j + 1) + ' sur ' + blocks.length);
   },
 
   /* ══ Tailles Bento : 3 formats seulement (pas de redimensionnement libre) ══ */
@@ -462,6 +573,9 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
     if (this.mode !== 'edit') return;
     if (k === 'escape') { e.preventDefault(); window.EdWin && EdWin.close(); return this.deselect(); }
     if (!this.sel) return;
+    // Alt + flèches : déplacer le bloc au clavier (accessibilité)
+    if (e.altKey && (k === 'arrowleft' || k === 'arrowup')) { e.preventDefault(); return this._moveKey(-1); }
+    if (e.altKey && (k === 'arrowright' || k === 'arrowdown')) { e.preventDefault(); return this._moveKey(1); }
     if (mod && k === 'c') { e.preventDefault(); return this._ctxAct('copy'); }
     if (mod && k === 'v') { e.preventDefault(); return this.paste(); }
     if (mod && k === 'd') { e.preventDefault(); return this._act('dup'); }
