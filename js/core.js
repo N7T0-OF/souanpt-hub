@@ -557,7 +557,26 @@ function generateSite(cfg, projects, reviews, opts) {
 </section>`,
     contact: `<section id="contact" class="ci rev"><div class="sl">Contact</div><h2>Travaillons ensemble</h2><div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>`,
   };
-  const bodySections = order.filter(k => sec[k]).map(k => secHtml[k]).join('\n');
+  /* Corps des styles Flottante & Latérale rendu DEPUIS LES BLOCS (même moteur que
+     Bento) : un bloc texte créé via la palette apparaît donc AUSSI ici, dans
+     l'ordre des blocs. Les rendus riches existants (grille projets, avis, contact)
+     sont réutilisés tels quels. Les liens restent dans la navigation. */
+  const flowText = b => {
+    const pr = bProps(b), t = esc(pr.title || ''), tx = esc(pr.text || '').replace(/\n/g, '<br>');
+    return `<section class="rev${bHidden(b) ? ' bl-hidden' : ''}" data-b="${esc(b.id)}" style="max-width:760px">${t ? `<div class="sl">${t}</div><h2>${t}</h2>` : ''}<p class="about-p">${tx}</p></section>`;
+  };
+  const renderFlowBody = () => {
+    let projectsShown = false;
+    return blocks.filter(b => editor || !bHidden(b)).map(b => {
+      if (b.type === 'profile' || b.type === 'link') return '';        // hero + nav
+      if (b.type === 'project') { if (projectsShown || !sec.projects) return ''; projectsShown = true; return secHtml.projects; }
+      if (b.type === 'text')    return flowText(b);
+      if (b.type === 'reviews') return sec.avis ? secHtml.avis : '';
+      if (b.type === 'contact') return sec.contact ? secHtml.contact : '';
+      return '';
+    }).join('\n');
+  };
+  const bodySections = renderFlowBody();
   const navLinks = order.filter(k => sec[k]).map(k => `<a href="#${k}">${SEC_LABELS[k]}</a>`).join('\n    ');
 
   return `<!DOCTYPE html>
@@ -760,7 +779,7 @@ ${layoutStyle === 'bento' ? `
     ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
   </aside>
   <main class="sb-main">
-    <div class="sb-hero" style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
+    <div class="sb-hero" data-b="b_profile" data-no-drag style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
       <div class="sb-hero-in"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}</h1><p class="hsub">${esc(cfg.bio)}</p></div>
     </div>
     ${bodySections}
@@ -781,7 +800,7 @@ ${layoutStyle === 'bento' ? `
   ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
   ${cfg.email?`<a href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
 </div>
-<div class="hero"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
+<div class="hero" data-b="b_profile" data-no-drag><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
 <div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>
 ${bodySections}
 <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>`}

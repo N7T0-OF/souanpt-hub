@@ -398,6 +398,9 @@ body:not(.ed-on) [data-add]{display:none!important}
   _press(e, el) {
     if (this.mode !== 'edit' || e.button === 2) return;
     if (this._ui(e.target) || this._editable(e.target)) return;
+    // Décollage réservé à la grille Bento. En Flottante/Latérale le clic sélectionne
+    // (barre flottante, édition) mais la réorganisation en flux viendra ensuite.
+    if (!el.parentElement || !el.parentElement.classList.contains('bn-grid')) return;
     const bl = this.blocks().find(x => x.id === el.getAttribute('data-b'));
     if (bl && bLocked(bl)) return;
     const type = e.pointerType || 'mouse';
