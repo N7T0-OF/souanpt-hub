@@ -246,6 +246,66 @@ const bProps  = b => b.content || b.props || {};
 const bFocal  = b => { const m = (b && bProps(b).mediaPosition) || {}; return { x: Number(m.x ?? 50), y: Number(m.y ?? 50) }; };
 const focalCss = f => `${f.x}% ${f.y}%`;
 
+/* ══ PLACEMENT ABSOLU (x/y sur la grille) ══
+   Maths adaptées d'OpenBento (voir THIRD_PARTY_LICENSES.md) — avec UNE différence
+   volontaire : OpenBento TOLÈRE les chevauchements (z-index selon l'ordre du
+   tableau) ; ici ils sont INTERDITS et résolus, conformément à l'exigence
+   « absence de chevauchements ». Un bloc sans x/y est placé automatiquement dans
+   le premier emplacement libre. Les trous, eux, sont autorisés (canvas libre). */
+const bX = b => (b.layout && b.layout.x) || null;
+const bY = b => (b.layout && b.layout.y) || null;
+
+/** Test de chevauchement AABB entre deux blocs placés */
+function blocksOverlap(a, b) {
+  const ax = bX(a), ay = bY(a), bx = bX(b), by = bY(b);
+  if (!ax || !ay || !bx || !by) return false;
+  const aw = Math.min(bW(a), BLOCK_COLS), bw = Math.min(bW(b), BLOCK_COLS);
+  return !(ax + aw <= bx || bx + bw <= ax || ay + bH(a) <= by || by + bH(b) <= ay);
+}
+/** Ensemble des cellules occupées « col-row » */
+function occupiedCells(blocks, excludeIds) {
+  const ex = new Set(excludeIds || []);
+  const cells = new Set();
+  blocks.forEach(b => {
+    if (ex.has(b.id)) return;
+    const x = bX(b), y = bY(b); if (!x || !y) return;
+    const w = Math.min(bW(b), BLOCK_COLS);
+    for (let c = x; c < x + w; c++) for (let r = y; r < y + bH(b); r++) cells.add(c + '-' + r);
+  });
+  return cells;
+}
+/** Première position libre pour un bloc w×h (balayage lignes puis colonnes) */
+function findFreeSpot(w, h, occupied, fromRow) {
+  const need = Math.min(w, BLOCK_COLS);
+  for (let row = Math.max(1, fromRow || 1); row <= 400; row++) {
+    for (let col = 1; col <= BLOCK_COLS - need + 1; col++) {
+      let ok = true;
+      for (let c = col; c < col + need && ok; c++)
+        for (let r = row; r < row + h && ok; r++) if (occupied.has(c + '-' + r)) ok = false;
+      if (ok) return { x: col, y: row };
+    }
+  }
+  return { x: 1, y: 401 };
+}
+/** Donne une place à tout bloc qui n'en a pas, et déloge ceux qui se chevauchent.
+    L'ordre du tableau fait foi (les premiers gardent leur place). */
+function placeBlocks(blocks) {
+  const placed = [];
+  blocks.forEach(b => {
+    const w = Math.min(bW(b), BLOCK_COLS), h = bH(b);
+    let x = bX(b), y = bY(b);
+    const fits = x && y && x >= 1 && x + w - 1 <= BLOCK_COLS;
+    if (fits && !placed.some(o => blocksOverlap({ ...b, layout: { ...b.layout, x, y } }, o))) {
+      b.layout.x = x; b.layout.y = y;
+    } else {
+      const spot = findFreeSpot(w, h, occupiedCells(placed));
+      b.layout.x = spot.x; b.layout.y = spot.y;
+    }
+    placed.push(b);
+  });
+  return blocks;
+}
+
 /** Convertit n'importe quel bloc (V2 plat ou V3) vers la forme V3 canonique. */
 function normalizeBlock(b) {
   if (!b || !b.id) return null;
@@ -279,7 +339,7 @@ function getBlocks(cfg, projects, links) {
   const add = (type, id, prefix) => normalizeBlock({ id: prefix + id, type, ref: id, w: 1, h: 1 });
   (projects || getProjects()).forEach(p => { if (!have.has('project:' + p.id)) base.push(add('project', p.id, 'b_proj_')); });
   (links    || getLinks()).forEach(l    => { if (!have.has('link:' + l.id))    base.push(add('link',    l.id, 'b_link_')); });
-  return base;
+  return placeBlocks(base);   // x/y garantis, aucun chevauchement
 }
 
 /** Migration : projets → blocs Projet, liens → blocs Réseau, à propos → bloc Texte…
@@ -328,8 +388,13 @@ function renderBentoGrid(blocks, ctx) {
     if (s.includes('mailto') || s.includes('@')) return '✉';
     return '🔗';
   };
-  const cell = (b, inner, extra) =>
-    `<article class="bn bn-${esc(b.type)}${bHidden(b) ? ' bl-hidden' : ''}" data-b="${esc(b.id)}" style="--w:${Math.min(BLOCK_COLS, bW(b))};--h:${bH(b)}"${extra || ''}>${inner}</article>`;
+  const cell = (b, inner, extra) => {
+    const w = Math.min(BLOCK_COLS, bW(b)), h = bH(b), x = bX(b), y = bY(b);
+    // Placement absolu quand il existe ; sinon la grille place automatiquement.
+    // Sur mobile, le CSS neutralise x/y et repasse en flux (voir media query).
+    const pos = (x && y) ? `grid-column:${x}/span ${w};grid-row:${y}/span ${h};` : '';
+    return `<article class="bn bn-${esc(b.type)}${bHidden(b) ? ' bl-hidden' : ''}" data-b="${esc(b.id)}" style="${pos}--w:${w};--h:${h}"${extra || ''}>${inner}</article>`;
+  };
 
   // En mode éditeur les blocs masqués sont RENDUS (grisés par la couche d'édition) ;
   // à la publication ils ne sont pas émis du tout.
@@ -587,9 +652,11 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .bl-hidden{display:none!important}
 /* ── Style Bento : tout le corps est une grille de blocs ── */
 .bn-page{max-width:1080px;margin:0 auto;padding:0 16px 60px}
-.bn-grid{display:grid;grid-template-columns:repeat(${BLOCK_COLS},1fr);gap:14px;margin:34px 0;align-items:stretch}
+/* Rangées de hauteur FIXE : c'est ce qui donne un sens à la coordonnée y
+   (sans ça, un placement absolu vertical serait imprévisible). */
+.bn-grid{display:grid;grid-template-columns:repeat(${BLOCK_COLS},1fr);grid-auto-rows:150px;gap:14px;margin:34px 0}
 .bn{grid-column:span var(--w,1);grid-row:span var(--h,1);position:relative;display:flex;flex-direction:column;gap:6px;justify-content:center;
-    min-height:150px;padding:18px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow:hidden}
+    padding:18px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow:hidden}
 .bn[onclick]{cursor:pointer}
 .bn-t{font-size:14px;font-weight:800;letter-spacing:-.2px;color:var(--t)}
 .bn-sub{font-size:11px;color:${mutedC};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -613,9 +680,17 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .bn-rvi b{color:var(--t)}
 .bn-st{color:var(--a);font-size:10px}
 /* 820px : au-dessus la grille garde ses 4 colonnes (~200px/carte, lisible) —
-   ça couvre aussi l'aperçu de l'éditeur (~876px) qui doit montrer le vrai desktop. */
-@media(max-width:820px){.bn-grid{grid-template-columns:repeat(2,1fr)}.bn{grid-column:span min(var(--w,1),2)}}
-@media(max-width:560px){.bn-grid{grid-template-columns:1fr}.bn{grid-column:span 1;grid-row:span 1}}
+   ça couvre aussi l'aperçu de l'éditeur (~876px) qui doit montrer le vrai desktop.
+   En dessous, le placement absolu (x/y) N'A PLUS DE SENS (moins de colonnes) :
+   on le neutralise et la grille repasse en flux, dans l'ordre des blocs. */
+@media(max-width:820px){
+  .bn-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:minmax(150px,auto)}
+  .bn{grid-column:auto/span min(var(--w,1),2)!important;grid-row:auto!important}
+}
+@media(max-width:560px){
+  .bn-grid{grid-template-columns:1fr}
+  .bn{grid-column:auto/span 1!important;grid-row:auto!important}
+}
 .sb-wrap{display:flex;min-height:100vh;gap:14px;padding:14px}
 .sb-side{width:230px;flex-shrink:0;position:sticky;top:14px;height:calc(100vh - 28px);padding:24px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow-y:auto}
 .sb-logo{display:flex;align-items:center;gap:9px;font-size:18px;font-weight:800;letter-spacing:-.5px;margin-bottom:20px}

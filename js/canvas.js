@@ -428,22 +428,47 @@ body:not(.ed-on) [data-add]{display:none!important}
       width: r.width + 'px', height: r.height + 'px', margin: '0', zIndex: '9997',
     });
     el.classList.add('ed-drag');
-    this._d = { el, ph, grid, sx, sy, dx: 0, dy: 0 };
+    const b = this.blocks().find(x => x.id === el.getAttribute('data-b')) || {};
+    const cs = getComputedStyle(grid);
+    const cols = cs.gridTemplateColumns.split(' ').filter(Boolean).length || BLOCK_COLS;
+    this._d = { el, ph, grid, sx, sy, dx: 0, dy: 0,
+                w: Math.min(bW(b), BLOCK_COLS), h: bH(b),
+                x: bX(b), y: bY(b), mobile: cols < BLOCK_COLS };
+  },
+  /** Cellule de grille sous le curseur (pixels → col/row). Adapté d'OpenBento. */
+  _cellFromPointer(grid, clientX, clientY) {
+    const r = grid.getBoundingClientRect(), cs = getComputedStyle(grid);
+    const cols = cs.gridTemplateColumns.split(' ').filter(Boolean).length || BLOCK_COLS;
+    const gapC = parseFloat(cs.columnGap || cs.gap) || 14;
+    const gapR = parseFloat(cs.rowGap || cs.gap) || 14;
+    const rowH = parseFloat(cs.gridAutoRows) || 150;
+    const colW = (grid.clientWidth - gapC * (cols - 1)) / cols || 1;
+    const col = Math.min(cols, Math.max(1, Math.floor((clientX - r.left) / (colW + gapC)) + 1));
+    const row = Math.max(1, Math.floor((clientY - r.top) / (rowH + gapR)) + 1);
+    return { col, row, cols };
   },
   _follow(ev) {
     const d = this._d; if (!d) return;
     d.dx = ev.clientX - d.sx; d.dy = ev.clientY - d.sy;
     const tilt = Math.max(-2, Math.min(2, d.dx / 40));   // rotation très légère
     d.el.style.transform = `translate(${d.dx}px,${d.dy}px) scale(1.02) rotate(${tilt}deg)`;
-    // cible sous le curseur (la carte portée est pointer-events:none)
-    const under = this.doc.elementFromPoint(ev.clientX, ev.clientY);
-    const t = under && under.closest ? under.closest('[data-b]') : null;
-    if (!t || t === d.el || t.parentElement !== d.grid) return;
-    const r = t.getBoundingClientRect();
-    const after = (ev.clientX - r.left) > r.width / 2;
-    const next = after ? t.nextSibling : t;
-    if (next === d.ph) return;
-    this._flip(d.grid, () => d.grid.insertBefore(d.ph, next));
+    if (d.mobile) {   // sous 820px la grille est en flux : on retombe sur l'échange de place
+      const under = this.doc.elementFromPoint(ev.clientX, ev.clientY);
+      const t = under && under.closest ? under.closest('[data-b]') : null;
+      if (!t || t === d.el || t.parentElement !== d.grid) return;
+      const r = t.getBoundingClientRect();
+      const next = (ev.clientX - r.left) > r.width / 2 ? t.nextSibling : t;
+      if (next !== d.ph) this._flip(d.grid, () => d.grid.insertBefore(d.ph, next));
+      return;
+    }
+    // Placement absolu : le fantôme se pose sur la cellule visée, bornée à la grille
+    const { col, row, cols } = this._cellFromPointer(d.grid, ev.clientX, ev.clientY);
+    const w = Math.min(d.w, cols);
+    const x = Math.max(1, Math.min(col, cols - w + 1)), y = Math.max(1, row);
+    if (x === d.x && y === d.y) return;
+    d.x = x; d.y = y;
+    d.ph.style.gridColumn = x + '/span ' + w;
+    d.ph.style.gridRow = y + '/span ' + d.h;
   },
   /** FLIP : réorganisation animée des voisines (sinon la grille saute) */
   _flip(grid, mutate) {
@@ -470,9 +495,28 @@ body:not(.ed-on) [data-add]{display:none!important}
     ['position', 'left', 'top', 'width', 'height', 'margin', 'zIndex', 'transform'].forEach(p => el.style.removeProperty(p.replace(/[A-Z]/g, m => '-' + m.toLowerCase())));
     el.classList.remove('ed-drag');
     this.doc.body.classList.remove('ed-dragging');
-    this._dragging = false; this._d = null;
-    this._order(grid);
-    this.select(el.getAttribute('data-b'));
+    this._dragging = false;
+    const id = el.getAttribute('data-b');
+    if (d.mobile) { this._order(grid); }
+    else {
+      // Pose le bloc à ses nouvelles coordonnées. Il PASSE EN TÊTE du tableau :
+      // placeBlocks respecte l'ordre, donc c'est lui qui garde la place voulue et
+      // ce sont les blocs gênants qui sont délogés (jamais de chevauchement).
+      const blocks = this.blocks();
+      const i = blocks.findIndex(b => b.id === id);
+      if (i >= 0 && d.x && d.y) {
+        const [b] = blocks.splice(i, 1);
+        b.layout.x = d.x; b.layout.y = d.y;
+        blocks.unshift(b);
+        this.commit(placeBlocks(blocks));
+        this.rerender();
+        this._say('Bloc déplacé en colonne ' + d.x + ', ligne ' + d.y);
+        this._d = null;
+        return;
+      }
+    }
+    this._d = null;
+    this.select(id);
     this._say('Bloc déplacé');
   },
   /** annonce pour lecteurs d'écran */
@@ -508,10 +552,10 @@ body:not(.ed-on) [data-add]{display:none!important}
     const blocks = this.blocks();
     const b = blocks.find(x => x.id === this.sel); if (!b) return;
     if (bLocked(b)) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 2000);
-    b.layout.w = s.w; b.layout.h = s.h; this.commit(blocks);
-    const el = this.doc.querySelector('[data-b="' + (window.CSS && CSS.escape ? CSS.escape(this.sel) : this.sel) + '"]');
-    if (el) { el.style.setProperty('--w', s.w); el.style.setProperty('--h', s.h); }
-    this.select(this.sel);
+    const i = blocks.indexOf(b);
+    blocks.splice(i, 1); b.layout.w = s.w; b.layout.h = s.h; blocks.unshift(b);
+    this.commit(placeBlocks(blocks));   // aucun chevauchement
+    this.rerender();
   },
   _winSize(anchorRect) {
     const b = this.blocks().find(x => x.id === this.sel) || {};
@@ -564,9 +608,14 @@ body:not(.ed-on) [data-add]{display:none!important}
       const s = this._nearestSize(+el.style.getPropertyValue('--w') || 1, +el.style.getPropertyValue('--h') || 1);
       el.style.setProperty('--w', s.w); el.style.setProperty('--h', s.h);
       const blocks = this.blocks();
-      const b = blocks.find(x => x.id === el.getAttribute('data-b'));
-      if (b) { b.layout.w = s.w; b.layout.h = s.h; this.commit(blocks); }
-      this.select(el.getAttribute('data-b'));
+      const i = blocks.findIndex(x => x.id === el.getAttribute('data-b'));
+      if (i >= 0) {
+        const [b] = blocks.splice(i, 1);      // prioritaire : il garde sa place
+        b.layout.w = s.w; b.layout.h = s.h;
+        blocks.unshift(b);
+        this.commit(placeBlocks(blocks));     // les voisins gênés sont délogés
+        this.rerender();
+      }
       showToast?.('Taille : ' + s.n, '#666', 1200);
     };
     doc.addEventListener('pointermove', move); doc.addEventListener('pointerup', up);
