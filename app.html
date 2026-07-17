@@ -716,6 +716,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .edw-fx2{display:flex;flex-direction:column;gap:4px;margin-top:7px}
 .edw-fx2 label{display:flex;align-items:center;gap:8px;font-size:9px;color:var(--muted2)}
 .edw-fx2 input[type=range]{flex:1;accent-color:var(--accent)}
+/* Palette d'ajout de blocs */
+.edwin.edwin-wide{width:320px}
+.edp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.edp-b{display:flex;align-items:center;gap:7px;background:var(--s2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 9px;font-family:inherit;font-size:10px;font-weight:700;color:var(--muted2);cursor:pointer;transition:all .13s;text-align:left}
+.edp-b:hover{border-color:var(--accent);color:var(--text);transform:translateY(-1px);background:rgba(200,255,0,.05)}
+.edp-b span{font-size:14px;line-height:1}
 .edw-ok{width:100%;margin-top:12px;background:var(--accent);color:#060606;border:none;border-radius:8px;padding:9px;
   font-family:inherit;font-size:11px;font-weight:800;cursor:pointer}
 .edw-ok:hover{opacity:.88}

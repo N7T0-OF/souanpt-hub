@@ -217,6 +217,29 @@ const BLOCK_COLS = 4;                       // colonnes de la grille (desktop)
 const BLOCKS_VERSION = 3;
 const blockUid = t => 'b_' + t + '_' + Math.random().toString(36).slice(2, 8);
 
+/* ══ Registre des plateformes — une DONNÉE, pas du code par réseau.
+   Adapté d'OpenBento (socialPlatforms.ts, cf. THIRD_PARTY_LICENSES.md) :
+   {id, label, icon, color, placeholder, buildUrl(saisie)}. Ajouter un réseau =
+   ajouter une ligne ici, rien d'autre à toucher. ══ */
+const _h = v => String(v || '').trim().replace(/^@/, '');
+const _url = (base, v) => /^https?:\/\//i.test(v) ? v : base + encodeURIComponent(_h(v));
+const SOCIAL_PLATFORMS = [
+  { id: 'discord',   label: 'Discord',   icon: '🎮', color: '#5865F2', placeholder: 'code d\'invitation', buildUrl: v => _url('https://discord.gg/', v) },
+  { id: 'instagram', label: 'Instagram', icon: '📸', color: '#E4405F', placeholder: 'pseudo',             buildUrl: v => _url('https://instagram.com/', v) },
+  { id: 'behance',   label: 'Behance',   icon: '🎨', color: '#1769FF', placeholder: 'pseudo',             buildUrl: v => _url('https://www.behance.net/', v) },
+  { id: 'github',    label: 'GitHub',    icon: '🐙', color: '#f0f6fc', placeholder: 'pseudo',             buildUrl: v => _url('https://github.com/', v) },
+  { id: 'linkedin',  label: 'LinkedIn',  icon: '💼', color: '#0A66C2', placeholder: 'pseudo',             buildUrl: v => _url('https://www.linkedin.com/in/', v) },
+  { id: 'tiktok',    label: 'TikTok',    icon: '🎵', color: '#ff0050', placeholder: 'pseudo',             buildUrl: v => /^https?:/i.test(v) ? v : 'https://www.tiktok.com/@' + encodeURIComponent(_h(v)) },
+  { id: 'youtube',   label: 'YouTube',   icon: '▶',  color: '#FF0000', placeholder: 'chaîne',             buildUrl: v => /^https?:/i.test(v) ? v : 'https://www.youtube.com/@' + encodeURIComponent(_h(v)) },
+  { id: 'twitch',    label: 'Twitch',    icon: '🟣', color: '#9146FF', placeholder: 'pseudo',             buildUrl: v => _url('https://twitch.tv/', v) },
+  { id: 'modrinth',  label: 'Modrinth',  icon: '🧩', color: '#1bd96a', placeholder: 'pseudo',             buildUrl: v => _url('https://modrinth.com/user/', v) },
+  { id: 'kofi',      label: 'Ko-fi',     icon: '☕', color: '#FF5E5B', placeholder: 'pseudo',             buildUrl: v => _url('https://ko-fi.com/', v) },
+  { id: 'x',         label: 'X',         icon: '🐦', color: '#e7e9ea', placeholder: 'pseudo',             buildUrl: v => _url('https://x.com/', v) },
+  { id: 'email',     label: 'Email',     icon: '✉',  color: '#C8FF00', placeholder: 'toi@exemple.fr',     buildUrl: v => /^mailto:/i.test(v) ? v : 'mailto:' + _h(v) },
+  { id: 'custom',    label: 'Lien perso', icon: '🔗', color: '#888',   placeholder: 'https://…',          buildUrl: v => /^https?:\/\//i.test(v) ? v : 'https://' + _h(v) },
+];
+const socialById = id => SOCIAL_PLATFORMS.find(p => p.id === id) || SOCIAL_PLATFORMS[SOCIAL_PLATFORMS.length - 1];
+
 /* ── Modèle V3 (unifié) ────────────────────────────────────────────────
    {
      id, type,

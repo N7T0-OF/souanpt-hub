@@ -63,7 +63,7 @@ const EdCanvas = {
       if (this.mode !== 'edit') return;
       if (this._ui(e.target)) return;
       e.preventDefault(); e.stopPropagation();
-      if (e.target.closest && e.target.closest('[data-add]')) { this.deselect(); return edAddProject(); }
+      if (e.target.closest && e.target.closest('[data-add]')) { this.deselect(); return edAddBlock(); }
       const t = e.target.closest && e.target.closest('[data-b]');
       if (t && t.getAttribute('data-b')) this.select(t.getAttribute('data-b')); else this.deselect();
     }, true);
@@ -129,7 +129,7 @@ const EdCanvas = {
     if (a === 'paste') { return this.paste(); }
     if (a === 'undo') return this.undo();
     if (a === 'redo') return this.redo();
-    if (a === 'add') return showToast?.('Palette « + » : étape 3c 🚧', '#e4b24a', 2400);
+    if (a === 'add') return edAddBlock();
     if (a === 'struct') return showToast?.('Fenêtre Structure : étape 3c 🚧', '#e4b24a', 2400);
     if (i < 0) return;
     if (a === 'lock') {
@@ -935,4 +935,57 @@ function edAddProject() {
   });
 }
 window.edAddProject = edAddProject;
+
+/* ── ＋ Palette d'ajout de blocs (multi-types) ── */
+function edPushBlock(raw) {
+  const blocks = getBlocks(SiteConfig.get());
+  blocks.push(normalizeBlock(raw));
+  EdCanvas.commit(placeBlocks(blocks));
+  EdCanvas.rerender();
+}
+function edCreateText() {
+  edPushBlock({ id: blockUid('text'), type: 'text', props: { title: '', text: 'Nouveau texte — double-clic pour modifier' }, w: 2, h: 1 });
+  EdWin.close();
+  showToast?.('Bloc texte ajouté ✓', '#2e9a63', 1800);
+}
+function edCreateSocial(pid) {
+  const p = socialById(pid);
+  EdWin.open(null, p.icon + ' ' + p.label, `
+    <div class="edw-l">${p.label} — identifiant / lien</div>
+    <input class="edw-in" id="soc-h" placeholder="${_eesc(p.placeholder)}">
+    <div class="edw-hint" style="margin-top:6px">L'URL est construite automatiquement.</div>
+    <button class="edw-ok" id="soc-ok">Ajouter le bloc ${_eesc(p.label)}</button>`, w => {
+    const inp = w.querySelector('#soc-h'); setTimeout(() => inp.focus(), 30);
+    const go = () => {
+      const v = inp.value.trim(); if (!v) return showToast?.('Renseigne ton ' + p.label, '#c0392b', 1800);
+      const links = getLinks(); const id = Date.now().toString();
+      links.push({ id, title: p.label, url: p.buildUrl(v), clicks: 0, platform: p.id });
+      localStorage.setItem('hub_links', JSON.stringify(links));
+      EdCanvas.commit(placeBlocks(getBlocks(SiteConfig.get())));   // réconcilie → bloc lien créé
+      EdCanvas.rerender(); EdWin.close();
+      showToast?.('Bloc ' + p.label + ' ajouté ✓', '#2e9a63', 2000);
+    };
+    w.querySelector('#soc-ok').onclick = go;
+    inp.onkeydown = e => { if (e.key === 'Enter') go(); };
+  });
+}
+function edAddBlock() {
+  const soc = SOCIAL_PLATFORMS.map(p =>
+    `<button class="edp-b" data-soc="${p.id}" title="${_eesc(p.label)}"><span style="color:${p.color}">${p.icon}</span>${_eesc(p.label)}</button>`).join('');
+  const html = `
+    <div class="edw-l">Portfolio</div>
+    <div class="edp-grid"><button class="edp-b" data-a="project"><span>🗂️</span>Projet</button></div>
+    <div class="edw-l">Réseaux & liens</div>
+    <div class="edp-grid">${soc}</div>
+    <div class="edw-l">Contenu</div>
+    <div class="edp-grid"><button class="edp-b" data-a="text"><span>✍️</span>Texte</button></div>`;
+  EdWin.open(null, '＋ Ajouter un bloc', html, w => {
+    w.querySelectorAll('[data-soc]').forEach(b => b.onclick = () => edCreateSocial(b.dataset.soc));
+    w.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+      if (b.dataset.a === 'project') { EdWin.close(); edAddProject(); }
+      else if (b.dataset.a === 'text') edCreateText();
+    });
+  });
+}
+window.edAddBlock = edAddBlock;
 window.edWinTheme = edWinTheme; window.edWinFx = edWinFx; window.edWinEdit = edWinEdit;
