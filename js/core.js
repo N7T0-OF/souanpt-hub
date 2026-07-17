@@ -239,6 +239,12 @@ const bLocked = b => !!(b.layout ? b.layout.locked : b.locked);
 const bHidden = b => (b.visibility ? b.visibility.public === false : !!b.hidden);
 const bRef    = b => (b.content && b.content.ref !== undefined ? b.content.ref : b.ref);
 const bProps  = b => b.content || b.props || {};
+/* Point focal du média (0-100 sur chaque axe), 50/50 = centré.
+   Adapté d'OpenBento (voir THIRD_PARTY_LICENSES.md) : le cadrage est une DONNÉE
+   appliquée en CSS, jamais un recadrage du fichier. C'est ce qui permet aux GIF
+   de rester animés — ré-encoder une image (canvas → WebP/JPEG) les figerait. */
+const bFocal  = b => { const m = (b && bProps(b).mediaPosition) || {}; return { x: Number(m.x ?? 50), y: Number(m.y ?? 50) }; };
+const focalCss = f => `${f.x}% ${f.y}%`;
 
 /** Convertit n'importe quel bloc (V2 plat ou V3) vers la forme V3 canonique. */
 function normalizeBlock(b) {
@@ -346,7 +352,7 @@ function renderBentoGrid(blocks, ctx) {
     if (b.type === 'project') {
       const p = P(bRef(b)); if (!p) return '';
       const i = Math.max(0, projects.indexOf(p));
-      return cell(b, `<div class="bn-cov" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i % 6]}`}"></div>
+      return cell(b, `<div class="bn-cov" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(b))}/cover` : `background:${GRADS[i % 6]}`}"></div>
         <div class="bn-pb"><div class="bn-t">${esc(p.title || 'Projet')}</div><div class="ptags">${(p.tags || []).slice(0, 2).map(t => `<span class="ptag">${esc(t)}</span>`).join('')}</div></div>`,
         ` data-p="${esc(p.title || 'Projet')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')"` : ''}`);
     }
@@ -414,7 +420,7 @@ function generateSite(cfg, projects, reviews, opts) {
   const pHid  = p => { const b = blkOf(p); return b ? bHidden(b) : false; };
   const cards = projects.filter(p => editor || !pHid(p)).map((p, i) => `
     <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
-      <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
+      <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(blkOf(p)))}/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
         <div class="ptags">${(p.tags||[]).slice(0,3).map(t=>`<span class="ptag">${esc(t)}</span>`).join('')}</div>

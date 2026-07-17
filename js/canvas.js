@@ -759,15 +759,31 @@ function edWinEdit(blockId) {
                localStorage.setItem('hub_links', JSON.stringify(ls)); } };
   } else if (b.type === 'project') {
     const p = getProjects().find(x => String(x.id) === String(bRef(b))) || {};
+    const f = bFocal(b);
     title = '✎ Projet';
     html = F('e1', 'Titre', p.title || '') + F('e2', 'Tags (séparés par une virgule)', (p.tags || []).join(', '))
-         + F('e3', 'Lien du projet', p.url || '') + F('e4', 'Couverture — URL image', p.cover || '');
-    save = w => { const ps = getProjects(); const x = ps.find(y => String(y.id) === String(bRef(b)));
+         + F('e3', 'Lien du projet', p.url || '') + F('e4', 'Couverture — URL image', p.cover || '')
+         // Cadrage NON destructif : on ne touche jamais au fichier (les GIF restent animés)
+         + (p.cover ? `<div class="edw-l">Cadrage de la couverture <span class="edw-hint">le fichier n'est pas modifié</span></div>
+             <div class="edw-focal" id="fz"><div id="fp" style="background:url('${_eesc(p.cover)}') ${f.x}% ${f.y}%/cover"></div></div>
+             <div class="edw-fx2">
+               <label>Horizontal <input type="range" id="fx" min="0" max="100" value="${f.x}"></label>
+               <label>Vertical <input type="range" id="fy" min="0" max="100" value="${f.y}"></label>
+             </div>` : '');
+    save = w => {
+      const ps = getProjects(); const x = ps.find(y => String(y.id) === String(bRef(b)));
       if (x) { x.title = w.querySelector('#e1').value;
                x.tags = w.querySelector('#e2').value.split(',').map(t => t.trim()).filter(Boolean);
                x.url = w.querySelector('#e3').value; x.cover = w.querySelector('#e4').value;
                localStorage.setItem('hub_projects', JSON.stringify(ps));
-               if (typeof renderProjects === 'function') renderProjects(); } };
+               if (typeof renderProjects === 'function') renderProjects(); }
+      const fx = w.querySelector('#fx'), fy = w.querySelector('#fy');
+      if (fx && fy) {   // le point focal vit dans le bloc (modèle V3), pas dans le fichier
+        const bl = getBlocks(SiteConfig.get()); const y = bl.find(z => z.id === blockId);
+        if (y) { y.content = { ...(y.content || {}), mediaPosition: { x: +fx.value, y: +fy.value } };
+                 SiteConfig.set('blocks', bl); }
+      }
+    };
   } else if (b.type === 'reviews') {
     title = '✎ Avis';
     const m = c.avisMode || 'defile';
@@ -783,6 +799,12 @@ function edWinEdit(blockId) {
       w.querySelectorAll('[data-m]').forEach(y => y.classList.toggle('on', y === x));
       edSet('avisMode', x.dataset.m);
     });
+    // aperçu du cadrage en direct (aucun ré-encodage, juste du CSS)
+    const fx = w.querySelector('#fx'), fy = w.querySelector('#fy'), fp = w.querySelector('#fp');
+    if (fx && fy && fp) {
+      const upd = () => { fp.style.backgroundPosition = fx.value + '% ' + fy.value + '%'; };
+      fx.oninput = upd; fy.oninput = upd;
+    }
     const ok = w.querySelector('#edw-save');
     if (ok) ok.onclick = () => { save(w); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
   });
