@@ -925,10 +925,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
   <div class="nav-section">
     <div class="nav-label">Contenu</div>
-    <button class="ni" data-page="links" onclick="showPage('links')">
-      <svg viewBox="0 0 16 16" fill="none"><path d="M6 10a4 4 0 0 0 4 0l2-2a4 4 0 0 0-4-4L6 6" stroke="currentColor" stroke-width="1.2"/><path d="M10 6a4 4 0 0 0-4 0L4 8a4 4 0 0 0 4 4l2-2" stroke="currentColor" stroke-width="1.2"/></svg>
-      Profil Links
-    </button>
     <button class="ni" data-page="editor" onclick="showPage('editor')">
       <svg viewBox="0 0 16 16" fill="none"><path d="M2 12L6 4l4 8" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 9.5h5" stroke="currentColor" stroke-width="1.2"/><path d="M10 4h4M12 2v4" stroke="currentColor" stroke-width="1.2"/></svg>
       Éditeur de site
@@ -1057,26 +1053,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div style="font-size:10px;color:var(--muted2);margin-bottom:14px">Un clic · Connexion automatique · Déploiement instantané</div>
         <button class="btn btn-accent" onclick="showPage('github')">Se connecter avec GitHub →</button>
       </div>
-    </div>
-
-    <!-- ══ PAGE: LINKS ══ -->
-    <div class="page" id="page-links">
-      <div class="section-header">
-        <div class="section-title">Profil Links</div>
-        <div class="section-line"></div>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="document.getElementById('add-link-form').classList.toggle('visible')">+ Ajouter</button>
-      </div>
-      <div class="form-box" id="add-link-form">
-        <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px">
-          <div><div class="prop-label">Titre</div><input class="prop-input" id="new-link-title" placeholder="Mon Behance"></div>
-          <div><div class="prop-label">URL</div><input class="prop-input" id="new-link-url" placeholder="https://behance.net/..."></div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-accent" onclick="addLink()">Ajouter</button>
-          <button class="btn btn-ghost" onclick="document.getElementById('add-link-form').classList.remove('visible')">Annuler</button>
-        </div>
-      </div>
-      <div id="links-list"></div>
     </div>
 
     <!-- ══ PAGE: ÉDITEUR ══ -->
@@ -2174,7 +2150,7 @@ function addLink() {
   links.push({ id:Date.now().toString(), title:t, url:u, clicks:0 });
   localStorage.setItem('hub_links', JSON.stringify(links));
   renderLinks();
-  document.getElementById('add-link-form').classList.remove('visible');
+  document.getElementById('add-link-form')?.classList.remove('visible');
   ['new-link-title','new-link-url'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
 }
 function renderLinks() {

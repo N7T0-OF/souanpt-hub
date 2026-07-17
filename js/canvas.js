@@ -656,14 +656,17 @@ document.addEventListener('keydown', e => EdCanvas._key(e));
 function edMigrationNotice() {
   try {
     if (localStorage.getItem('hub_migr_portfolio')) return;
-    const projs = getProjects(); if (!projs.length) return;
+    const projs = getProjects(), links = getLinks();
+    if (!projs.length && !links.length) return;
     const gifs = projs.filter(p => /^data:image\/gif|\.gif($|\?)/i.test(p.cover || '')).length;
-    const covers = projs.filter(p => p.cover).length;
     localStorage.setItem('hub_migr_portfolio', '1');
+    const parts = [];
+    if (projs.length) parts.push(projs.length + ' projet' + (projs.length > 1 ? 's' : ''));
+    if (links.length) parts.push(links.length + ' lien' + (links.length > 1 ? 's' : ''));
+    if (gifs) parts.push(gifs + ' GIF');
     setTimeout(() => showToast?.(
-      '✓ Portfolio migré dans l\'Éditeur — ' + projs.length + ' projet' + (projs.length > 1 ? 's' : '') +
-      ' · ' + covers + ' couverture' + (covers > 1 ? 's' : '') + ' conservée' + (covers > 1 ? 's' : '') +
-      (gifs ? ' · ' + gifs + ' GIF' : '') + ' · 0 donnée perdue', '#2e9a63', 6000), 1200);
+      '✓ Portfolio & Profil Links migrés dans l\'Éditeur — ' + parts.join(' · ') + ' · 0 donnée perdue',
+      '#2e9a63', 6000), 1200);
   } catch (e) {}
 }
 document.addEventListener('DOMContentLoaded', edMigrationNotice);
