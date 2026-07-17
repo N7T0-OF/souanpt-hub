@@ -214,6 +214,10 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 body:not(.ed-on) [data-add]{display:none!important}
 /* Fantôme laissé à l'ancienne place */
 .ed-ph{border:1px dashed rgba(200,255,0,.5)!important;border-radius:14px;background:rgba(200,255,0,.05)!important;pointer-events:none}
+/* Retour visuel dès le pointerdown (avant décollage) : léger enfoncement + grab,
+   et déjà plus de sélection de texte pendant l'attente (fin du bug signalé). */
+.ed-hold{transform:scale(.995);cursor:grab;transition:transform .1s ease}
+.ed-hold,.ed-hold *{user-select:none!important;-webkit-user-select:none!important}
 /* Pendant le déplacement : plus aucune sélection de texte ni interaction publique */
 .ed-dragging,.ed-dragging *{user-select:none!important;-webkit-user-select:none!important;cursor:grabbing!important}
 [data-b]{touch-action:none}
@@ -383,30 +387,39 @@ body:not(.ed-on) [data-add]{display:none!important}
      se détache du flux, suit le curseur ; un fantôme garde sa place et les
      voisines se réorganisent avec une animation FLIP.
   ══════════════════════════════════════════════════════════ */
-  HOLD_MS: 200, MOVE_TOL: 5,
+  // Délais de maintien avant décollage, par type de pointeur (§20).
+  // Souris quasi immédiate ; tactile plus long pour ne pas voler un scroll.
+  HOLD: { mouse: 120, pen: 160, touch: 260 },
+  EARLY_AT: 70, EARLY_MOVE: 3, MOVE_TOL: 5, SCROLL_CANCEL: 12,
   /** éléments où le maintien ne doit PAS lancer un déplacement */
   _editable(t) {
-    return !!(t && t.closest && t.closest('input,textarea,select,[contenteditable="true"],#ed-tb,.ed-rz,.ed-ctx'));
+    return !!(t && t.closest && t.closest('input,textarea,select,[contenteditable="true"],[data-no-drag],#ed-tb,.ed-rz,.ed-ctx'));
   },
   _press(e, el) {
     if (this.mode !== 'edit' || e.button === 2) return;
     if (this._ui(e.target) || this._editable(e.target)) return;
     const bl = this.blocks().find(x => x.id === el.getAttribute('data-b'));
     if (bl && bLocked(bl)) return;
-    // stoppe net la sélection de texte du navigateur (cause du bug signalé)
-    e.preventDefault();
-    const doc = this.doc, sx = e.clientX, sy = e.clientY;
+    const type = e.pointerType || 'mouse';
+    const delay = this.HOLD[type] || this.HOLD.mouse;
+    // Souris/stylet : on coupe tout de suite la sélection de texte (bug signalé).
+    // Tactile : on NE bloque PAS encore (laisse le scroll possible tant que non décollé).
+    if (type !== 'touch') e.preventDefault();
+    const doc = this.doc, sx = e.clientX, sy = e.clientY, t0 = performance.now();
+    el.classList.add('ed-hold');                 // retour visuel immédiat (scale .995)
     let live = false;
-    const tmr = setTimeout(() => { live = true; this._lift(el, sx, sy); }, this.HOLD_MS);
+    const start = () => { if (live) return; live = true; clearTimeout(tmr); el.classList.remove('ed-hold'); this._lift(el, sx, sy); };
+    const tmr = setTimeout(start, delay);
     const move = ev => {
-      if (!live) {           // bouge trop tôt → ce n'est pas un maintien, on annule
-        if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > this.MOVE_TOL) { clearTimeout(tmr); done(); }
-        return;
-      }
-      ev.preventDefault();   // une fois décollé, on bloque le scroll tactile
-      this._follow(ev);
+      if (live) { ev.preventDefault(); this._follow(ev); return; }
+      const dist = Math.hypot(ev.clientX - sx, ev.clientY - sy);
+      const elapsed = performance.now() - t0;
+      // Activation anticipée : maintenu ≥70 ms puis mouvement volontaire ≥3 px.
+      if (elapsed >= this.EARLY_AT && dist >= this.EARLY_MOVE) { start(); ev.preventDefault(); this._follow(ev); return; }
+      // Mouvement franc AVANT le seuil = scroll (tactile) ou clic-glissé : on abandonne.
+      if (dist > (type === 'touch' ? this.SCROLL_CANCEL : this.MOVE_TOL)) { clearTimeout(tmr); el.classList.remove('ed-hold'); done(); }
     };
-    const up = () => { clearTimeout(tmr); if (live) this._drop(); done(); };
+    const up = () => { clearTimeout(tmr); el.classList.remove('ed-hold'); if (live) this._drop(); done(); };
     const done = () => { doc.removeEventListener('pointermove', move); doc.removeEventListener('pointerup', up); doc.removeEventListener('pointercancel', up); };
     doc.addEventListener('pointermove', move, { passive: false });
     doc.addEventListener('pointerup', up); doc.addEventListener('pointercancel', up);
