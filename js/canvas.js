@@ -99,8 +99,8 @@ const EdCanvas = {
       ['edit', '✎ Modifier', ''], ['dup', '⧉ Dupliquer', 'Ctrl+D'], ['copy', '⧉ Copier', 'Ctrl+C'],
       ['paste', '📋 Coller', 'Ctrl+V'], null,
       ['front', '↑ Déplacer vers l\'avant', ''], ['back', '↓ Déplacer vers l\'arrière', ''], null,
-      ['lock', b.locked ? '🔓 Déverrouiller' : '🔒 Verrouiller', ''],
-      ['hide', b.hidden ? '👁 Réafficher' : '👁 Masquer', ''],
+      ['lock', bLocked(b) ? '🔓 Déverrouiller' : '🔒 Verrouiller', ''],
+      ['hide', bHidden(b) ? '👁 Réafficher' : '👁 Masquer', ''],
       ['del', '🗑 Supprimer', 'Suppr'],
     ] : [
       ['add', '＋ Ajouter un bloc', ''], ['paste', '📋 Coller', 'Ctrl+V'], null,
@@ -133,8 +133,8 @@ const EdCanvas = {
     if (a === 'struct') return showToast?.('Fenêtre Structure : étape 3c 🚧', '#e4b24a', 2400);
     if (i < 0) return;
     if (a === 'lock') {
-      blocks[i].locked = !blocks[i].locked; this.commit(blocks);
-      showToast?.(blocks[i].locked ? '🔒 Bloc verrouillé' : '🔓 Bloc déverrouillé', '#666', 1600);
+      blocks[i].layout.locked = !bLocked(blocks[i]); this.commit(blocks);
+      showToast?.(bLocked(blocks[i]) ? '🔒 Bloc verrouillé' : '🔓 Bloc déverrouillé', '#666', 1600);
       this.select(this.sel); return;
     }
     if (a === 'front' || a === 'back') {
@@ -235,7 +235,7 @@ body:not(.ed-on) [data-add]{display:none!important}
       h.addEventListener('pointerdown', e => {
         if (this.mode !== 'edit') return;
         const bl = this.blocks().find(x => x.id === el.getAttribute('data-b'));
-        if (bl && bl.locked) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 2000);
+        if (bl && bLocked(bl)) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 2000);
         e.preventDefault(); e.stopPropagation();
         const doc2 = this.doc;
         this._lift(el, e.clientX, e.clientY);
@@ -270,8 +270,8 @@ body:not(.ed-on) [data-add]{display:none!important}
   /** URL configurée sur un bloc (neutralisée en Édition, mais testable) */
   _linkOf(b) {
     if (!b) return '';
-    if (b.type === 'link')    return (getLinks().find(x => String(x.id) === String(b.ref)) || {}).url || '';
-    if (b.type === 'project') return (getProjects().find(x => String(x.id) === String(b.ref)) || {}).url || '';
+    if (b.type === 'link')    return (getLinks().find(x => String(x.id) === String(bRef(b))) || {}).url || '';
+    if (b.type === 'project') return (getProjects().find(x => String(x.id) === String(bRef(b))) || {}).url || '';
     if (b.type === 'contact') { const e = SiteConfig.get().email; return e ? 'mailto:' + e : ''; }
     return '';
   },
@@ -282,12 +282,12 @@ body:not(.ed-on) [data-add]{display:none!important}
     const b = this.blocks().find(x => x.id === this.sel) || {};
     const url = this._linkOf(b);
     const inGrid = el.parentElement && el.parentElement.classList.contains('bn-grid');
-    tb.innerHTML = `<span class="ed-ty">${this._TYPES[b.type] || 'Bloc'}${b.locked ? ' 🔒' : ''}</span><span class="sep"></span>` +
+    tb.innerHTML = `<span class="ed-ty">${this._TYPES[b.type] || 'Bloc'}${bLocked(b) ? ' 🔒' : ''}</span><span class="sep"></span>` +
       `<button data-a="move">⋮⋮ Déplacer</button><button data-a="edit">✎ Modifier</button>` +
       (inGrid ? `<button data-a="size">⤢ Taille</button>` : '') +
       `<button data-a="style">🎨 Style</button><button data-a="fx">⚡ Effets</button>` +
-      `<button data-a="dup">⧉ Dupliquer</button><button data-a="hide">${b.hidden ? '👁 Afficher' : '👁 Masquer'}</button>` +
-      `<button data-a="lock">${b.locked ? '🔓' : '🔒'}</button><button data-a="del" title="Supprimer">🗑</button>` +
+      `<button data-a="dup">⧉ Dupliquer</button><button data-a="hide">${bHidden(b) ? '👁 Afficher' : '👁 Masquer'}</button>` +
+      `<button data-a="lock">${bLocked(b) ? '🔓' : '🔒'}</button><button data-a="del" title="Supprimer">🗑</button>` +
       // Le lien est neutralisé en Édition : on le signale et on offre de le tester.
       (url ? `<span class="sep"></span><button data-a="testlink" title="${_eesc(url)}">🔗 Tester le lien</button>` : '');
     tb.onclick = e => { const btn = e.target.closest('button'); if (btn) { e.stopPropagation(); this._act(btn.dataset.a); } };
@@ -335,14 +335,14 @@ body:not(.ed-on) [data-add]{display:none!important}
       blocks.splice(i + 1, 0, c); this.commit(blocks); this.rerender();
       showToast?.('Bloc dupliqué ✓', '#2e9a63', 1800);
     } else if (a === 'hide') {
-      blocks[i].hidden = !blocks[i].hidden;
+      blocks[i].visibility.public = bHidden(blocks[i]);   // masqué ⇄ public
       this.commit(blocks);
       // bascule la classe en local : pas de reconstruction du canvas (la transition
       // CSS fait le gris ↔ couleurs en ~200 ms), la sélection est conservée.
       const el = this.doc.querySelector('[data-b="' + (window.CSS && CSS.escape ? CSS.escape(this.sel) : this.sel) + '"]');
-      if (el) el.classList.toggle('bl-hidden', !!blocks[i].hidden);
+      if (el) el.classList.toggle('bl-hidden', bHidden(blocks[i]));
       this._toolbar(el);
-      showToast?.(blocks[i].hidden ? 'Bloc masqué — grisé ici, absent du site public' : 'Bloc réaffiché ✓', '#666', 2200);
+      showToast?.(bHidden(blocks[i]) ? 'Bloc masqué — grisé ici, absent du site public' : 'Bloc réaffiché ✓', '#666', 2200);
     } else if (a === 'del') {
       const b = blocks[i];
       // Un bloc projet/lien référence une donnée réelle : la supprimer aussi,
@@ -350,10 +350,10 @@ body:not(.ed-on) [data-add]{display:none!important}
       if (b.type === 'project' || b.type === 'link') {
         const key = b.type === 'project' ? 'hub_projects' : 'hub_links';
         const list = b.type === 'project' ? getProjects() : getLinks();
-        const item = list.find(x => String(x.id) === String(b.ref));
+        const item = list.find(x => String(x.id) === String(bRef(b)));
         const nom = item ? (item.title || 'sans titre') : '';
         if (!confirm('Supprimer définitivement ' + (b.type === 'project' ? 'le projet' : 'le lien') + ' « ' + nom + ' » ?\n\nCette donnée sera retirée du Hub, pas seulement du site.')) return;
-        localStorage.setItem(key, JSON.stringify(list.filter(x => String(x.id) !== String(b.ref))));
+        localStorage.setItem(key, JSON.stringify(list.filter(x => String(x.id) !== String(bRef(b)))));
         if (typeof renderProjects === 'function') renderProjects();
         if (typeof syncKPIs === 'function') syncKPIs();
       }
@@ -392,7 +392,7 @@ body:not(.ed-on) [data-add]{display:none!important}
     if (this.mode !== 'edit' || e.button === 2) return;
     if (this._ui(e.target) || this._editable(e.target)) return;
     const bl = this.blocks().find(x => x.id === el.getAttribute('data-b'));
-    if (bl && bl.locked) return;
+    if (bl && bLocked(bl)) return;
     // stoppe net la sélection de texte du navigateur (cause du bug signalé)
     e.preventDefault();
     const doc = this.doc, sx = e.clientX, sy = e.clientY;
@@ -488,7 +488,7 @@ body:not(.ed-on) [data-add]{display:none!important}
     const blocks = this.blocks();
     const i = blocks.findIndex(b => b.id === this.sel);
     if (i < 0) return;
-    if (blocks[i].locked) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 1800);
+    if (bLocked(blocks[i])) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 1800);
     const j = i + dir;
     if (j < 0 || j >= blocks.length) return;
     [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
@@ -507,15 +507,15 @@ body:not(.ed-on) [data-add]{display:none!important}
     const s = this.SIZES.find(x => x.k === k); if (!s) return;
     const blocks = this.blocks();
     const b = blocks.find(x => x.id === this.sel); if (!b) return;
-    if (b.locked) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 2000);
-    b.w = s.w; b.h = s.h; this.commit(blocks);
+    if (bLocked(b)) return showToast?.('🔒 Bloc verrouillé', '#e4b24a', 2000);
+    b.layout.w = s.w; b.layout.h = s.h; this.commit(blocks);
     const el = this.doc.querySelector('[data-b="' + (window.CSS && CSS.escape ? CSS.escape(this.sel) : this.sel) + '"]');
     if (el) { el.style.setProperty('--w', s.w); el.style.setProperty('--h', s.h); }
     this.select(this.sel);
   },
   _winSize(anchorRect) {
     const b = this.blocks().find(x => x.id === this.sel) || {};
-    const cur = this._nearestSize(b.w || 1, b.h || 1).k;
+    const cur = this._nearestSize(bW(b), bH(b)).k;
     EdWin.open(null, '⤢ Taille du bloc',
       '<div class="edw-row">' + this.SIZES.map(s =>
         `<button class="edw-st${s.k === cur ? ' on' : ''}" data-s="${s.k}">${s.n}<br><span style="opacity:.5">${s.w}×${s.h}</span></button>`).join('') + '</div>',
@@ -565,7 +565,7 @@ body:not(.ed-on) [data-add]{display:none!important}
       el.style.setProperty('--w', s.w); el.style.setProperty('--h', s.h);
       const blocks = this.blocks();
       const b = blocks.find(x => x.id === el.getAttribute('data-b'));
-      if (b) { b.w = s.w; b.h = s.h; this.commit(blocks); }
+      if (b) { b.layout.w = s.w; b.layout.h = s.h; this.commit(blocks); }
       this.select(el.getAttribute('data-b'));
       showToast?.('Taille : ' + s.n, '#666', 1200);
     };
@@ -741,28 +741,28 @@ function edWinEdit(blockId) {
       SiteConfig.set('siteName', g('e1')); SiteConfig.set('heroText', g('e2')); SiteConfig.set('bio', g('e3')); };
   } else if (b.type === 'text') {
     title = '✎ Texte';
-    html = F('e1', 'Titre', (b.props || {}).title || '') + F('e2', 'Texte', (b.props || {}).text || '', 'area');
+    html = F('e1', 'Titre', bProps(b).title || '') + F('e2', 'Texte', bProps(b).text || '', 'area');
     save = w => { const bl = getBlocks(SiteConfig.get()); const x = bl.find(y => y.id === blockId);
-      x.props = { ...(x.props || {}), title: w.querySelector('#e1').value, text: w.querySelector('#e2').value };
+      x.content = { ...(x.content || {}), title: w.querySelector('#e1').value, text: w.querySelector('#e2').value };
       SiteConfig.set('blocks', bl);
-      if (x.props.title === 'À propos') SiteConfig.set('about', x.props.text); };
+      if (x.content.title === 'À propos') SiteConfig.set('about', x.content.text); };
   } else if (b.type === 'contact') {
     title = '✎ Contact';
     html = F('e1', 'Adresse e-mail', c.email);
     save = w => SiteConfig.set('email', w.querySelector('#e1').value);
   } else if (b.type === 'link') {
-    const l = getLinks().find(x => String(x.id) === String(b.ref)) || {};
+    const l = getLinks().find(x => String(x.id) === String(bRef(b))) || {};
     title = '✎ Lien';
     html = F('e1', 'Libellé', l.title || '') + F('e2', 'URL', l.url || '');
-    save = w => { const ls = getLinks(); const x = ls.find(y => String(y.id) === String(b.ref));
+    save = w => { const ls = getLinks(); const x = ls.find(y => String(y.id) === String(bRef(b)));
       if (x) { x.title = w.querySelector('#e1').value; x.url = w.querySelector('#e2').value;
                localStorage.setItem('hub_links', JSON.stringify(ls)); } };
   } else if (b.type === 'project') {
-    const p = getProjects().find(x => String(x.id) === String(b.ref)) || {};
+    const p = getProjects().find(x => String(x.id) === String(bRef(b))) || {};
     title = '✎ Projet';
     html = F('e1', 'Titre', p.title || '') + F('e2', 'Tags (séparés par une virgule)', (p.tags || []).join(', '))
          + F('e3', 'Lien du projet', p.url || '') + F('e4', 'Couverture — URL image', p.cover || '');
-    save = w => { const ps = getProjects(); const x = ps.find(y => String(y.id) === String(b.ref));
+    save = w => { const ps = getProjects(); const x = ps.find(y => String(y.id) === String(bRef(b)));
       if (x) { x.title = w.querySelector('#e1').value;
                x.tags = w.querySelector('#e2').value.split(',').map(t => t.trim()).filter(Boolean);
                x.url = w.querySelector('#e3').value; x.cover = w.querySelector('#e4').value;

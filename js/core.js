@@ -214,24 +214,66 @@ function getLinks()    { try { return JSON.parse(localStorage.getItem('hub_links
      type : profile | project | link | text | reviews | contact
 ══════════════════════════════════════════════════════ */
 const BLOCK_COLS = 4;                       // colonnes de la grille (desktop)
+const BLOCKS_VERSION = 3;
 const blockUid = t => 'b_' + t + '_' + Math.random().toString(36).slice(2, 8);
 
-/** Renvoie les blocs du site : ceux enregistrés, sinon migrés depuis l'existant.
-    RÉCONCILIATION : tout projet/lien qui n'a pas encore de bloc en reçoit un.
-    Indispensable — sinon un projet ajouté après coup (import Behance, bulle « + »)
-    n'aurait aucun bloc et resterait invisible sur le site. */
+/* ── Modèle V3 (unifié) ────────────────────────────────────────────────
+   {
+     id, type,
+     content    : { ref?, ...données propres }      // ref → hub_projects / hub_links
+     layout     : { w, h, x?, y?, mobileOrder?, locked? }
+     style      : { background?, foreground?, borderRadius?, border?, shadow?, opacity? }
+     effects    : { tilt3d?, shine?, hoverLift?, mouseGlow?, reveal? }
+     visibility : { public, desktop, tablet, mobile }
+     link       : { url?, newTab? }
+     createdAt, updatedAt
+   }
+   Les DONNÉES restent dans hub_projects / hub_links (via content.ref) : c'est ce
+   qui préserve la sync Behance, l'analytics (data-p) et le classement.
+   ─────────────────────────────────────────────────────────────────────
+   ACCESSEURS TOLÉRANTS : ils lisent indifféremment un bloc V2 (plat) ou V3.
+   Toute lecture DOIT passer par eux — c'est ce qui rend la migration sans risque. */
+const bW      = b => Math.max(1, (b.layout ? b.layout.w : b.w) || 1);
+const bH      = b => Math.max(1, (b.layout ? b.layout.h : b.h) || 1);
+const bLocked = b => !!(b.layout ? b.layout.locked : b.locked);
+const bHidden = b => (b.visibility ? b.visibility.public === false : !!b.hidden);
+const bRef    = b => (b.content && b.content.ref !== undefined ? b.content.ref : b.ref);
+const bProps  = b => b.content || b.props || {};
+
+/** Convertit n'importe quel bloc (V2 plat ou V3) vers la forme V3 canonique. */
+function normalizeBlock(b) {
+  if (!b || !b.id) return null;
+  const now = Date.now();
+  if (b.layout && b.visibility && b.content) {          // déjà V3
+    b.layout.w = bW(b); b.layout.h = bH(b);
+    return b;
+  }
+  const { ref, props, w, h, hidden, locked, ...rest } = b;
+  return {
+    id: b.id, type: b.type,
+    content: { ...(props || {}), ...(ref !== undefined ? { ref } : {}) },
+    layout: { w: Math.max(1, w || 1), h: Math.max(1, h || 1), locked: !!locked },
+    style: rest.style || {},
+    effects: rest.effects || {},
+    visibility: { public: !hidden, desktop: true, tablet: true, mobile: true },
+    link: rest.link || {},
+    createdAt: rest.createdAt || now, updatedAt: now,
+  };
+}
+
+/** Renvoie les blocs du site (toujours en V3) : enregistrés, sinon migrés.
+    RÉCONCILIATION : tout projet/lien sans bloc en reçoit un — sinon un projet
+    ajouté après coup (bulle « + », import Behance) resterait invisible. */
 function getBlocks(cfg, projects, links) {
   cfg = cfg || SiteConfig.get();
-  if (!Array.isArray(cfg.blocks) || !cfg.blocks.length) return migrateBlocks(cfg, projects, links);
-  const out = cfg.blocks.slice();
-  const have = new Set(out.filter(b => b.ref != null).map(b => b.type + ':' + b.ref));
-  (projects || getProjects()).forEach(p => {
-    if (!have.has('project:' + p.id)) out.push({ id: 'b_proj_' + p.id, type: 'project', ref: p.id, w: 1, h: 1 });
-  });
-  (links || getLinks()).forEach(l => {
-    if (!have.has('link:' + l.id)) out.push({ id: 'b_link_' + l.id, type: 'link', ref: l.id, w: 1, h: 1 });
-  });
-  return out;
+  const base = (Array.isArray(cfg.blocks) && cfg.blocks.length)
+    ? cfg.blocks.map(normalizeBlock).filter(Boolean)
+    : migrateBlocks(cfg, projects, links);
+  const have = new Set(base.filter(b => bRef(b) != null).map(b => b.type + ':' + bRef(b)));
+  const add = (type, id, prefix) => normalizeBlock({ id: prefix + id, type, ref: id, w: 1, h: 1 });
+  (projects || getProjects()).forEach(p => { if (!have.has('project:' + p.id)) base.push(add('project', p.id, 'b_proj_')); });
+  (links    || getLinks()).forEach(l    => { if (!have.has('link:' + l.id))    base.push(add('link',    l.id, 'b_link_')); });
+  return base;
 }
 
 /** Migration : projets → blocs Projet, liens → blocs Réseau, à propos → bloc Texte…
@@ -252,7 +294,7 @@ function migrateBlocks(cfg, projects, links) {
     out.push({ id: 'b_proj_' + p.id, type: 'project', ref: p.id, w: i === 0 ? 2 : 1, h: i === 0 ? 2 : 1 }));
   if (sec.avis)    out.push({ id: 'b_reviews', type: 'reviews', w: 2, h: 1 });
   if (sec.contact) out.push({ id: 'b_contact', type: 'contact', w: 1, h: 1 });
-  return out;
+  return out.map(normalizeBlock);   // toujours rendu en V3
 }
 
 /** Résumé de migration (affiché à l'utilisateur) */
@@ -281,11 +323,11 @@ function renderBentoGrid(blocks, ctx) {
     return '🔗';
   };
   const cell = (b, inner, extra) =>
-    `<article class="bn bn-${esc(b.type)}${b.hidden ? ' bl-hidden' : ''}" data-b="${esc(b.id)}" style="--w:${Math.max(1, Math.min(BLOCK_COLS, b.w || 1))};--h:${Math.max(1, b.h || 1)}"${extra || ''}>${inner}</article>`;
+    `<article class="bn bn-${esc(b.type)}${bHidden(b) ? ' bl-hidden' : ''}" data-b="${esc(b.id)}" style="--w:${Math.min(BLOCK_COLS, bW(b))};--h:${bH(b)}"${extra || ''}>${inner}</article>`;
 
   // En mode éditeur les blocs masqués sont RENDUS (grisés par la couche d'édition) ;
   // à la publication ils ne sont pas émis du tout.
-  const shown = blocks.filter(b => editor || !b.hidden);
+  const shown = blocks.filter(b => editor || !bHidden(b));
   const parts = shown.map(b => {
     if (b.type === 'profile')
       return cell(b, `<div class="bn-av">${esc(String(cfg.siteName || 'S')[0].toUpperCase())}</div>
@@ -293,16 +335,16 @@ function renderBentoGrid(blocks, ctx) {
         <h1 class="bn-name">${esc(cfg.siteName || '')}</h1>
         ${cfg.bio ? `<p class="bn-bio">${esc(cfg.bio)}</p>` : ''}`);
     if (b.type === 'text') {
-      const pr = b.props || {};
+      const pr = bProps(b);
       return cell(b, `${pr.title ? `<div class="bn-t">${esc(pr.title)}</div>` : ''}<p class="bn-txt">${esc(pr.text || '').replace(/\n/g, '<br>')}</p>`);
     }
     if (b.type === 'link') {
-      const l = L(b.ref); if (!l) return '';
+      const l = L(bRef(b)); if (!l) return '';
       return cell(b, `<span class="bn-ic">${platIcon(l.title || '', l.url || '')}</span><div class="bn-t">${esc(l.title || 'Lien')}</div><div class="bn-sub">${esc(String(l.url || '').replace(/^https?:\/\//, '').slice(0, 30))}</div>`,
         ` data-l="${esc(l.title || 'Lien')}" onclick="window.open('${esc(l.url)}','_blank')"`);
     }
     if (b.type === 'project') {
-      const p = P(b.ref); if (!p) return '';
+      const p = P(bRef(b)); if (!p) return '';
       const i = Math.max(0, projects.indexOf(p));
       return cell(b, `<div class="bn-cov" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i % 6]}`}"></div>
         <div class="bn-pb"><div class="bn-t">${esc(p.title || 'Projet')}</div><div class="ptags">${(p.tags || []).slice(0, 2).map(t => `<span class="ptag">${esc(t)}</span>`).join('')}</div></div>`,
@@ -368,9 +410,10 @@ function generateSite(cfg, projects, reviews, opts) {
   const revDur      = { none: 0, light: .3, smooth: .6, premium: .8 }[animLevel] ?? .6;
   const revY        = animLevel === 'none' ? 0 : animLevel === 'premium' ? 26 : 18;
 
-  const blkOf = p => blocks.find(b => b.type === 'project' && String(b.ref) === String(p.id)) || {};
-  const cards = projects.filter(p => editor || !blkOf(p).hidden).map((p, i) => `
-    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${blkOf(p).hidden ? ' bl-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}" data-b="${esc(blkOf(p).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
+  const blkOf = p => blocks.find(b => b.type === 'project' && String(bRef(b)) === String(p.id)) || null;
+  const pHid  = p => { const b = blkOf(p); return b ? bHidden(b) : false; };
+  const cards = projects.filter(p => editor || !pHid(p)).map((p, i) => `
+    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}')center/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
