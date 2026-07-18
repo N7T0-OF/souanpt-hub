@@ -455,6 +455,25 @@ function edPreviewExternal() {
   const html=generateSite(edGetConfig()); const win=window.open('','_blank'); if(win){win.document.write(html);win.document.close();}
 }
 
+/**
+ * Exporte le site en UN SEUL fichier index.html autonome — philosophie OpenBento :
+ * ton site t'appartient, héberge-le où tu veux (Netlify, Vercel, GitHub Pages, ton
+ * serveur), sans dépendre de souanpt.hub. Aucun compte, aucun backend requis.
+ * Le rendu est celui du site PUBLIC (pas d'outils d'édition, blocs masqués absents).
+ */
+function edExportSite() {
+  const cfg = edGetConfig();
+  const html = generateSite(cfg, null, null);          // sans {editor:true} = site public exact
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'index.html';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const ko = Math.round(html.length / 1024);
+  showToast('✓ Site exporté (index.html · ' + ko + ' Ko) — hébergeable partout, il est à toi', '#2e9a63', 5000);
+}
+
 async function edDeploy() {
   if (!Auth.ok()) { showToast('Connecte GitHub dans "GitHub & Déploiement"','#e4b24a',3000); showPage('github'); return; }
   edSaveConfig();
