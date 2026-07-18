@@ -631,6 +631,7 @@ function showPage(id) {
   if(id==='github') setTimeout(()=>GHPage.init(),50);
   if(id==='editor') { edResetPanels(); edLoad(); setTimeout(edRefreshPreview,100); }
   if(id==='overview') { window.Analytics?.refresh(); if(typeof syncKPIs==='function')syncKPIs(); if(typeof renderActivity==='function')renderActivity(); }
+  if(id==='storage')  { window.StorageUI?.init(); window.StorageUI?.render(); }
 }
 
 async function syncBehance(){

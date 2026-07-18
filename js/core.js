@@ -246,6 +246,30 @@ const HubFiles = {
     return meta;   // même path → même URL publique, blocs du site intacts
   },
 
+  /** Change la visibilité = DÉPLACE réellement le fichier entre le dépôt public
+      (site) et le dépôt privé. ⚠ L'URL publique change forcément (dépôt différent) :
+      c'est le prix du vrai cloisonnement. Le contenu est recopié tel quel (base64
+      de GitHub réutilisé sans décodage → aucun risque de corruption). */
+  async setVisibility(id, visibility) {
+    const meta = this.get(id); if (!meta) throw new Error('Fichier introuvable');
+    if (meta.visibility === visibility) return meta;
+    const token = Auth.token(); if (!token) throw new Error('Connecte GitHub');
+    const cur = await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`);
+    const b64 = String(cur.content || '').replace(/\n/g, '');
+    const oldRepo = meta.repo, oldSha = cur.sha;
+    const target = this._repo(visibility);
+    if (target.private) await GH.ensureRepo(token, target.owner, target.repo, true);
+    await GH.api(token, `/repos/${target.owner}/${target.repo}/contents/${meta.path}`, {
+      method: 'PUT', body: JSON.stringify({ message: 'move: ' + meta.name, content: b64 }),
+    });
+    if (oldSha) await GH.api(token, `/repos/${meta.owner}/${oldRepo}/contents/${meta.path}`, {
+      method: 'DELETE', body: JSON.stringify({ message: 'move out: ' + meta.name, sha: oldSha }),
+    }).catch(() => {});
+    meta.repo = target.repo; meta.visibility = visibility; meta.updatedAt = Date.now();
+    this._save(this.list().map(f => f.id === id ? meta : f));
+    return meta;
+  },
+
   /** Ouvre un fichier PRIVÉ : récupéré avec le jeton, jamais exposé publiquement. */
   async objectUrl(id) {
     const meta = this.get(id); if (!meta) throw new Error('Fichier introuvable');
