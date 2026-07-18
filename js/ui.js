@@ -611,6 +611,8 @@ function showPage(id) {
   // Portfolio ET Profil Links ont fusionné dans l'Éditeur : projets et liens y
   // sont des blocs (les liens s'ajoutent via la palette « + » → Réseaux & liens).
   if (id === 'portfolio' || id === 'links') { showPage('editor'); return; }
+  // Médias a fusionné dans Stockage (mêmes fichiers, filtres Images/GIF/Vidéos).
+  if (id === 'media') { showPage('storage'); return; }
   // Behance & GitHub ont déménagé dans Paramètres → Intégrations
   if (id === 'github' || id === 'behance') {
     showPage('settings');

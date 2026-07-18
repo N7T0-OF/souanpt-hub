@@ -133,7 +133,8 @@ const Analytics = {
      n'a pas été chargé) → aucun risque de publier un site vide. */
   async activate() {
     if (!(window.Cloud && Cloud.enabled && Cloud.user())) { showToast('Connecte-toi d\'abord (Google ou Discord)', '#e4b24a', 3500); return; }
-    if (!window.Auth || !Auth.ok()) { showToast('Connecte GitHub (Paramètres → Intégrations) pour publier', '#e4b24a', 4000); showPage('settings'); return; }
+    // `Auth` vient d'un const → jamais présent sur window (voir core.js access())
+    if (typeof Auth === 'undefined' || !Auth.ok()) { showToast('Connecte GitHub (Paramètres → Intégrations) pour publier', '#e4b24a', 4000); showPage('settings'); return; }
     try { SiteConfig.set('ownerUid', Cloud.user().uid); } catch (e) {}
     showToast('⚡ Installation du compteur — publication en cours…', '#666', 3000);
     try { await edDeploy(); showToast('✓ Statistiques activées — les visites vont remonter ici', '#2e9a63', 4000); }

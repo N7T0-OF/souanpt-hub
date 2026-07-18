@@ -21,7 +21,10 @@ const Cloud = {
       this._auth.onAuthStateChanged(u => {
         this._user = u; this._resolved = true;
         // mémorise l'uid dans la config du site → le mouchard analytics l'embarque au déploiement
-        if (u) { try { window.SiteConfig && SiteConfig.set('ownerUid', u.uid); } catch (e) {} }
+        // ⚠ SiteConfig est un const → absent de window : le test window.SiteConfig
+        // était toujours faux et ownerUid n'était JAMAIS enregistré (attribution
+        // des statistiques cassée en silence).
+        if (u) { try { if (typeof SiteConfig !== 'undefined') SiteConfig.set('ownerUid', u.uid); } catch (e) {} }
         this._cbs.forEach(cb => { try { cb(u); } catch (e) { console.error('[cloud] cb', e); } });
       });
     } catch (e) { console.error('[cloud] init', e); this.enabled = false; }

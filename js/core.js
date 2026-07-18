@@ -181,10 +181,32 @@ const HubFiles = {
     if (['zip','7z','rar'].includes(ext)) return 'archive';
     return 'document';
   },
+  /** Diagnostic précis de l'accès GitHub (les fichiers y sont stockés).
+      Renvoie {ok, reason}. « connecté » au Hub ≠ « GitHub connecté » : on peut
+      entrer avec Google/Discord sans aucun jeton GitHub — d'où un message clair. */
+  access() {
+    // ⚠ `Auth` est déclaré avec const → il n'existe PAS sur window (contrairement
+    // à var/function). Tester window.Auth renvoyait toujours undefined et affichait
+    // « Connecte GitHub » alors que l'utilisateur était bien connecté.
+    if (typeof Auth === 'undefined' || !Auth.token()) {
+      const viaCloud = !!(window.Cloud && Cloud.enabled && Cloud.user());
+      return { ok: false, reason: viaCloud ? 'cloud-only' : 'none' };
+    }
+    return { ok: true, reason: Auth.owner() ? 'ok' : 'no-login' };
+  },
+  /** Répare le cas « jeton présent mais identité manquante » (login absent). */
+  async ensureIdentity() {
+    if (Auth.owner()) return Auth.owner();
+    const token = Auth.token(); if (!token) return '';
+    const user = await GH.getUser(token);          // /user
+    if (user && user.login) { Auth.set(token, user); return user.login; }
+    return '';
+  },
+
   /** Dépôt cible selon la visibilité */
   _repo(visibility) {
     const owner = Auth.owner();
-    if (!owner) throw new Error('Connecte GitHub pour stocker des fichiers');
+    if (!owner) throw new Error('Identité GitHub introuvable — reconnecte GitHub dans Paramètres → Intégrations');
     if (visibility === 'public') {
       const cfg = SiteConfig.get();
       return { owner, repo: (cfg.repo || '').split('/')[1] || SITE_REPO_NAME, private: false };
@@ -202,7 +224,8 @@ const HubFiles = {
     opts = opts || {};
     const visibility = opts.visibility === 'public' ? 'public' : 'private';   // PRIVÉ par défaut
     const token = Auth.token();
-    if (!token) throw new Error('Connecte GitHub pour stocker des fichiers');
+    if (!token) throw new Error('GitHub non connecté');
+    await this.ensureIdentity();               // répare un login manquant avant d'écrire
     const name = this._safe(file.name), ext = this._ext(name);
     if (FILE_BLOCKED_EXT.includes(ext)) throw new Error('Type de fichier interdit : .' + ext);
     if (file.size > FILE_MAX_BYTES) throw new Error('Fichier trop lourd (max 25 Mo)');

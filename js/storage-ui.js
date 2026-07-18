@@ -123,7 +123,17 @@ const StorageUI = {
   async onPick(ev) { await this.add([...(ev.target.files || [])]); ev.target.value = ''; },
   async add(files) {
     if (!files.length) return;
-    if (!window.Auth || !Auth.ok()) { showToast?.('Connecte GitHub (Paramètres → Intégrations) pour stocker tes fichiers', '#e4b24a', 4500); return; }
+    const acc = HubFiles.access();
+    if (!acc.ok && acc.reason !== 'no-login') {
+      // ⚠ Être connecté au Hub (Google/Discord) ne donne PAS accès à GitHub :
+      // les fichiers y sont stockés, il faut donc le connecter séparément.
+      const msg = acc.reason === 'cloud-only'
+        ? 'Tu es connecté au Hub, mais pas à GitHub — c\'est là que tes fichiers sont stockés. Je t\'ouvre la page pour le connecter.'
+        : 'Connecte GitHub pour stocker tes fichiers — je t\'ouvre la page.';
+      showToast?.(msg, '#e4b24a', 6000);
+      setTimeout(() => { try { showPage('github'); } catch (e) {} }, 900);   // → Paramètres → Intégrations → GitHub
+      return;
+    }
     for (const f of files) {
       try {
         showToast?.('⟳ Envoi de ' + f.name + '…', '#666', 2500);
