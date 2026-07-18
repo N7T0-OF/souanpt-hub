@@ -83,17 +83,8 @@ h2{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-1px;margin-bot
 .step h3{font-size:13px;font-weight:800;margin-bottom:6px}
 .step p{font-size:11px;color:var(--m);line-height:1.6}
 
-/* ── AVIS ── */
-.rg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.rc{background:var(--s1);border:1px solid var(--b);border-radius:16px;padding:20px}
-.rh{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.rav{width:34px;height:34px;border-radius:50%;background:var(--a-dim);color:var(--a);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px}
-.rn{font-size:12px;font-weight:700}
-.rs{color:var(--gold);font-size:12px}
-.rt{font-size:12px;color:var(--m);line-height:1.7}
-.rempty{grid-column:1/-1;text-align:center;color:var(--m2);font-size:12px;padding:26px;border:1px dashed var(--b);border-radius:16px}
 
-/* ── ROADMAP ── */
+/* ── COLONNES « POURQUOI » ── */
 .road{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
 .rcol{background:var(--s1);border:1px solid var(--b);border-radius:16px;padding:20px}
 .rcol h3{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
@@ -156,9 +147,8 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
   <div class="nl">
     <a href="#features">Fonctionnalités</a>
     <a href="classement.html">Classement 🏆</a>
-    <a href="tarifs.html">Tarifs</a>
-    <a href="#roadmap">Roadmap</a>
     <a href="#faq">FAQ</a>
+    <a href="soutenir.html">Soutenir</a>
   </div>
   <a class="ncta" href="app.html" id="nav-dash-btn">Tableau de bord</a>
   <button class="burger" id="burger" aria-label="Menu" onclick="toggleMenu()"><span></span><span></span><span></span></button>
@@ -166,9 +156,8 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
 <div class="mobmenu" id="mobmenu">
   <a href="#features" onclick="toggleMenu()">Fonctionnalités</a>
   <a href="classement.html">Classement 🏆</a>
-  <a href="#avis" onclick="toggleMenu()">Avis</a>
-  <a href="#roadmap" onclick="toggleMenu()">Roadmap</a>
   <a href="#faq" onclick="toggleMenu()">FAQ</a>
+  <a href="soutenir.html">Soutenir</a>
   <a href="app.html" class="mm-cta" id="mob-dash-btn">Tableau de bord →</a>
 </div>
 </div>
@@ -220,49 +209,37 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
   </div>
 </section>
 
-<!-- ══ AVIS ══ -->
-<section id="avis">
-  <div class="sl">Témoignages</div>
-  <h2>Ils utilisent souanpt.hub</h2>
-  <p class="ssub">Les avis validés dans ton dashboard s'affichent automatiquement ici et sur ton site publié.</p>
-  <div class="rg" id="landing-reviews"></div>
-</section>
-
-<!-- ══ ROADMAP ══ -->
-<section id="roadmap">
-  <div class="sl">Roadmap</div>
-  <h2>Le projet évolue</h2>
-  <p class="ssub">souanpt.hub devient un Creator OS complet, étape par étape.</p>
+<!-- ══ POURQUOI ══ (remplace « Témoignages » : aucun faux avis, que du vérifiable) -->
+<section id="pourquoi">
+  <div class="sl">Pourquoi souanpt.hub</div>
+  <h2>Tes données restent les tiennes</h2>
+  <p class="ssub">Chaque point ci-dessous est vérifiable dans le produit, aujourd'hui.</p>
   <div class="road">
     <div class="rcol">
-      <h3><span class="dot" style="background:var(--a)"></span>Disponible</h3>
+      <h3><span class="dot" style="background:var(--a)"></span>Gratuit, sans conditions</h3>
       <ul>
-        <li>Connexion Google + pseudo (souanpt.hub/@toi)</li>
-        <li>Portails clients instantanés (lien privé, sans compte)</li>
-        <li>Portfolio complet : liens, couvertures, glisser-déposer</li>
-        <li>2 styles de site + éditeur par blocs</li>
-        <li>Avis visiteurs + modération · Classement 🏆</li>
-        <li>Premium à vie (PayPal + codes cadeaux)</li>
+        <li>Aucun abonnement, aucune carte bancaire</li>
+        <li><strong>Aucune fonctionnalité réservée à un paiement</strong></li>
+        <li>Pas de limite artificielle pour te faire payer</li>
+        <li>Financé par des dons volontaires</li>
       </ul>
     </div>
     <div class="rcol">
-      <h3><span class="dot" style="background:var(--gold)"></span>Bientôt</h3>
+      <h3><span class="dot" style="background:var(--gold)"></span>Portable</h3>
       <ul>
-        <li>Paramètres → onglet Intégrations (cartes dépliables : GitHub, Behance, Discord, Google, Stripe, PayPal…)</li>
-        <li>Refonte page Compte (façon Discord)</li>
-        <li>Paiement Premium 100% automatique (Stripe)</li>
-        <li>Domaine personnalisé assisté</li>
-        <li>Fusion de comptes (Google + GitHub + Discord)</li>
+        <li>Ton site est publié sur <strong>ton</strong> compte GitHub</li>
+        <li>Un site = un fichier HTML autonome, sans dépendance au hub</li>
+        <li>Tes fichiers restent dans tes dépôts, privés par défaut</li>
+        <li>Tu peux partir avec tout, à tout moment</li>
       </ul>
     </div>
     <div class="rcol">
-      <h3><span class="dot" style="background:#818cf8"></span>Plus tard</h3>
+      <h3><span class="dot" style="background:#818cf8"></span>Respectueux</h3>
       <ul>
-        <li>Styles de site 3 à 6 + bibliothèque de blocs</li>
-        <li>Messagerie &amp; validation dans le portail client</li>
-        <li>Analytics avancées + heatmap</li>
-        <li>Images sur le cloud (Firebase Storage)</li>
-        <li>Saisons, succès &amp; créateur vérifié (classement)</li>
+        <li>Statistiques sans cookie ni traceur publicitaire</li>
+        <li>Le référent des visiteurs n'est pas collecté</li>
+        <li>Aucune revente de données</li>
+        <li>Technologies et formats ouverts</li>
       </ul>
     </div>
   </div>
@@ -278,7 +255,7 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
     <div class="fitem"><div class="fq">Behance demande-t-il une clé API ? <span class="ar">→</span></div><div class="fa">Non. Adobe a fermé l'API Behance, alors la sync utilise le flux RSS public de ton profil : ton pseudo suffit. Chaque projet arrive avec son lien et sa couverture.</div></div>
     <div class="fitem"><div class="fq">Comment mes clients laissent-ils un avis ? <span class="ar">→</span></div><div class="fa">Sur ton site publié, bouton « ✎ Laisser un avis » : nom, étoiles, texte. L'avis arrive dans ton dashboard où tu l'approuves ou le refuses. Les avis approuvés s'affichent sur ton site au prochain déploiement.</div></div>
     <div class="fitem"><div class="fq">Où sont stockées mes données ? <span class="ar">→</span></div><div class="fa">Dans ton navigateur (localStorage) et sauvegardées automatiquement dans un repo GitHub privé qui t'appartient. Tu peux tout exporter en JSON à tout moment.</div></div>
-    <div class="fitem"><div class="fq">Puis-je utiliser mon propre domaine ? <span class="ar">→</span></div><div class="fa">Ton site est publié sur username.github.io/ton-repo. GitHub Pages supporte les domaines personnalisés — la configuration guidée depuis le hub arrive dans la roadmap.</div></div>
+    <div class="fitem"><div class="fq">Puis-je utiliser mon propre domaine ? <span class="ar">→</span></div><div class="fa">Ton site est publié sur username.github.io/ton-repo. GitHub Pages supporte les domaines personnalisés — tu peux en brancher un dès maintenant depuis les réglages de ton dépôt.</div></div>
   </div>
 </section>
 
@@ -296,8 +273,8 @@ footer{border-top:1px solid var(--b);padding:32px 24px;text-align:center}
 <footer>
   <div class="flinks">
     <a href="classement.html">Classement</a>
-    <a href="tarifs.html">Tarifs</a>
-    <a href="soutenir.html">❤️ Me soutenir</a>
+    <a href="#pourquoi">Pourquoi souanpt.hub</a>
+    <a href="soutenir.html">❤️ Soutenir</a>
     <a href="#faq">FAQ</a>
     <a href="app.html">Tableau de bord</a>
   </div>
@@ -342,7 +319,7 @@ try {
 } catch {}
 
 /* Apparition au scroll */
-document.querySelectorAll('.fcard,.step,.rc,.rcol,.fitem,.sl,h2,.ssub').forEach(el => el.classList.add('rev'));
+document.querySelectorAll('.fcard,.step,.rcol,.fitem,.sl,h2,.ssub').forEach(el => el.classList.add('rev'));
 if ('IntersectionObserver' in window) {
   const io = new IntersectionObserver(es => es.forEach(en => {
     if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
@@ -352,24 +329,10 @@ if ('IntersectionObserver' in window) {
   document.querySelectorAll('.rev').forEach(el => el.classList.add('in'));
 }
 
-/* Avis approuvés du hub → affichés sur la landing */
-(function(){
-  const box = document.getElementById('landing-reviews');
-  let reviews = [];
-  try { reviews = (JSON.parse(localStorage.getItem('hub_reviews')||'[]')).filter(r => r.status === 'approved').slice(0, 6); } catch {}
-  const escL = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  if (!reviews.length) {
-    box.innerHTML = '<div class="rempty">✨ Les avis validés dans ton dashboard apparaîtront ici automatiquement.</div>';
-    return;
-  }
-  box.innerHTML = reviews.map(r => `
-    <div class="rc">
-      <div class="rh"><div class="rav">${escL((r.author||'?')[0].toUpperCase())}</div>
-        <div><div class="rn">${escL(r.author)}</div><div class="rs">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div></div>
-      </div>
-      <p class="rt">${escL(r.text)}</p>
-    </div>`).join('');
-})();
+/* La section « Témoignages » a été retirée : elle lisait localStorage, donc elle
+   n'affichait les avis QU'À leur auteur — un visiteur ne voyait jamais rien.
+   Une vitrine d'avis qui ne montre rien aux visiteurs ne sert à rien, et la
+   remplir de faux avis est exclu. Remplacée par « Pourquoi souanpt.hub ». */
 </script>
 </body>
 </html>

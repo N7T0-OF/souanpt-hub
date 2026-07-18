@@ -77,30 +77,16 @@ Push → le bouton **« Continuer avec Discord »** apparaît sur la page de con
 
 Quand tout est en place, préviens-moi : on teste le flux ensemble et je corrige si besoin.
 
-## 3. Premium — 2 modes d'attribution
+## 3. Dons — Ko-fi & PayPal
 
-Un lien **PayPal.me ne peut PAS** débloquer le Premium automatiquement (aucun serveur
-n'est prévenu de « qui a payé »). Deux solutions :
+Il n'y a **plus de plan payant** : aucune fonctionnalité n'est réservée à un
+paiement, donc rien à débloquer et **aucun backend de paiement à maintenir**.
+Les liens de don (Ko-fi, PayPal) sont de simples liens sortants — pas de webhook,
+pas de secret, pas de Worker.
 
-### Mode A — Codes cadeaux (marche aujourd'hui, zéro backend) 🎁
-1. L'acheteur paie via PayPal (bouton « Passer à Premium »).
-2. Tu crées un **code** dans Firebase → Firestore → collection `codes` → nouveau document :
-   ID = `SOUANPT-XXXX` (ce que tu veux), champ `used` (boolean) = `false`.
-3. Tu envoies le code à l'acheteur (ou il l'offre à qui il veut).
-4. Il l'entre dans **Paramètres → Premium → J'ai un code** → Premium activé instantanément.
-   Les règles Firestore empêchent la réutilisation d'un code.
+> Le Worker `premium-stripe-worker.js` a été supprimé avec le Premium.
+> Il reste récupérable dans l'historique git si le besoin revient.
 
-> ⚠ Ce mode n'est pas infalsifiable (un utilisateur technique pourrait forcer son plan).
-> Suffisant pour lancer ; passe au mode B pour verrouiller.
-
-### Mode B — Stripe automatique & sécurisé (100% auto)
-Déploie `premium-stripe-worker.js` (même méthode que le Worker Discord) :
-1. Stripe → crée un **Payment Link** « Premium 4 € ».
-2. Sur ta page tarifs, redirige vers ce lien en ajoutant `?client_reference_id={UID}`
-   (l'UID Firebase de l'acheteur connecté).
-3. Stripe → Developers → Webhooks → `checkout.session.completed` → URL du Worker.
-4. Secrets du Worker : `STRIPE_WEBHOOK_SECRET`, `FIREBASE_PROJECT_ID`,
-   `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`.
-5. Résultat : dès qu'un paiement réussit, le Worker passe `users/{uid}.plan = "pro"`
-   tout seul. Pour verrouiller, on ajoutera une règle empêchant l'utilisateur de
-   modifier `plan` lui-même (seul le Worker le peut).
+L'intégration **Stripe** conservée dans Paramètres → Intégrations sert à un tout
+autre usage : permettre à **tes clients** de régler **tes** factures. Elle ne
+concerne pas souanpt.hub.

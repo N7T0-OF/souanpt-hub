@@ -762,7 +762,9 @@ function edWinTheme(btn) {
 /* ── ⚡ Effets (ex-groupe « Animations & effets ») ── */
 function edWinFx(btn) {
   const c = SiteConfig.get(), fx = c.fx || {};
-  const lv = [['none', 'Aucune'], ['light', 'Légères'], ['smooth', 'Fluides'], ['premium', 'Premium']];
+  // La valeur 'premium' est conservée (configs déjà enregistrées) : seul le
+  // LIBELLÉ change — plus aucun rapport avec un plan payant, qui n'existe plus.
+  const lv = [['none', 'Aucune'], ['light', 'Légères'], ['smooth', 'Fluides'], ['premium', 'Intenses']];
   const tg = [['tilt', '✨ Effet 3D interactif'], ['shine', '🌟 Brillance'], ['lift', '↑ Hover Lift'], ['glow', '💡 Reflet lumineux'], ['mouseglow', '🔦 Halo qui suit la souris']];
   const html = `
     <div class="edw-l">Animations d'apparition</div>
