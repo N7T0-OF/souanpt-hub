@@ -654,6 +654,16 @@ function renderBentoGrid(blocks, ctx) {
       return cell(b, `<span class="bn-ic">✉</span><div class="bn-t">Me contacter</div><div class="bn-sub">${esc(cfg.email)}</div>`,
         ` onclick="location.href='mailto:${esc(cfg.email)}'"`);
     }
+    if (b.type === 'file') {
+      // Bloc Document / CV — l'URL est figée dans le bloc à la création : le site
+      // exporté reste autonome (aucune dépendance au Hub).
+      const p = bProps(b); if (!p.url) return '';
+      return cell(b, `<span class="bn-ic">${esc(p.icon || '📄')}</span>
+        <div class="bn-t">${esc(p.title || 'Document')}</div>
+        ${p.sub ? `<div class="bn-sub">${esc(p.sub)}</div>` : ''}
+        <div class="bn-dl">⬇ Télécharger</div>`,
+        ` data-l="${esc(p.title || 'Document')}" onclick="window.open('${esc(p.url)}','_blank')"`);
+    }
     return '';
   });
   // Bulle « + Ajouter un projet » : uniquement dans l'éditeur (jamais publiée,
@@ -771,6 +781,15 @@ function generateSite(cfg, projects, reviews, opts) {
       if (b.type === 'profile' || b.type === 'link') return '';        // hero + nav
       if (b.type === 'project') { if (projectsShown || !sec.projects) return ''; projectsShown = true; return secHtml.projects; }
       if (b.type === 'text')    return flowText(b);
+      if (b.type === 'file') {
+        const p = bProps(b); if (!p.url) return '';
+        return `<section class="rev fdoc${bHidden(b) ? ' bl-hidden' : ''}" data-b="${esc(b.id)}">
+          <span class="fdoc-i">${esc(p.icon || '📄')}</span>
+          <div class="fdoc-tx"><div class="fdoc-t">${esc(p.title || 'Document')}</div>
+            ${p.sub ? `<div class="fdoc-s">${esc(p.sub)}</div>` : ''}</div>
+          <a class="bp" href="${esc(p.url)}" target="_blank" rel="noopener" data-l="${esc(p.title || 'Document')}">⬇ Télécharger</a>
+        </section>`;
+      }
       if (b.type === 'reviews') return sec.avis ? secHtml.avis : '';
       if (b.type === 'contact') return sec.contact ? secHtml.contact : '';
       return '';
@@ -908,6 +927,14 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .bn-htag{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--a)}
 .bn-name{font-size:clamp(20px,3vw,30px);font-weight:800;letter-spacing:-1px;color:var(--t)}
 .bn-bio{font-size:12px;line-height:1.7;color:${mutedC}}
+/* Bloc Document / CV */
+.bn-dl{margin-top:6px;font-size:10px;font-weight:800;color:var(--a)}
+.fdoc{display:flex;align-items:center;gap:16px;max-width:760px;padding:18px 20px;border:1px solid var(--b);
+  border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};flex-wrap:wrap}
+.fdoc-i{font-size:30px;line-height:1}
+.fdoc-tx{flex:1;min-width:150px}
+.fdoc-t{font-size:15px;font-weight:800;color:var(--t)}
+.fdoc-s{font-size:12px;color:${mutedC};margin-top:3px}
 /* Bulle « + Ajouter un projet » — éditeur uniquement (jamais publiée) */
 .bn-add{align-items:center;justify-content:center;gap:8px;border-style:dashed!important;
   border-color:rgba(128,128,128,.4)!important;background:transparent!important;cursor:pointer;

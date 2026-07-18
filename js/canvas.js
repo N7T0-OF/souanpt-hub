@@ -270,7 +270,7 @@ body:not(.ed-on) [data-add]{display:none!important}
     doc.querySelectorAll('.ed-rz').forEach(e => e.remove());
   },
 
-  _TYPES: { profile: 'Profil', project: 'Projet', link: 'Lien', text: 'Texte', reviews: 'Avis', contact: 'Contact' },
+  _TYPES: { profile: 'Profil', project: 'Projet', link: 'Lien', text: 'Texte', reviews: 'Avis', contact: 'Contact', file: 'Document' },
   /** URL configurée sur un bloc (neutralisée en Édition, mais testable) */
   _linkOf(b) {
     if (!b) return '';
@@ -814,6 +814,16 @@ function edWinEdit(blockId) {
       x.content = { ...(x.content || {}), title: w.querySelector('#e1').value, text: w.querySelector('#e2').value };
       SiteConfig.set('blocks', bl);
       if (x.content.title === 'À propos') SiteConfig.set('about', x.content.text); };
+  } else if (b.type === 'file') {
+    const pr = bProps(b);
+    title = '✎ Document';
+    html = F('e1', 'Titre affiché', pr.title || '') + F('e2', 'Sous-titre', pr.sub || '')
+         + `<div class="edw-l">Fichier</div><div class="edw-hint" style="font-size:9px">${_eesc(pr.url || '(aucun)')}</div>`;
+    save = w => {
+      const bl = getBlocks(SiteConfig.get()); const x = bl.find(y => y.id === blockId);
+      x.content = { ...(x.content || {}), title: w.querySelector('#e1').value, sub: w.querySelector('#e2').value };
+      SiteConfig.set('blocks', bl);
+    };
   } else if (b.type === 'contact') {
     title = '✎ Contact';
     html = F('e1', 'Adresse e-mail', c.email);

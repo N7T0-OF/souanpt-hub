@@ -56,6 +56,7 @@ const StorageUI = {
     wrap.className = this.view === 'grid' ? 'st-grid' : 'st-list';
     wrap.innerHTML = files.map(f => this.view === 'grid' ? this._card(f) : this._row(f)).join('');
     this._summary(all);
+    this._paint();          // état sélectionné + barre d'actions groupées
   },
 
   _badge(f) {
@@ -68,7 +69,8 @@ const StorageUI = {
     return `<div class="st-act">
       ${t ? `<button onclick="StorageUI.restore('${f.id}')" title="Restaurer">↩</button>
              <button onclick="StorageUI.destroy('${f.id}')" title="Supprimer définitivement">✕</button>`
-        : `<button onclick="StorageUI.open('${f.id}')" title="Ouvrir">👁</button>
+        : `<button onclick="StorageUI.preview('${f.id}')" title="Aperçu rapide (Espace)">👁</button>
+             <button onclick="StorageUI.addToSite('${f.id}')" title="Ajouter à mon site">＋</button>
              <button onclick="StorageUI.toggleVis('${f.id}')" title="${f.visibility === 'public' ? 'Rendre privé' : 'Rendre public'}">${f.visibility === 'public' ? '🔒' : '🌍'}</button>
              <button onclick="StorageUI.replace('${f.id}')" title="Remplacer (garde le même lien)">⇄</button>
              <button onclick="StorageUI.trash('${f.id}')" title="Mettre à la corbeille">🗑</button>`}
@@ -78,7 +80,7 @@ const StorageUI = {
     const thumb = (f.kind === 'image' || f.kind === 'gif') && f.visibility === 'public'
       ? `<div class="st-th" style="background:url('${this._esc(HubFiles.publicUrl(f))}') center/cover"></div>`
       : `<div class="st-th"><span>${this.ICONS[f.kind] || '📃'}</span></div>`;
-    return `<article class="st-card" data-f="${this._esc(f.id)}" ondblclick="StorageUI.open('${f.id}')">
+    return `<article class="st-card${this.sel.has(f.id) ? ' on' : ''}" data-f="${this._esc(f.id)}" onclick="StorageUI.toggle('${f.id}',event)" ondblclick="StorageUI.preview('${f.id}')">
       ${thumb}
       <div class="st-meta">
         <div class="st-n" title="${this._esc(f.displayName || f.name)}">${this._esc(f.displayName || f.name)}</div>
@@ -89,7 +91,7 @@ const StorageUI = {
     </article>`;
   },
   _row(f) {
-    return `<div class="st-row" data-f="${this._esc(f.id)}" ondblclick="StorageUI.open('${f.id}')">
+    return `<div class="st-row${this.sel.has(f.id) ? ' on' : ''}" data-f="${this._esc(f.id)}" onclick="StorageUI.toggle('${f.id}',event)" ondblclick="StorageUI.preview('${f.id}')">
       <span class="st-ri">${this.ICONS[f.kind] || '📃'}</span>
       <span class="st-rn" title="${this._esc(f.displayName || f.name)}">${this._esc(f.displayName || f.name)}</span>
       <span class="st-rk">${this._esc(f.ext || f.kind)}</span>
@@ -118,6 +120,7 @@ const StorageUI = {
       Les fichiers privés sont dans un dépôt privé : GitHub applique l'accès côté serveur.
     </div>`;
   },
+
 
   /* ── actions ── */
   async onPick(ev) { await this.add([...(ev.target.files || [])]); ev.target.value = ''; },
@@ -181,7 +184,9 @@ const StorageUI = {
     const used = (f.usages || []).length;
     if (used && !confirm('Ce fichier est utilisé à ' + used + ' endroit(s). Le mettre à la corbeille peut casser ces contenus.\n\nContinuer ?')) return;
     HubFiles.trash(id); this.render();
-    showToast?.('🗑 Mis à la corbeille — restaurable', '#666', 3000);
+    // barre « Annuler » aussi sur une suppression simple (pas seulement en groupe)
+    this._undo('« ' + (f.displayName || f.name) + ' » mis à la corbeille',
+               () => { HubFiles.restore(id); this.render(); });
   },
   restore(id) { HubFiles.restore(id); this.render(); showToast?.('↩ Restauré', '#2e9a63', 2000); },
   async destroy(id) {
@@ -275,6 +280,40 @@ const StorageUI = {
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } catch (e) { showToast?.('✗ ' + (e.message || 'échec'), '#c0392b', 3000); }
   },
+  /** ＋ Ajouter au site : crée un bloc relié au fichier, visible dans les 3 thèmes.
+      Un fichier PRIVÉ n'est pas lisible par les visiteurs → on propose de le publier. */
+  async addToSite(id) {
+    const f = HubFiles.get(id); if (!f) return;
+    if (f.visibility !== 'public') {
+      if (!confirm('« ' + (f.displayName || f.name) + ' » est privé.\n\n' +
+                   'Pour l\'afficher sur ton site public, il doit devenir PUBLIC (accessible par lien).\n\nLe rendre public et l\'ajouter ?')) return;
+      try { showToast?.('⟳ Publication du fichier…', '#666', 2500); await HubFiles.setVisibility(id, 'public'); }
+      catch (e) { return showToast?.('✗ ' + (e.message || 'échec'), '#c0392b', 4000); }
+    }
+    const meta = HubFiles.get(id);
+    const url = HubFiles.publicUrl(meta);
+    if (!url) return showToast?.('✗ Lien public indisponible', '#c0392b', 3000);
+    const isImg = meta.kind === 'image' || meta.kind === 'gif';
+    const blocks = getBlocks(SiteConfig.get());
+    if (isImg) {
+      // image → couverture d'un bloc texte visuel n'a pas de sens : on crée un bloc
+      // Document illustré (le bloc Image dédié viendra avec la galerie).
+      blocks.push(normalizeBlock({ id: blockUid('file'), type: 'file', w: 2, h: 1,
+        props: { fileId: id, url, title: meta.displayName || meta.name, sub: 'Image · ' + this._size(meta.size), icon: this.ICONS[meta.kind], kind: meta.kind } }));
+    } else {
+      const isCV = /cv|curriculum/i.test(meta.displayName || meta.name);
+      blocks.push(normalizeBlock({ id: blockUid('file'), type: 'file', w: 2, h: 1,
+        props: { fileId: id, url, title: isCV ? 'Mon CV' : (meta.displayName || meta.name),
+                 sub: (meta.ext || '').toUpperCase() + ' · ' + this._size(meta.size), icon: this.ICONS[meta.kind] || '📄', kind: meta.kind } }));
+    }
+    SiteConfig.set('blocks', placeBlocks(blocks));
+    // enregistre l'usage (avertissement avant suppression)
+    const l = HubFiles.list().map(x => x.id === id ? { ...x, usages: [...new Set([...(x.usages || []), 'Site public'])] } : x);
+    localStorage.setItem('hub_files', JSON.stringify(l));
+    this.render();
+    showToast?.('✓ Bloc ajouté à ton site — ouvre l\'Éditeur pour le placer', '#2e9a63', 4500);
+  },
+
   rename(id) {
     const f = HubFiles.get(id); if (!f) return;
     const n = prompt('Nouveau nom :', f.displayName || f.name);
