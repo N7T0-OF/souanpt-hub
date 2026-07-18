@@ -89,6 +89,7 @@ const Cloud = {
   SYNC_KEYS: {                    // clé localStorage → nom de collection Firestore
     hub_clients: 'clients', hub_invoices: 'invoices', hub_catalog: 'catalog',
     hub_reviews: 'reviews', hub_links: 'links', hub_media: 'media', hub_portals: 'portals',
+    hub_files: 'files',   // métadonnées des fichiers stockés sur GitHub (HubFiles)
   },
   _pushTimers: {}, _mirroring: false, _origSet: null,
 

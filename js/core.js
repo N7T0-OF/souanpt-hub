@@ -34,6 +34,16 @@ const GH = {
     const bin = atob(str.replace(/\n/g, ''));
     return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
   },
+  /** Base64 d'octets BRUTS (PDF, image, GIF…).
+      ⚠ Ne JAMAIS passer un binaire par b64enc : TextEncoder le réinterprète en
+      UTF-8 et corrompt le fichier. Découpé en tranches pour ne pas saturer la
+      pile d'appels sur les gros fichiers. */
+  b64encBytes(u8) {
+    let bin = '';
+    const CH = 0x8000;
+    for (let i = 0; i < u8.length; i += CH) bin += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+    return btoa(bin);
+  },
 
   async getUser(token)            { return this.api(token, '/user'); },
   async getRepo(token, owner, r)  { return this.api(token, `/repos/${owner}/${r}`); },
@@ -141,7 +151,128 @@ const Auth = {
 /* ══════════════════════════════════════════════════════
    CONNEXION GITHUB
 ══════════════════════════════════════════════════════ */
-const REPO_DATA_SUFFIX = '-hub-data';  // {username}-hub-data (backup privé)
+const REPO_DATA_SUFFIX  = '-hub-data';   // {username}-hub-data (backup privé)
+const REPO_FILES_SUFFIX = '-hub-files';  // {username}-hub-files (fichiers PRIVÉS)
+
+/* ══════════════════════════════════════════════════════
+   HubFiles — stockage de fichiers sur GitHub (gratuit à vie, sans carte).
+     • PUBLIC  → dépôt du site  → URL stable servie par GitHub Pages
+     • PRIVÉ   → dépôt privé    → GitHub applique l'accès côté SERVEUR
+     • Versions → historique git (gratuit) ; remplacer garde le MÊME chemin/URL
+   Les métadonnées (nom, dossier, tags, visibilité, usages) vivent dans
+   localStorage `hub_files` et sont miroitées vers Firestore par Cloud.
+══════════════════════════════════════════════════════ */
+const FILE_BLOCKED_EXT = ['exe','msi','bat','cmd','scr','com','vbs','ps1','jar','dll'];
+const FILE_MAX_BYTES   = 25 * 1024 * 1024;   // 25 Mo : marge sûre sous la limite API GitHub
+
+const HubFiles = {
+  KEY: 'hub_files',
+  list()      { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch { return []; } },
+  _save(l)    { localStorage.setItem(this.KEY, JSON.stringify(l)); },
+  get(id)     { return this.list().find(f => f.id === id) || null; },
+  _safe(n)    { return String(n || 'fichier').replace(/[^\w.\-]+/g, '_').slice(0, 100) || 'fichier'; },
+  _ext(n)     { const m = String(n || '').toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ''; },
+  _kind(mime, ext) {
+    if (/^image\/gif/.test(mime) || ext === 'gif') return 'gif';
+    if (/^image\//.test(mime))  return 'image';
+    if (/^video\//.test(mime))  return 'video';
+    if (/^audio\//.test(mime))  return 'audio';
+    if (ext === 'pdf')          return 'pdf';
+    if (['zip','7z','rar'].includes(ext)) return 'archive';
+    return 'document';
+  },
+  /** Dépôt cible selon la visibilité */
+  _repo(visibility) {
+    const owner = Auth.owner();
+    if (!owner) throw new Error('Connecte GitHub pour stocker des fichiers');
+    if (visibility === 'public') {
+      const cfg = SiteConfig.get();
+      return { owner, repo: (cfg.repo || '').split('/')[1] || SITE_REPO_NAME, private: false };
+    }
+    return { owner, repo: owner.toLowerCase() + REPO_FILES_SUFFIX, private: true };
+  },
+  /** URL publique stable (inchangée si on remplace le fichier) */
+  publicUrl(meta) {
+    if (!meta || meta.visibility !== 'public') return '';
+    return `https://${String(meta.owner).toLowerCase()}.github.io/${meta.repo}/${meta.path}`;
+  },
+
+  /** Envoie un File vers GitHub. visibility: 'private' (défaut) | 'public'. */
+  async upload(file, opts) {
+    opts = opts || {};
+    const visibility = opts.visibility === 'public' ? 'public' : 'private';   // PRIVÉ par défaut
+    const token = Auth.token();
+    if (!token) throw new Error('Connecte GitHub pour stocker des fichiers');
+    const name = this._safe(file.name), ext = this._ext(name);
+    if (FILE_BLOCKED_EXT.includes(ext)) throw new Error('Type de fichier interdit : .' + ext);
+    if (file.size > FILE_MAX_BYTES) throw new Error('Fichier trop lourd (max 25 Mo)');
+
+    const { owner, repo, private: isPriv } = this._repo(visibility);
+    if (isPriv) await GH.ensureRepo(token, owner, repo, true);
+
+    const id   = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const path = 'files/' + (opts.folder ? this._safe(opts.folder) + '/' : '') + id + '-' + name;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    // ⚠ binaire : surtout PAS b64enc (TextEncoder corromprait le fichier)
+    const b64 = GH.b64encBytes(bytes);
+    await GH.api(token, `/repos/${owner}/${repo}/contents/${path}`, {
+      method: 'PUT',
+      body: JSON.stringify({ message: 'file: ' + name, content: b64 }),
+    });
+
+    const meta = {
+      id, owner, repo, path, name, displayName: opts.displayName || file.name,
+      mime: file.type || '', ext, size: file.size, kind: this._kind(file.type || '', ext),
+      visibility, folder: opts.folder || '', tags: [], usages: [],
+      createdAt: Date.now(), updatedAt: Date.now(), status: 'active',
+    };
+    const l = this.list(); l.push(meta); this._save(l);
+    return meta;
+  },
+
+  /** Remplace le contenu SANS changer l'URL publique ni l'identifiant (§8). */
+  async replace(id, file) {
+    const meta = this.get(id); if (!meta) throw new Error('Fichier introuvable');
+    const token = Auth.token(); if (!token) throw new Error('Connecte GitHub');
+    if (file.size > FILE_MAX_BYTES) throw new Error('Fichier trop lourd (max 25 Mo)');
+    const sha = await GH.fileSha(token, meta.owner, meta.repo, meta.path);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`, {
+      method: 'PUT',
+      body: JSON.stringify({ message: 'replace: ' + meta.name, content: GH.b64encBytes(bytes), ...(sha ? { sha } : {}) }),
+    });
+    meta.size = file.size; meta.mime = file.type || meta.mime; meta.updatedAt = Date.now();
+    const l = this.list().map(f => f.id === id ? meta : f); this._save(l);
+    return meta;   // même path → même URL publique, blocs du site intacts
+  },
+
+  /** Ouvre un fichier PRIVÉ : récupéré avec le jeton, jamais exposé publiquement. */
+  async objectUrl(id) {
+    const meta = this.get(id); if (!meta) throw new Error('Fichier introuvable');
+    if (meta.visibility === 'public') return this.publicUrl(meta);
+    const token = Auth.token(); if (!token) throw new Error('Connecte GitHub');
+    const res = await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`);
+    const bin = atob(String(res.content || '').replace(/\n/g, ''));
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([u8], { type: meta.mime || 'application/octet-stream' }));
+  },
+
+  /** Corbeille (réversible) puis suppression définitive côté GitHub. */
+  trash(id)   { const l = this.list().map(f => f.id === id ? { ...f, status: 'trash',  deletedAt: Date.now() } : f); this._save(l); },
+  restore(id) { const l = this.list().map(f => f.id === id ? { ...f, status: 'active', deletedAt: null } : f); this._save(l); },
+  async destroy(id) {
+    const meta = this.get(id); if (!meta) return;
+    const token = Auth.token();
+    if (token) {
+      const sha = await GH.fileSha(token, meta.owner, meta.repo, meta.path);
+      if (sha) await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`, {
+        method: 'DELETE', body: JSON.stringify({ message: 'delete: ' + meta.name, sha }),
+      }).catch(() => {});
+    }
+    this._save(this.list().filter(f => f.id !== id));
+  },
+};
 const HUB_REPO_NAME    = 'souanpt-hub'; // repo du dashboard — jamais utilisé comme cible de déploiement
 const HUB_HOME_URL     = 'https://souanptjub.pages.dev/'; // accueil souanpt.hub V2 (Cloudflare Pages — cible du badge des sites publiés)
 const ANALYTICS_URL    = 'https://souanpt-analytics.titaneolinne13.workers.dev/hit'; // mouchard des sites publiés → agrégats Firestore (Worker gratuit)
