@@ -246,7 +246,8 @@ const HubFiles = {
     const meta = {
       id, owner, repo, path, name, displayName: opts.displayName || file.name,
       mime: file.type || '', ext, size: file.size, kind: this._kind(file.type || '', ext),
-      visibility, folder: opts.folder || '', tags: [], usages: [],
+      visibility, folder: opts.folder || '', tags: [], usages: [], fav: false,
+      sha: opts.sha || await this.hash(file),   // empreinte → doublons
       createdAt: Date.now(), updatedAt: Date.now(), status: 'active',
     };
     const l = this.list(); l.push(meta); this._save(l);
@@ -303,6 +304,27 @@ const HubFiles = {
     const u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     return URL.createObjectURL(new Blob([u8], { type: meta.mime || 'application/octet-stream' }));
+  },
+
+  /** Empreinte SHA-256 d'un fichier (crypto natif) → détection de doublons. */
+  async hash(file) {
+    try {
+      const buf = await file.arrayBuffer();
+      const d = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(d), b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) { return ''; }
+  },
+  /** Fichier déjà présent ? (même empreinte, hors corbeille) */
+  findDuplicate(sha) { return sha ? this.list().find(f => f.sha === sha && f.status !== 'trash') || null : null; },
+
+  rename(id, displayName) {
+    const n = String(displayName || '').trim(); if (!n) return null;
+    const l = this.list().map(f => f.id === id ? { ...f, displayName: n, updatedAt: Date.now() } : f);
+    this._save(l); return this.get(id);
+  },
+  toggleFav(id) {
+    const l = this.list().map(f => f.id === id ? { ...f, fav: !f.fav, updatedAt: f.updatedAt } : f);
+    this._save(l); return this.get(id);
   },
 
   /** Corbeille (réversible) puis suppression définitive côté GitHub. */

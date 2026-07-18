@@ -136,8 +136,14 @@ const StorageUI = {
     }
     for (const f of files) {
       try {
+        // Doublon ? (empreinte SHA-256 locale, avant tout envoi → quota préservé)
+        const sha = await HubFiles.hash(f);
+        const dup = HubFiles.findDuplicate(sha);
+        if (dup && !confirm('« ' + f.name +' » semble déjà présent :\n\n' +
+            (dup.displayName || dup.name) + ' (' + this._size(dup.size) + ')\n\n' +
+            'Importer quand même une copie ?')) { showToast?.('Import ignoré — fichier déjà présent', '#666', 3000); continue; }
         showToast?.('⟳ Envoi de ' + f.name + '…', '#666', 2500);
-        await HubFiles.upload(f, { visibility: 'private' });   // privé par défaut
+        await HubFiles.upload(f, { visibility: 'private', sha });   // privé par défaut
         this.render();
         showToast?.('✓ ' + f.name + ' ajouté (privé)', '#2e9a63', 2500);
       } catch (e) { showToast?.('✗ ' + f.name + ' — ' + (e.message || 'échec'), '#c0392b', 5000); }
@@ -185,13 +191,127 @@ const StorageUI = {
     catch (e) { showToast?.('✗ ' + (e.message || 'échec'), '#c0392b', 4000); }
   },
 
-  /** Glisser-déposer sur la zone */
+  /* ══ Sélection multiple ══ */
+  sel: new Set(),
+  _lastId: null,
+  clearSel() { this.sel.clear(); this._paint(); },
+  selectAll() { this._visible().forEach(f => this.sel.add(f.id)); this._paint(); },
+  toggle(id, ev) {
+    const ids = this._visible().map(f => f.id);
+    if (ev && ev.shiftKey && this._lastId) {                 // plage
+      const a = ids.indexOf(this._lastId), b = ids.indexOf(id);
+      if (a >= 0 && b >= 0) ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(i => this.sel.add(i));
+    } else if (ev && (ev.ctrlKey || ev.metaKey)) {           // ajout / retrait
+      this.sel.has(id) ? this.sel.delete(id) : this.sel.add(id);
+    } else {
+      this.sel.clear(); this.sel.add(id);
+    }
+    this._lastId = id; this._paint();
+  },
+  /** Met à jour l'état visuel + la barre d'actions, sans re-rendre toute la liste */
+  _paint() {
+    document.querySelectorAll('#st-files [data-f]').forEach(el =>
+      el.classList.toggle('on', this.sel.has(el.getAttribute('data-f'))));
+    const bar = document.getElementById('st-bulk'); if (!bar) return;
+    const n = this.sel.size;
+    bar.style.display = n ? 'flex' : 'none';
+    if (n) bar.querySelector('#st-bulk-n').textContent = n + ' élément' + (n > 1 ? 's' : '') + ' sélectionné' + (n > 1 ? 's' : '');
+  },
+  async bulk(action) {
+    const ids = [...this.sel];
+    if (!ids.length) return;
+    if (action === 'trash') {
+      ids.forEach(id => HubFiles.trash(id));
+      this.clearSel(); this.render();
+      this._undo('« ' + ids.length + ' élément(s) » mis à la corbeille', () => { ids.forEach(id => HubFiles.restore(id)); this.render(); });
+      return;
+    }
+    if (action === 'private' || action === 'public') {
+      if (action === 'public' && !confirm('Rendre ' + ids.length + ' fichier(s) PUBLIC(s) ?\n\nIls seront accessibles par n\'importe qui via leur lien.')) return;
+      showToast?.('⟳ Changement de visibilité…', '#666', 2500);
+      for (const id of ids) { try { await HubFiles.setVisibility(id, action); } catch (e) {} }
+      this.render(); showToast?.('✓ Visibilité mise à jour', '#2e9a63', 2500);
+      return;
+    }
+    if (action === 'download') { for (const id of ids) await this.download(id); return; }
+  },
+
+  /* ══ Annulation (quelques secondes) ══ */
+  _undo(msg, fn) {
+    const box = document.getElementById('st-undo'); if (!box) return;
+    clearTimeout(this._undoT);
+    box.innerHTML = `<span>${this._esc(msg)}</span><button id="st-undo-b">Annuler</button>`;
+    box.style.display = 'flex';
+    box.querySelector('#st-undo-b').onclick = () => { clearTimeout(this._undoT); box.style.display = 'none'; fn(); showToast?.('↩ Annulé', '#2e9a63', 1800); };
+    this._undoT = setTimeout(() => { box.style.display = 'none'; }, 7000);
+  },
+
+  /* ══ Aperçu rapide (Espace), comme le Finder ══ */
+  async preview(id) {
+    const f = HubFiles.get(id); if (!f) return;
+    const ov = document.getElementById('st-prev'); if (!ov) return;
+    const body = ov.querySelector('#st-prev-body');
+    ov.querySelector('#st-prev-t').textContent = f.displayName || f.name;
+    ov.querySelector('#st-prev-s').textContent = this._size(f.size) + ' · ' + (f.ext || f.kind) + ' · ' + (f.visibility === 'public' ? '🌍 public' : '🔒 privé');
+    body.innerHTML = '<div class="st-load">Chargement…</div>';
+    ov.style.display = 'flex';
+    this._prevId = id;
+    try {
+      const url = await HubFiles.objectUrl(id);
+      if (f.kind === 'image' || f.kind === 'gif') body.innerHTML = `<img src="${this._esc(url)}" alt="">`;
+      else if (f.kind === 'pdf')   body.innerHTML = `<iframe src="${this._esc(url)}"></iframe>`;   // lecteur PDF natif
+      else if (f.kind === 'video') body.innerHTML = `<video src="${this._esc(url)}" controls autoplay muted></video>`;
+      else if (f.kind === 'audio') body.innerHTML = `<audio src="${this._esc(url)}" controls autoplay></audio>`;
+      else body.innerHTML = `<div class="st-noprev"><div style="font-size:44px">${this.ICONS[f.kind] || '📃'}</div>
+        <p>Pas d'aperçu pour ce format.</p><a class="btn btn-accent" href="${this._esc(url)}" download="${this._esc(f.name)}">⬇ Télécharger</a></div>`;
+    } catch (e) { body.innerHTML = `<div class="st-noprev"><p>✗ ${this._esc(e.message || 'Impossible d\'ouvrir')}</p></div>`; }
+  },
+  closePreview() { const ov = document.getElementById('st-prev'); if (ov) { ov.style.display = 'none'; ov.querySelector('#st-prev-body').innerHTML = ''; } this._prevId = null; },
+  async download(id) {
+    const f = HubFiles.get(id); if (!f) return;
+    try {
+      const url = await HubFiles.objectUrl(id);
+      const a = document.createElement('a'); a.href = url; a.download = f.displayName || f.name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } catch (e) { showToast?.('✗ ' + (e.message || 'échec'), '#c0392b', 3000); }
+  },
+  rename(id) {
+    const f = HubFiles.get(id); if (!f) return;
+    const n = prompt('Nouveau nom :', f.displayName || f.name);
+    if (n && n.trim()) { HubFiles.rename(id, n); this.render(); showToast?.('✓ Renommé', '#2e9a63', 1800); }
+  },
+
+  /* ══ Raccourcis clavier ══ */
+  _keys(e) {
+    if (!document.getElementById('page-storage')?.classList.contains('active')) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    const k = e.key, mod = e.ctrlKey || e.metaKey;
+    if (k === 'Escape') { if (this._prevId) return this.closePreview(); return this.clearSel(); }
+    if (mod && k.toLowerCase() === 'a') { e.preventDefault(); return this.selectAll(); }
+    const id = [...this.sel][0];
+    if (!id) return;
+    if (k === ' ')       { e.preventDefault(); return this._prevId ? this.closePreview() : this.preview(id); }
+    if (k === 'Enter')   { e.preventDefault(); return this.open(id); }
+    if (k === 'F2')      { e.preventDefault(); return this.rename(id); }
+    if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); return this.bulk('trash'); }
+  },
+
+  /** Glisser-déposer + clavier + clics */
   init() {
     const dz = document.getElementById('st-drop'); if (!dz || dz._ready) return;
     dz._ready = true;
     ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); if (ev === 'drop' || !dz.contains(e.relatedTarget)) dz.classList.remove('over'); }));
     dz.addEventListener('drop', e => this.add([...(e.dataTransfer?.files || [])]));
+    // sélection : clic sur une carte (les boutons d'action gardent leur rôle)
+    dz.addEventListener('click', e => {
+      if (e.target.closest('.st-act')) return;
+      const card = e.target.closest('[data-f]');
+      if (card) this.toggle(card.getAttribute('data-f'), e);
+      else this.clearSel();
+    });
+    document.addEventListener('keydown', e => this._keys(e));
   },
 };
 window.StorageUI = StorageUI;
