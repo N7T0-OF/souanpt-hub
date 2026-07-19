@@ -53,6 +53,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
 .nav-section{padding:10px 0;border-bottom:1px solid var(--border)}
 .nav-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:0 18px;margin-bottom:4px}
+.nav-hint{font-size:8.5px;line-height:1.5;color:var(--muted2);padding:4px 18px 2px}
+.nav-hint code{color:var(--accent);font-family:inherit}
 .ni{
   display:flex;align-items:center;gap:9px;
   padding:9px 18px;font-size:11px;color:var(--muted2);
@@ -1068,8 +1070,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     </button>
     <button class="ni" data-page="portals" onclick="showPage('portals')">
       <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="1.5" r="1" fill="currentColor"/></svg>
-      Portails Clients <span class="nbadge" id="portals-badge" style="display:none"></span>
+      Portails <span class="nbadge" id="portals-badge" style="display:none"></span>
     </button>
+    <div class="nav-hint">Demandes, Portails et Clients partagent le même lien
+      <code>/c/…</code> — le client n'en reçoit jamais un nouveau.</div>
   </div>
 
   <div class="nav-section">

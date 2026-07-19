@@ -538,9 +538,13 @@ const QuoteUI = {
     };
     try {
       await Cloud._db.collection('estimates').doc(code).set(doc);
-      const url = location.origin + '/estimate/' + code;
+      /* Lien /c/<token> et non /estimate/<code> : c'est LE lien unique du
+         dossier. Il suivra le client jusqu'à la livraison — il n'aura jamais
+         à en recevoir un nouveau. /estimate/<code> reste valable pour les
+         liens déjà envoyés. */
+      const url = location.origin + '/c/' + code;
       const box = this._el('qf-msg');
-      if (box) box.textContent = `Lien d'estimation créé :\n${url}\n\nValable ${days} jours. Le client peut l'ouvrir sans compte, accepter ou négocier.`;
+      if (box) box.textContent = `Lien client créé :\n${url}\n\nValable ${days} jours. Il s'ouvre sans compte, et restera le même quand le projet passera en production.`;
       navigator.clipboard?.writeText(url).catch(() => {});
       showToast?.('Lien créé et copié ✓', '#2e9a63', 3500);
     } catch (err) {
