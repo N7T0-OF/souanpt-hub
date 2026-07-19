@@ -176,13 +176,28 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 .ed-on [data-b].ed-sel{outline:2px solid #C8FF00;outline-offset:2px}
 /* Bloc masqué : visible mais grisé EN ÉDITION (déplaçable/modifiable), absent en Aperçu.
    La transition joue dans les deux sens → retour immédiat des couleurs au réaffichage. */
+/* ATTENTION : le site publié masque .bl-hidden avec display:none !important.
+   Chaque type de bloc doit donc être RÉ-AFFICHÉ explicitement en édition,
+   sinon un bloc masqué devient invisible ICI AUSSI — et plus rien ne permet
+   de le remettre. C'est ce qui arrivait à la bannière (.sb-hero / .hero) et
+   aux sections des thèmes Flottante et Latérale (À propos, Document). */
 .ed-on .bn.bl-hidden{display:flex!important}
 .ed-on .pc.bl-hidden{display:block!important}
+.ed-on .sb-hero.bl-hidden{display:flex!important}
+.ed-on .hero.bl-hidden,
+.ed-on section.bl-hidden,
+.ed-on .fdoc.bl-hidden{display:block!important}
 .ed-on .bl-hidden{opacity:.42;filter:grayscale(1);border-style:dashed!important}
 [data-b]{transition:opacity .2s ease,filter .2s ease}
 .ed-on .bl-hidden::after{content:'Masqué sur le site public';position:absolute;top:6px;right:6px;z-index:59;
   background:rgba(15,15,15,.9);color:#f0ece4;border:1px solid rgba(255,255,255,.18);border-radius:5px;
   padding:2px 6px;font:700 8px system-ui;letter-spacing:.4px;filter:grayscale(0);pointer-events:none}
+/* Un bloc masqué doit dire COMMENT revenir en arrière, pas seulement qu'il
+   est masqué : sans ça, « supprimer » ressemble à une perte définitive. */
+.ed-on .sb-hero.bl-hidden::after,
+.ed-on .hero.bl-hidden::after{content:'Bannière masquée — clique dessus puis 👁 pour la remettre';
+  top:10px;right:10px;font-size:9px;padding:4px 9px;border-radius:999px;color:#C8FF00;
+  border-color:rgba(200,255,0,.32)}
 .ed-on .bl-hidden *{pointer-events:none}
 .ed-on .bl-hidden>.ed-h{pointer-events:auto}
 .ed-h{display:none;position:absolute;top:6px;left:6px;z-index:60;background:rgba(15,15,15,.88);color:#f0ece4;
