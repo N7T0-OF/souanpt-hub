@@ -1277,6 +1277,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copyFollowUp()">📋 Demander ce qui manque</button>
             <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copySummary()">📋 Envoyer l'estimation</button>
             <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copySummary(true)">📋 Envoyer le prix ferme</button>
+            <input class="prop-input" id="qf-project" placeholder="Nom du projet (facultatif)" style="width:180px;font-size:10px">
+            <button class="btn btn-accent" style="font-size:10px" onclick="QuoteUI.publish()">🔗 Créer un lien client</button>
           </div>
           <pre id="qf-msg" class="qf-msg"></pre>
         </div>

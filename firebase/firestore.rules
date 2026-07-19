@@ -40,14 +40,40 @@ service cloud.firestore {
       allow update, delete: if isOwner();
     }
 
-    // Codes Premium (cadeaux) — lisibles pour vérification ; un utilisateur connecté
-    // ne peut que passer un code inutilisé de used:false → used:true (une seule fois).
-    // Création/suppression : uniquement depuis la console Firebase (admin).
-    match /codes/{code} {
+    // ── Estimations partagées par lien, consultées SANS compte ──
+    // ⚠ Ce document est PUBLIC en lecture : il ne doit contenir que ce que le
+    // client a le droit de voir (lignes, total, délai, expiration). Le prix
+    // plancher, le taux horaire et la marge restent dans users/{uid}/data,
+    // qui n'est lisible que par son propriétaire.
+    match /estimates/{code} {
       allow read: if true;
-      allow update: if signedIn()
-                    && resource.data.used == false
-                    && request.resource.data.used == true;
+      allow create: if creatingSelf();
+      allow update, delete: if isOwner();
+
+      // Contre-offres. Le client n'a pas de compte — c'est tout l'intérêt du
+      // lien — donc la création est ouverte, mais la FORME est verrouillée :
+      // rien d'autre que ces champs ne peut être écrit, et le statut initial
+      // est imposé pour qu'une offre ne puisse pas s'auto-accepter.
+      match /offers/{offerId} {
+        allow read: if true;
+        allow create: if
+             request.resource.data.keys().hasOnly(['author','amount','discountPercent','message','status','createdAt'])
+          && request.resource.data.status == 'pending'
+          && request.resource.data.amount is number
+          && request.resource.data.amount > 0
+          && request.resource.data.amount < 1000000
+          && (!('message' in request.resource.data)
+              || (request.resource.data.message is string && request.resource.data.message.size() <= 600))
+          && (
+               request.resource.data.author == 'client'
+               || (signedIn()
+                   && get(/databases/$(database)/documents/estimates/$(code)).data.owner == request.auth.uid
+                   && request.resource.data.author == 'creator')
+             );
+        // Seul le créateur de l'estimation peut accepter, refuser ou effacer.
+        allow update, delete: if signedIn()
+          && get(/databases/$(database)/documents/estimates/$(code)).data.owner == request.auth.uid;
+      }
     }
 
     // Collections privées scopées par owner

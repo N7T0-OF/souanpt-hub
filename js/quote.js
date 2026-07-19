@@ -503,6 +503,51 @@ const QuoteUI = {
     if (!this._a) return;
     this._copy(QuoteEngine.followUp(this._a), 'Message');
   },
+  /* ── Publier l'estimation : crée un lien consultable sans compte ──
+     ⚠ On ne publie QUE ce que le client a le droit de voir. Les indicateurs
+     privés (temps interne, taux horaire, prix plancher) sont volontairement
+     absents de l'objet envoyé : le document Firestore est en lecture PUBLIQUE,
+     tout ce qui y entre est lisible par quiconque possède le lien. */
+  async publish() {
+    if (!this._a || !this._e) return;
+    if (!(window.Cloud && Cloud.enabled && Cloud.user()))
+      return showToast?.('Connecte-toi (Google ou Discord) pour créer un lien d\'estimation', '#e4b24a', 4000);
+    if (this._a.missing.length &&
+        !confirm('Le brief est encore incomplet :\n\n- ' + this._a.missing.join('\n- ')
+          + '\n\nPublier quand même ? Le client verra une FOURCHETTE, pas un prix ferme.')) return;
+
+    const e = this._e, a = this._a;
+    const code = (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
+    const days = 7;
+    // Objet volontairement plat et minimal — relire cette liste avant d'y ajouter
+    // quoi que ce soit : tout champ ajouté devient public.
+    const doc = {
+      owner: Cloud.user().uid,
+      creatorName: (localStorage.getItem('souanpt_pseudo') || Cloud.user().displayName || 'Créateur'),
+      projectName: (this._el('qf-project')?.value || '').trim(),
+      title: e.range ? 'Estimation de ton projet' : 'Ton devis',
+      currency: e.currency,
+      lines: e.lines.map(l => ({ label: l.label, qty: l.qty, total: l.total })),
+      extras: e.extras.map(x => ({ label: x.label, amount: x.amount })),
+      total: e.range ? e.range.high : e.total,
+      deadline: (a.deadline && a.deadline.mention) || '',
+      revisions: Pricing.get().revisionsIncluded,
+      status: 'sent',
+      createdAt: Date.now(),
+      expiresAt: Date.now() + days * 86400000,
+    };
+    try {
+      await Cloud._db.collection('estimates').doc(code).set(doc);
+      const url = location.origin + '/estimate/' + code;
+      const box = this._el('qf-msg');
+      if (box) box.textContent = `Lien d'estimation créé :\n${url}\n\nValable ${days} jours. Le client peut l'ouvrir sans compte, accepter ou négocier.`;
+      navigator.clipboard?.writeText(url).catch(() => {});
+      showToast?.('Lien créé et copié ✓', '#2e9a63', 3500);
+    } catch (err) {
+      showToast?.('✗ ' + (err.message || 'Publication impossible'), '#c0392b', 4000);
+    }
+  },
+
   copySummary(final) {
     if (!this._a || !this._e) return;
     if (final && this._a.missing.length &&
