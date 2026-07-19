@@ -1670,6 +1670,19 @@ async function deployPortfolio(onLog, onStep) {
 
   SiteConfig.set('lastDeploy', { url, ts: Date.now(), repo: owner + '/' + repoName });
   SiteConfig.set('repo', owner + '/' + repoName);
+
+  /* L'adresse du site publié doit remonter dans le PROFIL Firestore, pas
+     seulement dans localStorage. Sans ça, rien côté public ne sait où trouver
+     le site : /u/<pseudo> répondait « site non publié » et le classement
+     renvoyait vers « # ». Ces deux fonctionnalités lisent `siteUrl`/`repo`. */
+  try {
+    if (window.Cloud && Cloud.enabled && Cloud.user()) {
+      await Cloud.saveProfile(Cloud.user().uid, {
+        siteUrl: url, repo: owner + '/' + repoName, lastPublishedAt: Date.now(),
+      });
+    }
+  } catch (e) { console.warn('[deploy] profil non mis à jour', e); }
+
   return url;
 }
 
