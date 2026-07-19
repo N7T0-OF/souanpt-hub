@@ -165,6 +165,211 @@ const REPO_FILES_SUFFIX = '-hub-files';  // {username}-hub-files (fichiers PRIV�
 const FILE_BLOCKED_EXT = ['exe','msi','bat','cmd','scr','com','vbs','ps1','jar','dll'];
 const FILE_MAX_BYTES   = 25 * 1024 * 1024;   // 25 Mo : marge sûre sous la limite API GitHub
 
+/* ══════════════════════════════════════════════════════════════════════
+   Thumbs — aperçus de couverture, générés DANS LE NAVIGATEUR.
+
+   Pourquoi local : c'est gratuit et instantané. Le fichier complet est
+   déjà dans la mémoire du navigateur au moment de l'envoi, donc fabriquer
+   la vignette à ce moment-là ne coûte ni bande passante ni serveur.
+   Aucun octet ne part vers un service tiers.
+
+   Le but est de RECONNAÎTRE un fichier, pas de le reproduire : 320 px de
+   côté maximum, WebP qualité 0.62 → typiquement 8 à 25 Ko, contre
+   plusieurs Mo pour l'original. C'est ce qui remplace l'ancien affichage,
+   qui téléchargeait l'image ENTIÈRE pour remplir une case de 150 px.
+══════════════════════════════════════════════════════════════════════ */
+const THUMB_MAX = 320;
+const THUMB_Q   = 0.62;
+/* pdf.js servi par jsDelivr, qui publie le PAQUET COMPLET — pas seulement les
+   bundles JS. C'est indispensable : sans `standard_fonts/`, pdf.js ne peut pas
+   peindre un PDF dont les polices ne sont pas embarquées (le cas de la plupart
+   des CV faits sous Word ou LibreOffice) et le rendu reste bloqué sans erreur.
+   Vérifié : cdnjs ne sert ni standard_fonts/ ni cmaps/. */
+const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+const PDFJS_URL  = PDFJS_BASE + 'build/pdf.min.js';
+const PDFJS_WK   = PDFJS_BASE + 'build/pdf.worker.min.js';
+
+const Thumbs = {
+  /** Réduit un canvas/bitmap en WebP (repli PNG si le navigateur refuse). */
+  async _encode(canvas) {
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', THUMB_Q));
+    if (blob && blob.size) return { blob, ext: 'webp' };
+    const png = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    return png ? { blob: png, ext: 'png' } : null;
+  },
+  /** Dessine une source (bitmap/vidéo) réduite à THUMB_MAX. */
+  async _draw(src, sw, sh) {
+    if (!sw || !sh) return null;
+    const s = Math.min(1, THUMB_MAX / Math.max(sw, sh));
+    const w = Math.max(1, Math.round(sw * s)), h = Math.max(1, Math.round(sh * s));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(src, 0, 0, w, h);
+    const enc = await this._encode(c);
+    return enc ? { ...enc, w, h } : null;
+  },
+
+  /** Image ou GIF — pour un GIF, createImageBitmap ne garde que la 1re image. */
+  async fromImage(file) {
+    const bmp = await createImageBitmap(file);
+    try { return await this._draw(bmp, bmp.width, bmp.height); }
+    finally { bmp.close && bmp.close(); }
+  },
+
+  /** Vidéo — image extraite à ~10 % de la durée (le début est souvent noir). */
+  fromVideo(file) {
+    return new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement('video');
+      let done = false;
+      const finish = async ok => {
+        if (done) return; done = true;
+        clearTimeout(timer);
+        let out = null;
+        if (ok) { try { out = await this._draw(v, v.videoWidth, v.videoHeight); } catch (e) {} }
+        URL.revokeObjectURL(url); v.removeAttribute('src'); v.load?.();
+        resolve(out);
+      };
+      // Garde-fou : un conteneur non décodable resterait bloqué pour toujours.
+      const timer = setTimeout(() => finish(false), 12000);
+      v.muted = true; v.preload = 'metadata'; v.playsInline = true;
+      v.onloadedmetadata = () => { try { v.currentTime = Math.min(Math.max(v.duration * 0.1, 0.1), 10); } catch (e) { finish(false); } };
+      v.onseeked = () => finish(true);
+      v.onerror = () => finish(false);
+      v.src = url;
+    });
+  },
+
+  /** PDF — première page. PDF.js n'est chargé QUE si un PDF est déposé (§11). */
+  _pdfjs: null,
+  loadPdfJs() {
+    if (this._pdfjs) return this._pdfjs;
+    this._pdfjs = new Promise((resolve, reject) => {
+      if (window.pdfjsLib) return resolve(window.pdfjsLib);
+      const s = document.createElement('script');
+      s.src = PDFJS_URL;
+      s.onload = () => {
+        if (!window.pdfjsLib) return reject(new Error('pdf.js indisponible'));
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WK;
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = () => reject(new Error('pdf.js : chargement impossible'));
+      document.head.appendChild(s);
+    }).catch(e => { this._pdfjs = null; throw e; });
+    return this._pdfjs;
+  },
+  /* pdf.js peint la page via requestAnimationFrame. Or un onglet EN ARRIÈRE-PLAN
+     ne reçoit plus de rAF : le rendu ne se termine jamais. Si l'utilisateur
+     dépose un PDF puis change d'onglet, on attend simplement son retour au lieu
+     d'abandonner. (C'est aussi ce qui bloquait le rendu en test : la page de
+     test est masquée en permanence.) */
+  whenVisible(maxMs) {
+    if (!document.hidden) return Promise.resolve(true);
+    return new Promise(resolve => {
+      const done = ok => { clearTimeout(t); document.removeEventListener('visibilitychange', h); resolve(ok); };
+      const h = () => { if (!document.hidden) done(true); };
+      const t = setTimeout(() => done(false), maxMs || 120000);
+      document.addEventListener('visibilitychange', h);
+    });
+  },
+
+  async fromPdf(file) {
+    const lib = await this.loadPdfJs();
+    if (!(await this.whenVisible(120000))) throw new Error('onglet en arrière-plan : rendu PDF impossible');
+    const buf = await file.arrayBuffer();
+    const pdf = await lib.getDocument({
+      data: buf,
+      standardFontDataUrl: PDFJS_BASE + 'standard_fonts/',   // polices non embarquées
+      cMapUrl: PDFJS_BASE + 'cmaps/', cMapPacked: true,      // textes CJK / encodages exotiques
+    }).promise;
+    try {
+      const page = await pdf.getPage(1);
+      const v1 = page.getViewport({ scale: 1 });
+      const scale = Math.min(1.6, THUMB_MAX / Math.max(v1.width, v1.height));
+      const vp = page.getViewport({ scale });
+      const c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      // Fond blanc : un PDF sans fond donnerait une vignette transparente,
+      // illisible sur l'interface sombre.
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      // Le délai ne couvre QUE la peinture : l'attente de visibilité ci-dessus
+      // peut légitimement durer des minutes et ne doit pas compter dedans.
+      await this._limit(page.render({ canvasContext: ctx, viewport: vp }).promise, 20000, 'rendu PDF');
+      const enc = await this._encode(c);
+      return enc ? { ...enc, w: c.width, h: c.height, pages: pdf.numPages } : null;
+    } finally { pdf.destroy && pdf.destroy(); }
+  },
+
+  /** Durée d'un média audio (secondes), sans image. */
+  duration(file) {
+    return new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('audio');
+      const finish = d => { clearTimeout(t); URL.revokeObjectURL(url); resolve(d); };
+      const t = setTimeout(() => finish(0), 8000);
+      a.onloadedmetadata = () => finish(isFinite(a.duration) ? Math.round(a.duration) : 0);
+      a.onerror = () => finish(0);
+      a.preload = 'metadata'; a.src = url;
+    });
+  },
+
+  /** Texte — premières lignes utiles, pour reconnaître le document. */
+  async excerpt(file) {
+    const slice = file.slice(0, 8192);
+    const txt = await slice.text();
+    const lines = txt.replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+    return lines.slice(0, 4).join(' · ').slice(0, 220);
+  },
+
+  /* ZIP — nombre d'entrées lu dans le « End Of Central Directory », les
+     22 derniers octets du fichier. Aucune bibliothèque : on ne décompresse
+     rien, on lit juste un compteur. */
+  async zipCount(file) {
+    try {
+      const tail = new DataView(await file.slice(Math.max(0, file.size - 66000)).arrayBuffer());
+      for (let i = tail.byteLength - 22; i >= 0; i--) {
+        if (tail.getUint32(i, true) === 0x06054b50) return tail.getUint16(i + 10, true);
+      }
+    } catch (e) {}
+    return 0;
+  },
+
+  /* Abandonne au bout de N ms. Un fichier corrompu ou un décodeur qui part en
+     boucle ne doit pas laisser une promesse en suspens pour toujours : un PDF
+     malformé suffit à bloquer pdf.js, et l'aperçu est un bonus, pas un dû. */
+  _limit(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('délai dépassé : ' + label)), ms)),
+    ]);
+  },
+
+  /** Point d'entrée : fabrique l'aperçu adapté au type. Jamais d'exception. */
+  async build(file, kind, ext) {
+    try {
+      const T = (p, ms, l) => this._limit(p, ms, l);
+      if (kind === 'image' || kind === 'gif') {
+        const r = await T(this.fromImage(file), 15000, 'image');
+        return r && { type: 'thumbnail', ...r };
+      }
+      if (kind === 'video') {
+        const r = await this.fromVideo(file);          // garde-fou interne (12 s)
+        return r && { type: 'thumbnail', ...r };
+      }
+      // Pas de délai global ici : fromPdf peut attendre le retour de l'onglet,
+      // et borne lui-même la phase de peinture.
+      if (ext === 'pdf') {
+        const r = await this.fromPdf(file);
+        return r && { type: 'thumbnail', ...r };
+      }
+      if (kind === 'audio')                            return { type: 'audio', seconds: await this.duration(file) };
+      if (['txt','md','csv','json','srt','log'].includes(ext)) return { type: 'text', text: await T(this.excerpt(file), 10000, 'texte') };
+      if (['zip','cbz'].includes(ext))                 return { type: 'zip', entries: await this.zipCount(file) };
+    } catch (e) { console.warn('[thumbs] ' + (ext || kind), e); }
+    return null;   // pas d'aperçu possible → l'icône de type suffit
+  },
+};
+
 const HubFiles = {
   KEY: 'hub_files',
   list()      { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch { return []; } },
@@ -251,6 +456,9 @@ const HubFiles = {
       createdAt: Date.now(), updatedAt: Date.now(), status: 'active',
     };
     const l = this.list(); l.push(meta); this._save(l);
+    // L'aperçu est fabriqué APRÈS coup, sans bloquer : si sa génération ou
+    // son envoi échoue, le fichier est déjà en sécurité sur GitHub.
+    this.attachPreview(meta.id, file).catch(() => {});
     return meta;
   },
 
@@ -289,9 +497,88 @@ const HubFiles = {
     if (oldSha) await GH.api(token, `/repos/${meta.owner}/${oldRepo}/contents/${meta.path}`, {
       method: 'DELETE', body: JSON.stringify({ message: 'move out: ' + meta.name, sha: oldSha }),
     }).catch(() => {});
+    // La vignette DOIT suivre : laissée dans le dépôt public, la première
+    // page d'un document redevenu privé resterait lisible par tout le monde.
+    if (meta.preview && meta.preview.path) {
+      try {
+        const tp = meta.preview.path;
+        const t = await GH.api(token, `/repos/${meta.owner}/${oldRepo}/contents/${tp}`);
+        await GH.api(token, `/repos/${target.owner}/${target.repo}/contents/${tp}`, {
+          method: 'PUT', body: JSON.stringify({ message: 'move thumb: ' + meta.name, content: String(t.content || '').replace(/\n/g, '') }),
+        });
+        await GH.api(token, `/repos/${meta.owner}/${oldRepo}/contents/${tp}`, {
+          method: 'DELETE', body: JSON.stringify({ message: 'move thumb out: ' + meta.name, sha: t.sha }),
+        }).catch(() => {});
+      } catch (e) {
+        // Impossible de déplacer l'aperçu : on l'oublie plutôt que de risquer
+        // qu'il reste visible côté public ou qu'il pointe dans le vide.
+        console.warn('[thumb] déplacement', e);
+        delete meta.preview;
+      }
+    }
     meta.repo = target.repo; meta.visibility = visibility; meta.updatedAt = Date.now();
     this._save(this.list().map(f => f.id === id ? meta : f));
     return meta;
+  },
+
+  /* ══ Aperçus de couverture ══════════════════════════════════════════
+     La vignette vit dans LE MÊME DÉPÔT que son fichier. C'est essentiel :
+     la première page d'un CV privé est une donnée privée. La déposer dans
+     le dépôt public reviendrait à publier le document tout en le croyant
+     protégé. Elle suit donc le fichier quand il change de visibilité, et
+     disparaît avec lui.                                                   */
+  _thumbPath(meta, ext) { return 'thumbs/' + meta.id + '.' + (ext || 'webp'); },
+
+  /** Génère l'aperçu et le stocke. Ne lève jamais : un aperçu est un bonus. */
+  async attachPreview(id, file) {
+    const meta = this.get(id); if (!meta) return null;
+    const p = await Thumbs.build(file, meta.kind, meta.ext);
+    if (!p) return null;
+    const preview = { type: p.type, generatedAt: Date.now() };
+    if (p.type === 'thumbnail' && p.blob) {
+      try {
+        const token = Auth.token(); if (!token) throw new Error('GitHub non connecté');
+        const path = this._thumbPath(meta, p.ext);
+        const u8 = new Uint8Array(await p.blob.arrayBuffer());
+        const sha = await GH.fileSha(token, meta.owner, meta.repo, path);   // régénération
+        await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${path}`, {
+          method: 'PUT',
+          body: JSON.stringify({ message: 'thumb: ' + meta.name, content: GH.b64encBytes(u8), ...(sha ? { sha } : {}) }),
+        });
+        Object.assign(preview, { path, width: p.w, height: p.h, sizeBytes: p.blob.size });
+        if (p.pages) preview.pages = p.pages;
+      } catch (e) { console.warn('[thumb] envoi', e); return null; }
+    } else {
+      // Aperçus non visuels : quelques octets de métadonnée, aucun fichier.
+      if (p.seconds !== undefined) preview.seconds = p.seconds;
+      if (p.text    !== undefined) preview.text    = p.text;
+      if (p.entries !== undefined) preview.entries = p.entries;
+    }
+    const cur = this.get(id); if (!cur) return null;
+    cur.preview = preview;
+    this._save(this.list().map(f => f.id === id ? cur : f));
+    return preview;
+  },
+
+  /** URL affichable de la vignette. Fichier privé → récupérée avec le jeton. */
+  _thumbCache: {},
+  async thumbUrl(id) {
+    const meta = this.get(id);
+    if (!meta || !meta.preview || !meta.preview.path) return '';
+    if (meta.visibility === 'public') {
+      return `https://${String(meta.owner).toLowerCase()}.github.io/${meta.repo}/${meta.preview.path}`;
+    }
+    // Privé : passe par l'API authentifiée. Mis en cache pour la session,
+    // sinon chaque rendu de la grille relancerait un appel par fichier.
+    const key = meta.id + ':' + meta.preview.generatedAt;
+    if (this._thumbCache[key]) return this._thumbCache[key];
+    const token = Auth.token(); if (!token) return '';
+    try {
+      const res = await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.preview.path}`);
+      const url = 'data:image/webp;base64,' + String(res.content || '').replace(/\n/g, '');
+      this._thumbCache[key] = url;
+      return url;
+    } catch (e) { return ''; }
   },
 
   /** Ouvre un fichier PRIVÉ : récupéré avec le jeton, jamais exposé publiquement. */
@@ -338,6 +625,14 @@ const HubFiles = {
       if (sha) await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`, {
         method: 'DELETE', body: JSON.stringify({ message: 'delete: ' + meta.name, sha }),
       }).catch(() => {});
+      // La vignette part avec le fichier : sinon la 1re page d'un document
+      // supprimé resterait consultable dans le dépôt.
+      if (meta.preview && meta.preview.path) {
+        const ts = await GH.fileSha(token, meta.owner, meta.repo, meta.preview.path);
+        if (ts) await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.preview.path}`, {
+          method: 'DELETE', body: JSON.stringify({ message: 'delete thumb: ' + meta.name, sha: ts }),
+        }).catch(() => {});
+      }
     }
     this._save(this.list().filter(f => f.id !== id));
   },

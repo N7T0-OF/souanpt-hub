@@ -57,6 +57,7 @@ const StorageUI = {
     wrap.innerHTML = files.map(f => this.view === 'grid' ? this._card(f) : this._row(f)).join('');
     this._summary(all);
     this._paint();          // état sélectionné + barre d'actions groupées
+    this._loadThumbs(wrap);  // vignettes en différé (les privées coûtent un appel)
   },
 
   _badge(f) {
@@ -76,12 +77,73 @@ const StorageUI = {
              <button onclick="StorageUI.trash('${f.id}')" title="Mettre à la corbeille">🗑</button>`}
     </div>`;
   },
+  /* Couverture d'une carte. Une vignette VISUELLE est chargée en différé
+     (data-th) : un fichier privé demande un appel authentifié, on ne veut
+     pas en déclencher un par carte pendant le rendu de la grille. */
+  _thumb(f) {
+    const p = f.preview || null;
+    const ic = this.ICONS[f.kind] || '📃';
+    if (p && p.path) return `<div class="st-th" data-th="${this._esc(f.id)}"><span>${ic}</span></div>`;
+    if (p && p.type === 'text' && p.text)
+      return `<div class="st-th st-th-tx"><span class="st-th-ic">${ic}</span><p>${this._esc(p.text)}</p></div>`;
+    if (p && p.type === 'audio')
+      return `<div class="st-th"><span>${ic}</span><b class="st-th-b">${this._dur(p.seconds)}</b></div>`;
+    if (p && p.type === 'zip')
+      return `<div class="st-th"><span>${ic}</span><b class="st-th-b">${p.entries ? p.entries + ' fichiers' : 'archive'}</b></div>`;
+    return `<div class="st-th"><span>${ic}</span></div>`;
+  },
+  _dur(s) {
+    s = Number(s) || 0; if (!s) return 'audio';
+    const m = Math.floor(s / 60), r = s % 60;
+    return m + ':' + String(r).padStart(2, '0');
+  },
+
+  /* Rattrapage : les fichiers envoyés avant cette version n'ont pas d'aperçu.
+     Contrairement à l'envoi, il faut RETÉLÉCHARGER chaque fichier pour le
+     fabriquer — c'est coûteux, donc c'est déclenché à la demande, jamais tout
+     seul, et annoncé avant de commencer. */
+  async backfill() {
+    const todo = HubFiles.list().filter(f => f.status !== 'trash' && !f.preview);
+    if (!todo.length) return showToast('Tous les fichiers ont déjà un aperçu ✓', '#2e9a63', 2500);
+    const poids = todo.reduce((n, f) => n + (f.size || 0), 0);
+    if (!confirm(`Fabriquer l'aperçu de ${todo.length} fichier(s) ?\n\n`
+      + `Chaque fichier doit être retéléchargé (${this._size(poids)} au total), puis sa vignette est `
+      + `calculée dans ton navigateur et renvoyée. Tu peux fermer la page pour arrêter.`)) return;
+
+    const btn = document.getElementById('st-backfill');
+    let ok = 0, ko = 0;
+    for (let i = 0; i < todo.length; i++) {
+      const f = todo[i];
+      if (btn) btn.textContent = `⏳ ${i + 1}/${todo.length}`;
+      try {
+        const url = await HubFiles.objectUrl(f.id);
+        const blob = await (await fetch(url)).blob();
+        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+        // Thumbs.build lit `name` pour rien, mais File garde le bon type MIME.
+        const res = await HubFiles.attachPreview(f.id, new File([blob], f.name, { type: f.mime || blob.type }));
+        res ? ok++ : ko++;
+      } catch (e) { ko++; console.warn('[backfill]', f.name, e); }
+      this.render();
+    }
+    if (btn) btn.textContent = '🖼 Aperçus manquants';
+    showToast(`${ok} aperçu(s) créé(s)` + (ko ? ` · ${ko} sans aperçu possible` : ''),
+      ok ? '#2e9a63' : '#e4b24a', 4000);
+  },
+  /** Charge les vignettes visibles après le rendu (privées incluses). */
+  _loadThumbs(root) {
+    (root || document).querySelectorAll('.st-th[data-th]').forEach(async el => {
+      if (el.dataset.done) return; el.dataset.done = '1';
+      try {
+        const url = await HubFiles.thumbUrl(el.dataset.th);
+        if (!url) return;
+        el.style.background = `url('${url}') center/cover`;
+        el.innerHTML = '';
+      } catch (e) {}
+    });
+  },
   _card(f) {
-    const thumb = (f.kind === 'image' || f.kind === 'gif') && f.visibility === 'public'
-      ? `<div class="st-th" style="background:url('${this._esc(HubFiles.publicUrl(f))}') center/cover"></div>`
-      : `<div class="st-th"><span>${this.ICONS[f.kind] || '📃'}</span></div>`;
     return `<article class="st-card${this.sel.has(f.id) ? ' on' : ''}" data-f="${this._esc(f.id)}" onclick="StorageUI.toggle('${f.id}',event)" ondblclick="StorageUI.preview('${f.id}')">
-      ${thumb}
+      ${this._thumb(f)}
       <div class="st-meta">
         <div class="st-n" title="${this._esc(f.displayName || f.name)}">${this._esc(f.displayName || f.name)}</div>
         <div class="st-s">${this._size(f.size)} · ${this._esc(f.ext || f.kind)}</div>
