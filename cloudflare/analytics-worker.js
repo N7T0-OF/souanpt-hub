@@ -5,8 +5,10 @@
  * AGRÉGATS dans Firestore via le compte de service (écritures 100% serveur —
  * aucune écriture publique n'est autorisée côté Firestore).
  *
- * Détecte le pays (request.cf.country, gratuit), l'appareil (User-Agent) et la
- * source (referrer). Déduplication des visiteurs uniques côté client (par jour).
+ * Détecte le pays (request.cf.country, gratuit) et l'appareil (User-Agent).
+ * Déduplication des visiteurs uniques côté client (par jour).
+ * Le référent n'est NI envoyé par le traqueur NI stocké (section « Sources »
+ * retirée du dashboard).
  *
  * Secrets (Settings → Variables and Secrets) — mêmes que le Worker Discord :
  *   FIREBASE_CLIENT_EMAIL  (…@souanpt-hub.iam.gserviceaccount.com)
@@ -16,7 +18,6 @@
  * Modèle écrit (lu par Cloud.loadAnalytics) :
  *   users/{uid}/analytics/summary   { views, visitors, clicks }
  *   users/{uid}/analytics/daily     { days: { 'YYYY-MM-DD': {views, visitors} } }
- *   users/{uid}/analytics/referrers { map: { direct, google, discord, … } }
  *   users/{uid}/analytics/devices   { map: { desktop, mobile, tablet } }
  *   users/{uid}/analytics/countries { map: { FR, BE, … } }  (codes ISO)
  *   users/{uid}/analytics/projects  { map: { '<titre>': {views, clicks} } }
@@ -52,18 +53,12 @@ function trimEnv(env) {
   return out;
 }
 
-function classifyRef(r) {
-  if (!r) return 'direct';
-  r = r.toLowerCase();
-  if (r.indexOf('discord') >= 0) return 'discord';
-  if (r.indexOf('behance') >= 0) return 'behance';
-  if (r.indexOf('google') >= 0) return 'google';
-  if (r.indexOf('instagram') >= 0) return 'instagram';
-  if (r.indexOf('linkedin') >= 0) return 'linkedin';
-  if (r.indexOf('youtube') >= 0 || r.indexOf('youtu.be') >= 0) return 'youtube';
-  if (r.indexOf('twitter') >= 0 || r.indexOf('//t.co') >= 0 || r.indexOf('x.com') >= 0) return 'twitter';
-  return 'other';
-}
+/* Le référent (« Sources ») n'est plus ni classé ni stocké : la section a été
+   retirée du dashboard, donc plus rien ne le consommait. On arrête de le
+   collecter — c'est la donnée la plus sensible du lot (elle révèle le parcours
+   du visiteur) et une donnée non collectée n'a besoin ni d'être protégée ni
+   d'être déclarée. Les anciens documents `referrers` restent en base : ils ne
+   sont plus alimentés ni lus. */
 function device(ua) {
   ua = ua || '';
   if (/iPad|Tablet|PlayBook|Silk/i.test(ua)) return 'tablet';
@@ -80,7 +75,6 @@ async function handleHit(request, env) {
   const day = new Date().toISOString().slice(0, 10);
   const cc = ((request.cf && request.cf.country) || 'XX').replace(/[^A-Z]/gi, '').slice(0, 2).toUpperCase() || 'XX';
   const dev = device(String(body.ua || request.headers.get('user-agent') || ''));
-  const ref = classifyRef(String(body.ref || ''));
 
   const T = [];
   if (t === 'pv') {
@@ -89,7 +83,6 @@ async function handleHit(request, env) {
     if (body.u) { summary.push(inc('visitors', 1)); daily.push(inc('days.' + fp(day) + '.visitors', 1)); }
     T.push({ name: 'summary', fields: summary });
     T.push({ name: 'daily', fields: daily });
-    T.push({ name: 'referrers', fields: [inc('map.' + ref, 1)] });
     T.push({ name: 'devices', fields: [inc('map.' + dev, 1)] });
     T.push({ name: 'countries', fields: [inc('map.' + cc, 1)] });
   } else if (t === 'pj') {

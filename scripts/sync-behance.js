@@ -45,6 +45,9 @@ async function main() {
     };
   });
 
+  // assets/ n'est plus versionné (il ne contenait qu'un JSON vide) : on le crée
+  // au besoin, sinon writeFileSync échoue en ENOENT sur un clone neuf.
+  fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(projects, null, 2));
   console.log(`[behance-sync] ${projects.length} projet(s) écrits pour @${USERNAME}.`);
 }

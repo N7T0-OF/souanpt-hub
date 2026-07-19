@@ -360,7 +360,7 @@ function edPerf() {
   // Suggestions dans la barre (avec bouton Optimiser)
   const tips = [];
   if (heavyCovers) tips.push(`🖼 ${heavyCovers} couverture(s) non optimisée(s) <button onclick="optimizeAllCovers();return false">Optimiser</button>`);
-  if (g.animLevel === 'premium') tips.push('⚡ Animations Premium activées');
+  if (g.animLevel === 'premium') tips.push('⚡ Animations intenses activées');
   if (g.layoutStyle === 'sidebar' && !g.heroImage) tips.push('🌄 Hero conseillé pour le thème latéral');
   const box = document.getElementById('ed-tips');
   if (box) box.innerHTML = tips.slice(0, 2).map(t => `<span class="ptip">${t}</span>`).join('');
@@ -623,6 +623,9 @@ function showPage(id) {
     }, 80);
     return;
   }
+  // Changer de page ferme toute couche flottante (micro-fenêtre, menu
+  // contextuel) : elle appartenait à la page qu'on quitte.
+  window.DismissLayer?.close('page');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   const page=document.getElementById('page-'+id); if(page)page.classList.add('active');

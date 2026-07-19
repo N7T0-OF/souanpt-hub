@@ -26,8 +26,8 @@ if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
 New-Item -ItemType Directory $dist | Out-Null
 
 robocopy $src $dist /E `
-  /XD .git _legacy .github cloudflare node_modules `
-  /XF deploy-cloudflare.ps1 | Out-Null
+  /XD .git .github cloudflare node_modules docs .wrangler `
+  /XF deploy-cloudflare.ps1 *.md | Out-Null
 
 Write-Host ""
 Write-Host "  Deploiement de souanpt.hub vers Cloudflare Pages (projet: $Project)..." -ForegroundColor Green

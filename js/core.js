@@ -165,6 +165,211 @@ const REPO_FILES_SUFFIX = '-hub-files';  // {username}-hub-files (fichiers PRIV�
 const FILE_BLOCKED_EXT = ['exe','msi','bat','cmd','scr','com','vbs','ps1','jar','dll'];
 const FILE_MAX_BYTES   = 25 * 1024 * 1024;   // 25 Mo : marge sûre sous la limite API GitHub
 
+/* ══════════════════════════════════════════════════════════════════════
+   Thumbs — aperçus de couverture, générés DANS LE NAVIGATEUR.
+
+   Pourquoi local : c'est gratuit et instantané. Le fichier complet est
+   déjà dans la mémoire du navigateur au moment de l'envoi, donc fabriquer
+   la vignette à ce moment-là ne coûte ni bande passante ni serveur.
+   Aucun octet ne part vers un service tiers.
+
+   Le but est de RECONNAÎTRE un fichier, pas de le reproduire : 320 px de
+   côté maximum, WebP qualité 0.62 → typiquement 8 à 25 Ko, contre
+   plusieurs Mo pour l'original. C'est ce qui remplace l'ancien affichage,
+   qui téléchargeait l'image ENTIÈRE pour remplir une case de 150 px.
+══════════════════════════════════════════════════════════════════════ */
+const THUMB_MAX = 320;
+const THUMB_Q   = 0.62;
+/* pdf.js servi par jsDelivr, qui publie le PAQUET COMPLET — pas seulement les
+   bundles JS. C'est indispensable : sans `standard_fonts/`, pdf.js ne peut pas
+   peindre un PDF dont les polices ne sont pas embarquées (le cas de la plupart
+   des CV faits sous Word ou LibreOffice) et le rendu reste bloqué sans erreur.
+   Vérifié : cdnjs ne sert ni standard_fonts/ ni cmaps/. */
+const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+const PDFJS_URL  = PDFJS_BASE + 'build/pdf.min.js';
+const PDFJS_WK   = PDFJS_BASE + 'build/pdf.worker.min.js';
+
+const Thumbs = {
+  /** Réduit un canvas/bitmap en WebP (repli PNG si le navigateur refuse). */
+  async _encode(canvas) {
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', THUMB_Q));
+    if (blob && blob.size) return { blob, ext: 'webp' };
+    const png = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    return png ? { blob: png, ext: 'png' } : null;
+  },
+  /** Dessine une source (bitmap/vidéo) réduite à THUMB_MAX. */
+  async _draw(src, sw, sh) {
+    if (!sw || !sh) return null;
+    const s = Math.min(1, THUMB_MAX / Math.max(sw, sh));
+    const w = Math.max(1, Math.round(sw * s)), h = Math.max(1, Math.round(sh * s));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(src, 0, 0, w, h);
+    const enc = await this._encode(c);
+    return enc ? { ...enc, w, h } : null;
+  },
+
+  /** Image ou GIF — pour un GIF, createImageBitmap ne garde que la 1re image. */
+  async fromImage(file) {
+    const bmp = await createImageBitmap(file);
+    try { return await this._draw(bmp, bmp.width, bmp.height); }
+    finally { bmp.close && bmp.close(); }
+  },
+
+  /** Vidéo — image extraite à ~10 % de la durée (le début est souvent noir). */
+  fromVideo(file) {
+    return new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement('video');
+      let done = false;
+      const finish = async ok => {
+        if (done) return; done = true;
+        clearTimeout(timer);
+        let out = null;
+        if (ok) { try { out = await this._draw(v, v.videoWidth, v.videoHeight); } catch (e) {} }
+        URL.revokeObjectURL(url); v.removeAttribute('src'); v.load?.();
+        resolve(out);
+      };
+      // Garde-fou : un conteneur non décodable resterait bloqué pour toujours.
+      const timer = setTimeout(() => finish(false), 12000);
+      v.muted = true; v.preload = 'metadata'; v.playsInline = true;
+      v.onloadedmetadata = () => { try { v.currentTime = Math.min(Math.max(v.duration * 0.1, 0.1), 10); } catch (e) { finish(false); } };
+      v.onseeked = () => finish(true);
+      v.onerror = () => finish(false);
+      v.src = url;
+    });
+  },
+
+  /** PDF — première page. PDF.js n'est chargé QUE si un PDF est déposé (§11). */
+  _pdfjs: null,
+  loadPdfJs() {
+    if (this._pdfjs) return this._pdfjs;
+    this._pdfjs = new Promise((resolve, reject) => {
+      if (window.pdfjsLib) return resolve(window.pdfjsLib);
+      const s = document.createElement('script');
+      s.src = PDFJS_URL;
+      s.onload = () => {
+        if (!window.pdfjsLib) return reject(new Error('pdf.js indisponible'));
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WK;
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = () => reject(new Error('pdf.js : chargement impossible'));
+      document.head.appendChild(s);
+    }).catch(e => { this._pdfjs = null; throw e; });
+    return this._pdfjs;
+  },
+  /* pdf.js peint la page via requestAnimationFrame. Or un onglet EN ARRIÈRE-PLAN
+     ne reçoit plus de rAF : le rendu ne se termine jamais. Si l'utilisateur
+     dépose un PDF puis change d'onglet, on attend simplement son retour au lieu
+     d'abandonner. (C'est aussi ce qui bloquait le rendu en test : la page de
+     test est masquée en permanence.) */
+  whenVisible(maxMs) {
+    if (!document.hidden) return Promise.resolve(true);
+    return new Promise(resolve => {
+      const done = ok => { clearTimeout(t); document.removeEventListener('visibilitychange', h); resolve(ok); };
+      const h = () => { if (!document.hidden) done(true); };
+      const t = setTimeout(() => done(false), maxMs || 120000);
+      document.addEventListener('visibilitychange', h);
+    });
+  },
+
+  async fromPdf(file) {
+    const lib = await this.loadPdfJs();
+    if (!(await this.whenVisible(120000))) throw new Error('onglet en arrière-plan : rendu PDF impossible');
+    const buf = await file.arrayBuffer();
+    const pdf = await lib.getDocument({
+      data: buf,
+      standardFontDataUrl: PDFJS_BASE + 'standard_fonts/',   // polices non embarquées
+      cMapUrl: PDFJS_BASE + 'cmaps/', cMapPacked: true,      // textes CJK / encodages exotiques
+    }).promise;
+    try {
+      const page = await pdf.getPage(1);
+      const v1 = page.getViewport({ scale: 1 });
+      const scale = Math.min(1.6, THUMB_MAX / Math.max(v1.width, v1.height));
+      const vp = page.getViewport({ scale });
+      const c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      // Fond blanc : un PDF sans fond donnerait une vignette transparente,
+      // illisible sur l'interface sombre.
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      // Le délai ne couvre QUE la peinture : l'attente de visibilité ci-dessus
+      // peut légitimement durer des minutes et ne doit pas compter dedans.
+      await this._limit(page.render({ canvasContext: ctx, viewport: vp }).promise, 20000, 'rendu PDF');
+      const enc = await this._encode(c);
+      return enc ? { ...enc, w: c.width, h: c.height, pages: pdf.numPages } : null;
+    } finally { pdf.destroy && pdf.destroy(); }
+  },
+
+  /** Durée d'un média audio (secondes), sans image. */
+  duration(file) {
+    return new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('audio');
+      const finish = d => { clearTimeout(t); URL.revokeObjectURL(url); resolve(d); };
+      const t = setTimeout(() => finish(0), 8000);
+      a.onloadedmetadata = () => finish(isFinite(a.duration) ? Math.round(a.duration) : 0);
+      a.onerror = () => finish(0);
+      a.preload = 'metadata'; a.src = url;
+    });
+  },
+
+  /** Texte — premières lignes utiles, pour reconnaître le document. */
+  async excerpt(file) {
+    const slice = file.slice(0, 8192);
+    const txt = await slice.text();
+    const lines = txt.replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+    return lines.slice(0, 4).join(' · ').slice(0, 220);
+  },
+
+  /* ZIP — nombre d'entrées lu dans le « End Of Central Directory », les
+     22 derniers octets du fichier. Aucune bibliothèque : on ne décompresse
+     rien, on lit juste un compteur. */
+  async zipCount(file) {
+    try {
+      const tail = new DataView(await file.slice(Math.max(0, file.size - 66000)).arrayBuffer());
+      for (let i = tail.byteLength - 22; i >= 0; i--) {
+        if (tail.getUint32(i, true) === 0x06054b50) return tail.getUint16(i + 10, true);
+      }
+    } catch (e) {}
+    return 0;
+  },
+
+  /* Abandonne au bout de N ms. Un fichier corrompu ou un décodeur qui part en
+     boucle ne doit pas laisser une promesse en suspens pour toujours : un PDF
+     malformé suffit à bloquer pdf.js, et l'aperçu est un bonus, pas un dû. */
+  _limit(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('délai dépassé : ' + label)), ms)),
+    ]);
+  },
+
+  /** Point d'entrée : fabrique l'aperçu adapté au type. Jamais d'exception. */
+  async build(file, kind, ext) {
+    try {
+      const T = (p, ms, l) => this._limit(p, ms, l);
+      if (kind === 'image' || kind === 'gif') {
+        const r = await T(this.fromImage(file), 15000, 'image');
+        return r && { type: 'thumbnail', ...r };
+      }
+      if (kind === 'video') {
+        const r = await this.fromVideo(file);          // garde-fou interne (12 s)
+        return r && { type: 'thumbnail', ...r };
+      }
+      // Pas de délai global ici : fromPdf peut attendre le retour de l'onglet,
+      // et borne lui-même la phase de peinture.
+      if (ext === 'pdf') {
+        const r = await this.fromPdf(file);
+        return r && { type: 'thumbnail', ...r };
+      }
+      if (kind === 'audio')                            return { type: 'audio', seconds: await this.duration(file) };
+      if (['txt','md','csv','json','srt','log'].includes(ext)) return { type: 'text', text: await T(this.excerpt(file), 10000, 'texte') };
+      if (['zip','cbz'].includes(ext))                 return { type: 'zip', entries: await this.zipCount(file) };
+    } catch (e) { console.warn('[thumbs] ' + (ext || kind), e); }
+    return null;   // pas d'aperçu possible → l'icône de type suffit
+  },
+};
+
 const HubFiles = {
   KEY: 'hub_files',
   list()      { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch { return []; } },
@@ -251,6 +456,9 @@ const HubFiles = {
       createdAt: Date.now(), updatedAt: Date.now(), status: 'active',
     };
     const l = this.list(); l.push(meta); this._save(l);
+    // L'aperçu est fabriqué APRÈS coup, sans bloquer : si sa génération ou
+    // son envoi échoue, le fichier est déjà en sécurité sur GitHub.
+    this.attachPreview(meta.id, file).catch(() => {});
     return meta;
   },
 
@@ -289,9 +497,88 @@ const HubFiles = {
     if (oldSha) await GH.api(token, `/repos/${meta.owner}/${oldRepo}/contents/${meta.path}`, {
       method: 'DELETE', body: JSON.stringify({ message: 'move out: ' + meta.name, sha: oldSha }),
     }).catch(() => {});
+    // La vignette DOIT suivre : laissée dans le dépôt public, la première
+    // page d'un document redevenu privé resterait lisible par tout le monde.
+    if (meta.preview && meta.preview.path) {
+      try {
+        const tp = meta.preview.path;
+        const t = await GH.api(token, `/repos/${meta.owner}/${oldRepo}/contents/${tp}`);
+        await GH.api(token, `/repos/${target.owner}/${target.repo}/contents/${tp}`, {
+          method: 'PUT', body: JSON.stringify({ message: 'move thumb: ' + meta.name, content: String(t.content || '').replace(/\n/g, '') }),
+        });
+        await GH.api(token, `/repos/${meta.owner}/${oldRepo}/contents/${tp}`, {
+          method: 'DELETE', body: JSON.stringify({ message: 'move thumb out: ' + meta.name, sha: t.sha }),
+        }).catch(() => {});
+      } catch (e) {
+        // Impossible de déplacer l'aperçu : on l'oublie plutôt que de risquer
+        // qu'il reste visible côté public ou qu'il pointe dans le vide.
+        console.warn('[thumb] déplacement', e);
+        delete meta.preview;
+      }
+    }
     meta.repo = target.repo; meta.visibility = visibility; meta.updatedAt = Date.now();
     this._save(this.list().map(f => f.id === id ? meta : f));
     return meta;
+  },
+
+  /* ══ Aperçus de couverture ══════════════════════════════════════════
+     La vignette vit dans LE MÊME DÉPÔT que son fichier. C'est essentiel :
+     la première page d'un CV privé est une donnée privée. La déposer dans
+     le dépôt public reviendrait à publier le document tout en le croyant
+     protégé. Elle suit donc le fichier quand il change de visibilité, et
+     disparaît avec lui.                                                   */
+  _thumbPath(meta, ext) { return 'thumbs/' + meta.id + '.' + (ext || 'webp'); },
+
+  /** Génère l'aperçu et le stocke. Ne lève jamais : un aperçu est un bonus. */
+  async attachPreview(id, file) {
+    const meta = this.get(id); if (!meta) return null;
+    const p = await Thumbs.build(file, meta.kind, meta.ext);
+    if (!p) return null;
+    const preview = { type: p.type, generatedAt: Date.now() };
+    if (p.type === 'thumbnail' && p.blob) {
+      try {
+        const token = Auth.token(); if (!token) throw new Error('GitHub non connecté');
+        const path = this._thumbPath(meta, p.ext);
+        const u8 = new Uint8Array(await p.blob.arrayBuffer());
+        const sha = await GH.fileSha(token, meta.owner, meta.repo, path);   // régénération
+        await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${path}`, {
+          method: 'PUT',
+          body: JSON.stringify({ message: 'thumb: ' + meta.name, content: GH.b64encBytes(u8), ...(sha ? { sha } : {}) }),
+        });
+        Object.assign(preview, { path, width: p.w, height: p.h, sizeBytes: p.blob.size });
+        if (p.pages) preview.pages = p.pages;
+      } catch (e) { console.warn('[thumb] envoi', e); return null; }
+    } else {
+      // Aperçus non visuels : quelques octets de métadonnée, aucun fichier.
+      if (p.seconds !== undefined) preview.seconds = p.seconds;
+      if (p.text    !== undefined) preview.text    = p.text;
+      if (p.entries !== undefined) preview.entries = p.entries;
+    }
+    const cur = this.get(id); if (!cur) return null;
+    cur.preview = preview;
+    this._save(this.list().map(f => f.id === id ? cur : f));
+    return preview;
+  },
+
+  /** URL affichable de la vignette. Fichier privé → récupérée avec le jeton. */
+  _thumbCache: {},
+  async thumbUrl(id) {
+    const meta = this.get(id);
+    if (!meta || !meta.preview || !meta.preview.path) return '';
+    if (meta.visibility === 'public') {
+      return `https://${String(meta.owner).toLowerCase()}.github.io/${meta.repo}/${meta.preview.path}`;
+    }
+    // Privé : passe par l'API authentifiée. Mis en cache pour la session,
+    // sinon chaque rendu de la grille relancerait un appel par fichier.
+    const key = meta.id + ':' + meta.preview.generatedAt;
+    if (this._thumbCache[key]) return this._thumbCache[key];
+    const token = Auth.token(); if (!token) return '';
+    try {
+      const res = await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.preview.path}`);
+      const url = 'data:image/webp;base64,' + String(res.content || '').replace(/\n/g, '');
+      this._thumbCache[key] = url;
+      return url;
+    } catch (e) { return ''; }
   },
 
   /** Ouvre un fichier PRIVÉ : récupéré avec le jeton, jamais exposé publiquement. */
@@ -338,6 +625,14 @@ const HubFiles = {
       if (sha) await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`, {
         method: 'DELETE', body: JSON.stringify({ message: 'delete: ' + meta.name, sha }),
       }).catch(() => {});
+      // La vignette part avec le fichier : sinon la 1re page d'un document
+      // supprimé resterait consultable dans le dépôt.
+      if (meta.preview && meta.preview.path) {
+        const ts = await GH.fileSha(token, meta.owner, meta.repo, meta.preview.path);
+        if (ts) await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.preview.path}`, {
+          method: 'DELETE', body: JSON.stringify({ message: 'delete thumb: ' + meta.name, sha: ts }),
+        }).catch(() => {});
+      }
     }
     this._save(this.list().filter(f => f.id !== id));
   },
@@ -380,9 +675,21 @@ const SiteConfig = {
     behance: '', email: '', repo: '',
     sections: { projects: true, avis: true, contact: true, about: true },
     sectionOrder: ['about', 'projects', 'avis', 'contact'],
+    // Personnalisation des sections. Vide = on garde les valeurs d'origine
+    // (voir SEC_DEFAULTS) : un site déjà publié ne change pas d'apparence.
+    // Par section : { title, heading, desc, icon, showTitle, showDesc }
+    sectionMeta: {},
     avisMode: 'defile',
     about: '', goatcounter: '',
     layoutStyle: 'float', heroImage: '', projectsLimit: 0,
+    // Bannière du thème Latérale : action au clic (voir heroLinkHref).
+    // { type:'none'|'url'|'section'|'project'|'file'|'contact', url, section, projectId, blank }
+    heroLink: { type: 'none' },
+    // Moyens de contact. RIEN n'est publié sans `on: true` : une valeur saisie
+    // puis désactivée n'apparaît pas dans le HTML généré.
+    // [{ id:'email'|'discord'|'whatsapp'|'phone'|'telegram', on, value, label?, icon?, color? }]
+    contactMethods: null,          // null = retombe sur l'email seul (compat)
+    contactVariant: 'boutons',     // boutons · liste · cartes · icones · barre
     animLevel: 'smooth', fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
@@ -597,8 +904,48 @@ function migrateBlocksSummary(cfg, projects, links) {
    SITE GENERATOR — navbar style haunt.gg + projets cliquables + avis visiteurs
 ══════════════════════════════════════════════════════ */
 /** Rendu de la grille Bento depuis les blocs. Conserve data-p / data-l pour l'analytics. */
+/* ══════════════════════════════════════════════════════════════
+   Moyens de contact — registre unique (générateur + éditeur).
+
+   `href(valeur)` renvoie null quand la valeur ne permet pas de construire
+   une destination : on n'affiche alors PAS le moyen, plutôt qu'un lien
+   mort. Aucun de ces liens n'expose de donnée que l'utilisateur n'a pas
+   explicitement activée.
+══════════════════════════════════════════════════════════════ */
+const CONTACT_KINDS = {
+  email: {
+    label: 'Email', icon: '✉', color: '#C8FF00', placeholder: 'toi@exemple.fr',
+    href: v => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? 'mailto:' + v : null,
+  },
+  discord: {
+    label: 'Discord', icon: '🎮', color: '#5865F2', placeholder: 'discord.gg/xxxx ou pseudo',
+    // Un pseudo Discord n'est pas cliquable : on ne fabrique un lien que
+    // pour une vraie invitation, sinon le moyen ne s'affiche pas.
+    href: v => /discord\.(gg|com)\//i.test(v) ? (/^https?:/i.test(v) ? v : 'https://' + v.replace(/^\/+/, '')) : null,
+  },
+  whatsapp: {
+    label: 'WhatsApp', icon: '💬', color: '#25D366', placeholder: '+33 6 12 34 56 78',
+    href: v => { const d = v.replace(/[^\d]/g, ''); return d.length >= 8 ? 'https://wa.me/' + d : null; },
+  },
+  phone: {
+    label: 'Téléphone', icon: '📞', color: '#38bdf8', placeholder: '+33 6 12 34 56 78',
+    href: v => { const d = v.replace(/[^\d+]/g, ''); return d.length >= 6 ? 'tel:' + d : null; },
+  },
+  telegram: {
+    label: 'Telegram', icon: '✈', color: '#2AABEE', placeholder: '@pseudo',
+    href: v => { const u = v.replace(/^@/, '').replace(/^https?:\/\/t\.me\//i, ''); return u ? 'https://t.me/' + u : null; },
+  },
+};
+const CONTACT_ORDER = ['email', 'discord', 'whatsapp', 'phone', 'telegram'];
+
 function renderBentoGrid(blocks, ctx) {
   const { cfg, projects, links, approved, GRADS, editor } = ctx;
+  // Bento n'a pas de <section> : ce sont les BLOCS qui portent les titres. On
+  // reçoit quand même le résolveur de noms de sections pour que renommer
+  // « Portfolio » dans ☰ Sections se voie AUSSI ici, et pas seulement dans
+  // les thèmes Flottante et Latérale.
+  const sT = ctx.secTitle || (k => k);
+  const sTOr = ctx.secTitleOr || ((k, f) => f);
   const P = id => projects.find(p => String(p.id) === String(id));
   const L = id => links.find(l => String(l.id) === String(id));
   const platIcon = (t, u) => {
@@ -630,7 +977,9 @@ function renderBentoGrid(blocks, ctx) {
         ${cfg.bio ? `<p class="bn-bio">${esc(cfg.bio)}</p>` : ''}`);
     if (b.type === 'text') {
       const pr = bProps(b);
-      return cell(b, `${pr.title ? `<div class="bn-t">${esc(pr.title)}</div>` : ''}<p class="bn-txt">${esc(pr.text || '').replace(/\n/g, '<br>')}</p>`);
+      // b_about EST la section « À propos » : son titre suit ☰ Sections.
+      const t = b.id === 'b_about' ? sT('about') : pr.title;
+      return cell(b, `${t ? `<div class="bn-t">${esc(t)}</div>` : ''}<p class="bn-txt">${esc(pr.text || '').replace(/\n/g, '<br>')}</p>`);
     }
     if (b.type === 'link') {
       const l = L(bRef(b)); if (!l) return '';
@@ -646,13 +995,24 @@ function renderBentoGrid(blocks, ctx) {
     }
     if (b.type === 'reviews') {
       if (!approved.length) return '';
-      return cell(b, `<div class="bn-t">★ Avis</div><div class="bn-rv">${approved.slice(0, 3).map(r =>
+      return cell(b, `<div class="bn-t">★ ${esc(sTOr('avis', 'Avis'))}</div><div class="bn-rv">${approved.slice(0, 3).map(r =>
         `<div class="bn-rvi"><b>${esc(r.author)}</b> <span class="bn-st">${'★'.repeat(r.rating || 5)}</span><p>${esc(r.text)}</p></div>`).join('')}</div>`);
     }
     if (b.type === 'contact') {
-      if (!cfg.email) return '';
-      return cell(b, `<span class="bn-ic">✉</span><div class="bn-t">Me contacter</div><div class="bn-sub">${esc(cfg.email)}</div>`,
-        ` onclick="location.href='mailto:${esc(cfg.email)}'"`);
+      // Bento : une carte compacte listant les moyens ACTIVÉS. Le premier sert
+      // de destination au clic sur la carte ; les autres restent cliquables.
+      const cl = ctx.contactList ? ctx.contactList() : [];
+      if (!cl.length) return '';
+      const first = cl[0];
+      const rest = cl.slice(1);
+      return cell(b, `<span class="bn-ic">${esc(first.icon)}</span>
+        <div class="bn-t">${esc(sTOr('contact', 'Me contacter'))}</div>
+        <div class="bn-sub">${esc(first.value)}</div>
+        ${rest.length ? `<div class="bn-ct">${rest.map(it =>
+          `<a href="${esc(it.href)}"${it.blank ? ' target="_blank" rel="noopener noreferrer"' : ''}
+              title="${esc(it.label)}" aria-label="${esc(it.label)}"
+              style="--ct:${esc(it.color)}" onclick="event.stopPropagation()">${esc(it.icon)}</a>`).join('')}</div>` : ''}`,
+        ` onclick="location.href='${esc(first.href)}'"`);
     }
     if (b.type === 'file') {
       // Bloc Document / CV — l'URL est figée dans le bloc à la création : le site
@@ -707,6 +1067,36 @@ function generateSite(cfg, projects, reviews, opts) {
   const links       = getLinks();
   const blocks      = getBlocks(cfg, projects, links);   // même modèle pour tous les styles
   const heroImage   = String(cfg.heroImage || '').trim();
+  /* ── Bannière cliquable (thème Latérale) ──────────────────────────────
+     Résout l'action configurée en une simple destination. Retourne null si
+     aucune action : la bannière reste alors un <div>, sans curseur main ni
+     rôle de lien — une bannière « cliquable » qui ne mène nulle part est
+     pire que pas de lien du tout.
+     Dans l'éditeur, le clic est neutralisé en amont (mode Édition) : le lien
+     ne s'active qu'en Aperçu et sur le site publié.                        */
+  const heroLinkHref = () => {
+    const L = cfg.heroLink || {};
+    const t = L.type || 'none';
+    if (t === 'none') return null;
+    if (t === 'url') {
+      const u = String(L.url || '').trim();
+      if (!u) return null;
+      // Une URL sans schéma ne doit pas devenir un lien relatif cassé.
+      return /^(https?:|mailto:|tel:)/i.test(u) ? u : 'https://' + u;
+    }
+    if (t === 'section') return SEC_KEYS.includes(L.section) ? '#' + L.section : null;
+    if (t === 'project') {
+      const p = projects.find(x => String(x.id) === String(L.projectId));
+      return p && p.url ? String(p.url) : null;
+    }
+    if (t === 'file')    return String(L.url || '').trim() || null;
+    if (t === 'contact') return cfg.email ? 'mailto:' + cfg.email : '#contact';
+    return null;
+  };
+  const heroHref = heroLinkHref();
+  // Nouvel onglet uniquement pour ce qui sort du site (jamais pour une ancre).
+  const heroBlank = heroHref && !heroHref.startsWith('#')
+    && (cfg.heroLink || {}).blank !== false && !heroHref.startsWith('mailto:');
   const projLimit   = parseInt(cfg.projectsLimit) || 0;   // 0 = tous
   const hiddenCount = projLimit && projects.length > projLimit ? projects.length - projLimit : 0;
   const animLevel   = cfg.animLevel || 'smooth';
@@ -743,14 +1133,87 @@ function generateSite(cfg, projects, reviews, opts) {
     ? `<div class="mq"><div class="mqtrack" style="animation-duration:${Math.max(20, approved.length*7)}s">${mqHalf}${mqHalf}</div></div>`
     : `<div class="rg">${reviewCards}</div>`;
 
-  // ── Sections modulaires : visibilité + ordre pilotés par l'éditeur ──
-  const SEC_LABELS = { about: 'À propos', projects: 'Projets', avis: 'Avis', contact: 'Contact' };
-  const SEC_ICONS  = { about: '◈', projects: '▦', avis: '★', contact: '✉' };
+  // ── Sections modulaires : nom, description, icône, visibilité, ordre ──
+  // Les noms ne sont plus imposés : `cfg.sectionMeta` peut redéfinir chaque
+  // champ. Ce qui n'est PAS redéfini retombe sur ces valeurs d'origine, donc
+  // un site publié avant cette version s'affiche exactement pareil.
+  const SEC_DEFAULTS = {
+    about:    { title: 'À propos',    heading: 'Qui suis-je ?',        icon: '◈' },
+    projects: { title: 'Portfolio',   heading: 'Mes projets',          icon: '▦' },
+    avis:     { title: 'Témoignages', heading: 'Avis clients',         icon: '★' },
+    contact:  { title: 'Contact',     heading: 'Travaillons ensemble', icon: '✉' },
+  };
+  const meta = k => ({ ...(SEC_DEFAULTS[k] || {}), ...((cfg.sectionMeta || {})[k] || {}) });
+  const secTitle = k => String(meta(k).title || SEC_DEFAULTS[k]?.title || k);
+  /* Titre PERSONNALISÉ s'il existe, sinon le libellé d'origine passé en second
+     argument. Sert aux endroits (cartes Bento) dont le texte par défaut diffère
+     du nom de la section — « Me contacter » plutôt que « Contact » — pour ne pas
+     changer l'apparence d'un site que personne n'a renommé. */
+  const secTitleOr = (k, fallback) => {
+    const custom = ((cfg.sectionMeta || {})[k] || {}).title;
+    return String(custom || fallback);
+  };
+  const secIcon  = k => String(meta(k).icon || '•');
+  /** En-tête d'une section : surtitre + titre + description, chacun masquable. */
+  const secHead = k => {
+    const m = meta(k);
+    const head = m.showTitle === false ? '' :
+      `<div class="sl">${esc(m.title || '')}</div><h2>${esc(m.heading || m.title || '')}</h2>`;
+    const desc = (m.showDesc === false || !String(m.desc || '').trim()) ? ''
+      : `<p class="ssub">${esc(String(m.desc)).replace(/\n/g, '<br>')}</p>`;
+    return head + desc;
+  };
+
+  /* ══ Moyens de contact ═══════════════════════════════════════════════
+     Rien n'est publié sans activation explicite : un moyen dont `on` n'est
+     pas vrai n'est PAS rendu, et sa valeur n'apparaît nulle part dans le
+     HTML généré. Un numéro de téléphone saisi puis désactivé ne fuite donc
+     pas dans le code source de la page.                                   */
+  const contactList = () => {
+    const conf = Array.isArray(cfg.contactMethods) ? cfg.contactMethods : null;
+    // Config absente (site d'avant cette version) : on retombe sur l'email
+    // seul, exactement ce qui était affiché auparavant.
+    const src = conf || (cfg.email ? [{ id: 'email', on: true, value: cfg.email }] : []);
+    return src
+      .filter(m => m && m.on === true && String(m.value || '').trim())
+      .map(m => {
+        const k = CONTACT_KINDS[m.id]; if (!k) return null;
+        const v = String(m.value).trim();
+        const href = k.href(v);
+        if (!href) return null;
+        return {
+          href, label: String(m.label || k.label), icon: String(m.icon || k.icon),
+          color: String(m.color || k.color), value: v,
+          blank: !/^(mailto:|tel:)/.test(href),
+        };
+      })
+      .filter(Boolean);
+  };
+  const contactHtml = () => {
+    const items = contactList();
+    if (!items.length) return '';
+    const variant = ['boutons', 'liste', 'cartes', 'icones', 'barre'].includes(cfg.contactVariant)
+      ? cfg.contactVariant : 'boutons';
+    const a = (it, inner, extra) =>
+      `<a class="ct-i" href="${esc(it.href)}"${it.blank ? ' target="_blank" rel="noopener noreferrer"' : ''}` +
+      ` style="--ct:${esc(it.color)}"${extra || ''}>${inner}</a>`;
+    const body = items.map(it => {
+      const ic = `<span class="ct-ic">${esc(it.icon)}</span>`;
+      if (variant === 'icones') return a(it, ic, ` title="${esc(it.label)}" aria-label="${esc(it.label)}"`);
+      if (variant === 'cartes') return a(it, `${ic}<span class="ct-l">${esc(it.label)}</span><span class="ct-v">${esc(it.value)}</span>`);
+      if (variant === 'liste')  return a(it, `${ic}<span class="ct-l">${esc(it.label)}</span><span class="ct-v">${esc(it.value)}</span>`);
+      return a(it, `${ic}<span class="ct-l">${esc(it.label)}</span>`);   // boutons & barre
+    }).join('');
+    return `<div class="ct ct-${variant}">${body}</div>`;
+  };
+  // Compat : le reste du générateur lit encore ces tables.
+  const SEC_LABELS = {}; const SEC_ICONS = {};
+  ['about', 'projects', 'avis', 'contact'].forEach(k => { SEC_LABELS[k] = secTitle(k); SEC_ICONS[k] = secIcon(k); });
   const tagList = [...new Set(projects.flatMap(p => (p.tags || []).slice(0, 3)).filter(Boolean))].slice(0, 8);
   const secHtml = {
-    about: `<section id="about" class="rev" style="max-width:760px"><div class="sl">À propos</div><h2>Qui suis-je ?</h2><p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
-    projects: `<section id="projects" class="rev"><div class="prow"><div><div class="sl">Portfolio</div><h2 style="margin-bottom:0">Mes projets</h2></div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div><div class="pg" style="margin-top:20px">${cards}</div></section>`,
-    avis: `<section id="avis" class="rev"><div class="sl">Témoignages</div><h2>Avis clients</h2>
+    about: `<section id="about" class="rev" style="max-width:760px">${secHead('about')}<p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
+    projects: `<section id="projects" class="rev"><div class="prow"><div>${secHead('projects')}</div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div><div class="pg" style="margin-top:20px">${cards}</div></section>`,
+    avis: `<section id="avis" class="rev">${secHead('avis')}
   ${avisDisplay}
   <div class="leave">
     ${repoFull?`<button class="bg" onclick="document.getElementById('revform').classList.toggle('open')">✎ Laisser un avis</button>
@@ -765,7 +1228,9 @@ function generateSite(cfg, projects, reviews, opts) {
     </form>`:''}
   </div>
 </section>`,
-    contact: `<section id="contact" class="ci rev"><div class="sl">Contact</div><h2>Travaillons ensemble</h2><div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>`,
+    contact: `<section id="contact" class="ci rev">${secHead('contact')}${contactHtml()}${
+      behanceUser ? `<div class="ctas" style="margin-top:16px"><a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" rel="noopener noreferrer" class="bg">Behance →</a></div>` : ''
+    }</section>`,
   };
   /* Corps des styles Flottante & Latérale rendu DEPUIS LES BLOCS (même moteur que
      Bento) : un bloc texte créé via la palette apparaît donc AUSSI ici, dans
@@ -780,6 +1245,10 @@ function generateSite(cfg, projects, reviews, opts) {
     return blocks.filter(b => editor || !bHidden(b)).map(b => {
       if (b.type === 'profile' || b.type === 'link') return '';        // hero + nav
       if (b.type === 'project') { if (projectsShown || !sec.projects) return ''; projectsShown = true; return secHtml.projects; }
+      // « À propos » est un bloc texte particulier : c'est LA section about.
+      // Sans ce cas, son titre viendrait des props du bloc (figées à
+      // « À propos ») et la renommer dans ☰ Sections n'aurait aucun effet.
+      if (b.id === 'b_about') return sec.about ? secHtml.about : '';
       if (b.type === 'text')    return flowText(b);
       if (b.type === 'file') {
         const p = bProps(b); if (!p.url) return '';
@@ -829,6 +1298,31 @@ h1{font-size:clamp(40px,7vw,76px);font-weight:800;letter-spacing:-2px;line-heigh
 section{padding:48px 32px;max-width:1100px;margin:0 auto}
 .sl{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--a);margin-bottom:8px}
 h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
+/* Description de section (facultative). La marge négative rattrape celle du h2
+   pour rapprocher la description de son titre, sans dépendre de :has(). */
+.ssub{font-size:13px;color:var(--m);line-height:1.7;max-width:640px;margin:-16px 0 26px}
+/* ── MOYENS DE CONTACT (5 présentations) ── */
+.ct{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.ct-i{display:inline-flex;align-items:center;gap:9px;text-decoration:none;color:var(--t);
+  border:1px solid var(--b2);border-radius:12px;padding:12px 16px;transition:.2s;background:var(--s1)}
+.ct-i:hover{border-color:var(--ct);color:var(--ct);transform:translateY(-2px)}
+.ct-i:focus-visible{outline:2px solid var(--ct);outline-offset:2px}
+.ct-ic{font-size:16px;line-height:1}
+.ct-l{font-size:13px;font-weight:700}
+.ct-v{font-size:12px;color:var(--m)}
+.ct-liste{flex-direction:column;gap:6px}
+.ct-liste .ct-i{width:100%;padding:9px 13px;border-radius:10px}
+.ct-liste .ct-v{margin-left:auto}
+.ct-cartes{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.ct-cartes .ct-i{flex-direction:column;align-items:flex-start;gap:5px;padding:18px}
+.ct-cartes .ct-ic{font-size:22px}
+.ct-icones .ct-i{padding:0;width:46px;height:46px;justify-content:center;border-radius:50%}
+.ct-icones .ct-ic{font-size:19px}
+.ct-barre{flex-wrap:nowrap;overflow-x:auto;gap:8px;padding-bottom:4px}
+.ct-barre .ct-i{flex:0 0 auto;padding:10px 14px}
+@media(max-width:600px){.ct-cartes{grid-template-columns:1fr}}
+.prow h2{margin-bottom:0}
+.prow .ssub{margin:6px 0 0}
 /* ── PROJETS ── */
 .pg{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:16px}
 .pc{background:var(--s);border:1px solid var(--b);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .25s;position:relative}
@@ -922,6 +1416,11 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .bn-t{font-size:14px;font-weight:800;letter-spacing:-.2px;color:var(--t)}
 .bn-sub{font-size:11px;color:${mutedC};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bn-txt{font-size:12px;line-height:1.7;color:${mutedC}}
+/* Moyens de contact secondaires dans la carte Bento */
+.bn-ct{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.bn-ct a{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
+  border:1px solid var(--b2);font-size:12px;text-decoration:none;transition:.18s}
+.bn-ct a:hover{border-color:var(--ct);transform:translateY(-1px)}
 .bn-ic{font-size:22px;line-height:1}
 .bn-av{width:52px;height:52px;border-radius:50%;background:var(--a);color:#060606;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;font-family:'Syne',sans-serif}
 .bn-htag{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--a)}
@@ -979,6 +1478,10 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .sb-hero{border-radius:14px;min-height:min(56vh,420px);display:flex;align-items:flex-end;padding:34px;position:relative;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35)}
 .sb-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,.72))}
 .sb-hero-in{position:relative;z-index:1}
+/* Bannière cliquable : seul cas où le curseur devient une main. */
+.sb-hero-link{cursor:pointer;text-decoration:none;transition:transform .25s ease,box-shadow .25s ease}
+.sb-hero-link:hover{transform:translateY(-3px);box-shadow:0 26px 60px rgba(0,0,0,.45)}
+.sb-hero-link:focus-visible{outline:3px solid var(--a);outline-offset:3px}
 .sb-hero-in .htag{color:#fff;opacity:.85}
 .sb-hero-in h1{color:#fff;font-size:clamp(34px,5vw,60px)}
 .sb-hero-in .hsub{color:rgba(255,255,255,.8);margin-bottom:0}
@@ -992,7 +1495,7 @@ ${layoutStyle === 'bento' ? `
     <div class="nl"></div>
     ${cfg.email ? `<a class="ncta" href="mailto:${esc(cfg.email)}">Me contacter</a>` : ''}
   </nav></div>
-  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor })}
+  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor, secTitle, secTitleOr, contactList })}
   <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
 </div>` : layoutStyle === 'sidebar' ? `
 <div class="sb-wrap" id="sbw">
@@ -1006,9 +1509,11 @@ ${layoutStyle === 'bento' ? `
     ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
   </aside>
   <main class="sb-main">
-    <div class="sb-hero" data-b="b_profile" data-no-drag style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
+    <${heroHref ? 'a' : 'div'} class="sb-hero${heroHref ? ' sb-hero-link' : ''}" data-b="b_profile" data-no-drag${
+        heroHref ? ` href="${esc(heroHref)}"${heroBlank ? ' target="_blank" rel="noopener noreferrer"' : ''}` : ''
+      } style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
       <div class="sb-hero-in"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}</h1><p class="hsub">${esc(cfg.bio)}</p></div>
-    </div>
+    </${heroHref ? 'a' : 'div'}>
     ${bodySections}
     <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
   </main>
@@ -1087,7 +1592,7 @@ ${fx.mouseglow?`
   });`:''}
 }`:''}
 </script>
-${cfg.ownerUid ? `<script>(function(){var U=${JSON.stringify(String(cfg.ownerUid))},EP=${JSON.stringify(ANALYTICS_URL)};if(!U||location.protocol.indexOf('http')!==0||location.hostname==='localhost'||location.hostname==='127.0.0.1'){return;}var td=new Date().toISOString().slice(0,10),vid,ld,uq=true;try{vid=localStorage.getItem('_shv');if(!vid){vid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('_shv',vid);}ld=localStorage.getItem('_shd');uq=ld!==td;localStorage.setItem('_shd',td);}catch(e){}function S(p){p.uid=U;try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon(EP,b);}else{fetch(EP,{method:'POST',body:b,keepalive:true,mode:'no-cors'});}}catch(e){}}S({t:'pv',u:uq?1:0,ref:document.referrer||'',ua:navigator.userAgent});var seen={};try{var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){var t=en.target.getAttribute('data-p');if(t){seen[t]=1;}io.unobserve(en.target);}});},{threshold:.5});document.querySelectorAll('[data-p]').forEach(function(el){io.observe(el);});}catch(e){}function F(){var ps=Object.keys(seen);if(ps.length){S({t:'pj',projects:ps});seen={};}}setTimeout(F,4500);addEventListener('pagehide',F);document.querySelectorAll('[data-p]').forEach(function(el){el.addEventListener('click',function(){var t=el.getAttribute('data-p');if(t){S({t:'click',project:t});}});});})();</script>` : ''}
+${cfg.ownerUid ? `<script>(function(){var U=${JSON.stringify(String(cfg.ownerUid))},EP=${JSON.stringify(ANALYTICS_URL)};if(!U||location.protocol.indexOf('http')!==0||location.hostname==='localhost'||location.hostname==='127.0.0.1'){return;}var td=new Date().toISOString().slice(0,10),vid,ld,uq=true;try{vid=localStorage.getItem('_shv');if(!vid){vid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('_shv',vid);}ld=localStorage.getItem('_shd');uq=ld!==td;localStorage.setItem('_shd',td);}catch(e){}function S(p){p.uid=U;try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon(EP,b);}else{fetch(EP,{method:'POST',body:b,keepalive:true,mode:'no-cors'});}}catch(e){}}S({t:'pv',u:uq?1:0,ua:navigator.userAgent});var seen={};try{var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){var t=en.target.getAttribute('data-p');if(t){seen[t]=1;}io.unobserve(en.target);}});},{threshold:.5});document.querySelectorAll('[data-p]').forEach(function(el){io.observe(el);});}catch(e){}function F(){var ps=Object.keys(seen);if(ps.length){S({t:'pj',projects:ps});seen={};}}setTimeout(F,4500);addEventListener('pagehide',F);document.querySelectorAll('[data-p]').forEach(function(el){el.addEventListener('click',function(){var t=el.getAttribute('data-p');if(t){S({t:'click',project:t});}});});})();</script>` : ''}
 </body></html>`;
 }
 

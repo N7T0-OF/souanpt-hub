@@ -1,4 +1,40 @@
-﻿
-.wrangler/
+# ── Dépendances & build ──
 node_modules/
+dist/
+build/
+.cache/
+.temp/
+tmp/
+coverage/
 
+# ── Outils ──
+.wrangler/
+.vscode/
+.idea/
+
+# ── Secrets — ne JAMAIS committer ──
+# NB : firebase/firebase-config.js EST volontairement versionné. Les clés Web
+# Firebase sont publiques par conception (elles partent dans le navigateur de
+# chaque visiteur) ; la sécurité vient des règles Firestore, pas de leur secret.
+# Les VRAIS secrets (private_key du compte de service, client_secret Discord)
+# ne vivent QUE dans les secrets Cloudflare Workers, jamais dans un fichier.
+.env
+.env.*
+!.env.example
+*-adminsdk-*.json
+*serviceAccount*.json
+*.pem
+*.key
+
+# ── Fichiers utilisateurs (ils vivent dans les dépôts de stockage, pas ici) ──
+uploads/
+local-storage/
+generated-previews/
+
+# ── Divers ──
+*.log
+*.bak
+*.tmp
+*.orig
+.DS_Store
+Thumbs.db

@@ -5,6 +5,28 @@ Cette page conserve les avis de copyright et les licences applicables.
 
 ---
 
+## PDF.js
+
+- **Copyright** © Mozilla Foundation et les contributeurs de PDF.js
+- **Licence** : Apache License 2.0
+- **Source** : https://github.com/mozilla/pdf.js
+
+Utilisé pour fabriquer la **miniature de la première page** d'un PDF, dans le
+navigateur de l'utilisateur. Le fichier n'est envoyé à aucun service tiers.
+
+Aucun fichier de PDF.js n'est distribué dans ce dépôt : la bibliothèque est
+chargée **à la demande** depuis jsDelivr (`pdfjs-dist@3.11.174`), uniquement
+lorsqu'un PDF est déposé. Aucune autre page du hub ne la charge.
+
+> jsDelivr est utilisé plutôt que cdnjs parce qu'il publie le **paquet npm
+> complet**, y compris `standard_fonts/` et `cmaps/`. Sans ces ressources,
+> PDF.js ne peut pas dessiner un PDF dont les polices ne sont pas embarquées —
+> le cas de la plupart des CV produits par Word ou LibreOffice.
+
+Texte complet de la licence : https://www.apache.org/licenses/LICENSE-2.0
+
+---
+
 ## OpenBento
 
 - **Copyright** © 2025 Yoan Bernabeu et les contributeurs d'OpenBento

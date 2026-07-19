@@ -9,7 +9,7 @@ SOUANPT.HUB V2
 
 Cloudflare  ★ PLATEFORME PRINCIPALE
 ├── Pages    → héberge le hub (frontend)
-├── Workers  → API & fonctions serveur (relais Discord, Stripe Premium…)
+├── Workers  → API & fonctions serveur (relais Discord, statistiques…)
 ├── DNS      → domaine personnalisé (hub.souanpt.fr, souanpt.app…)
 └── CDN/SSL  → cache, performances, sécurité
 
@@ -54,8 +54,7 @@ hub/
 ├── js/
 │   ├── core.js     # GitHub API, Auth PAT, SiteConfig, Générateur, Deploy, Behance RSS, Avis
 │   └── ui.js       # GHPage, Éditeur, BubbleWidget, navigation
-├── scripts/sync-behance.js   # sync RSS optionnelle (Node, sans clé API)
-└── _legacy/        # anciens fichiers non chargés (archive)
+└── scripts/sync-behance.js   # sync RSS optionnelle (Node, sans clé API)
 ```
 
 Navigation : la racine (`/`) affiche la vitrine publique ; le bouton **Tableau de bord** ouvre `app.html`. Dans le dashboard, cliquer le logo souanpt.hub ramène à la vitrine.

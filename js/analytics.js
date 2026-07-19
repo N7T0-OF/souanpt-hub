@@ -68,11 +68,10 @@ const COUNTRY_NAMES = {
 const NAME_TO_CC = (() => { const m = {}; for (const cc in COUNTRY_NAMES) m[COUNTRY_NAMES[cc].toLowerCase()] = cc; m['usa'] = 'US'; m['etats-unis'] = 'US'; m['uk'] = 'GB'; m['angleterre'] = 'GB'; return m; })();
 
 const Analytics = {
-  data: null, demo: false, _loaded: false,
+  data: null, _loaded: false,
   _lastSync: 0, _live: null, _tick: null,
 
   async refresh() {
-    if (this.demo) { this.render(); return; }
     let d = null;
     try { d = await (window.Cloud && Cloud.loadAnalytics ? Cloud.loadAnalytics() : null); }
     catch (e) { console.warn('[analytics]', e); }
@@ -90,12 +89,12 @@ const Analytics = {
   startLive() {
     this.stopLive();
     this._live = setInterval(() => {
-      if (document.hidden || !this._onOverview() || this.demo) return;
+      if (document.hidden || !this._onOverview()) return;
       this.refresh();
     }, 60000);
     this._tick = setInterval(() => this._syncLabel(), 5000);
     document.addEventListener('visibilitychange', this._onVis = () => {
-      if (!document.hidden && this._onOverview() && !this.demo) this.refresh();
+      if (!document.hidden && this._onOverview()) this.refresh();
       else this._syncLabel();
     });
   },
@@ -105,27 +104,26 @@ const Analytics = {
   },
   _syncLabel() {
     const e = document.getElementById('an-sync'); if (!e) return;
-    if (this.demo) { e.classList.add('off'); e.innerHTML = '<i></i><b>Aperçu démo</b>'; return; }
     if (!this._lastSync) { e.classList.add('off'); e.innerHTML = '<i></i><b>En attente…</b>'; return; }
     e.classList.remove('off');
     const s = Math.round((Date.now() - this._lastSync) / 1000);
     const ago = s < 10 ? 'à l\'instant' : s < 60 ? 'il y a ' + s + ' s' : 'il y a ' + Math.round(s / 60) + ' min';
     e.innerHTML = '<i></i><b>En direct</b> · synchronisé ' + ago;
   },
-  toggleDemo() {
-    this.demo = !this.demo;
-    const b = document.getElementById('an-demo-btn');
-    if (b) b.textContent = this.demo ? '✕ Quitter la démo' : '👁 Aperçu démo';
-    if (!this.demo) { this.refresh(); return; }   // sortie de démo → vraies données
-    this.render(); this._syncLabel();
-  },
-
   /* Message d'état vide : dit précisément CE QU'IL MANQUE (sinon échec silencieux) */
   _emptyMsg() {
     const logged = !!(window.Cloud && Cloud.enabled && Cloud.user());
     if (!logged) return '⚠️ <b>Connecte-toi avec Google ou Discord</b> pour activer les statistiques : elles sont rattachées à ton compte. Tout le reste est automatique.';
     const btn = '<button class="btn btn-accent" style="margin-top:10px" onclick="Analytics.activate()">⚡ Activer les statistiques sur mon site</button>';
-    return 'Aucune visite enregistrée pour l\'instant.<br>Un site déjà en ligne ne peut pas installer le compteur tout seul : il faut le <b>republier une fois</b>. Un clic suffit — ensuite tout est automatique, à vie.<br>' + btn;
+    // Site déjà publié → on propose de l'ouvrir / partager : sans visiteurs, pas de stats.
+    const url = (typeof BubbleWidget !== 'undefined' && BubbleWidget.siteUrl) ? BubbleWidget.siteUrl() : '';
+    const share = url
+      ? ' <button class="btn btn-ghost" style="margin-top:10px" onclick="BubbleWidget.openSite()">↗ Ouvrir mon site</button>'
+        + ' <button class="btn btn-ghost" style="margin-top:10px" onclick="BubbleWidget.copyUrl()">🔗 Copier le lien</button>'
+      : '';
+    return '<b>Aucune statistique pour le moment.</b><br>Publie ton site et partage-le pour commencer à recevoir des données.<br>'
+      + '<span style="opacity:.7">Un site déjà en ligne ne peut pas installer le compteur tout seul : il faut le <b>republier une fois</b>. Un clic suffit — ensuite tout est automatique, à vie.</span><br>'
+      + btn + share;
   },
 
   /* Installe le compteur : republie le site avec la config ENREGISTRÉE.
@@ -146,29 +144,8 @@ const Analytics = {
   _esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
   _cap(s) { s = String(s); return s.charAt(0).toUpperCase() + s.slice(1); },
 
-  _demoData() {
-    const days = {}; const today = new Date();
-    for (let i = 89; i >= 0; i--) {
-      const dt = new Date(today); dt.setDate(dt.getDate() - i);
-      const k = dt.toISOString().slice(0, 10);
-      const base = 30 + Math.round(40 * Math.sin(i / 6) + (90 - i) * 0.7 + Math.random() * 22);
-      days[k] = { views: Math.max(4, base), visitors: Math.max(3, Math.round(base * 0.62)), clicks: Math.round(base * 0.2) };
-    }
-    let tv = 0, tu = 0; Object.values(days).forEach(d => { tv += d.views; tu += d.visitors; });
-    return {
-      summary: { views: tv, visitors: tu, clicks: Math.round(tv * 0.18) }, days,
-      referrers: { direct: 820, google: 610, discord: 430, behance: 295, instagram: 180, linkedin: 95, other: 120 },
-      devices: { desktop: 1520, mobile: 980, tablet: 145 },
-      countries: { FR: 1240, BE: 340, CA: 280, CH: 190, US: 160, GB: 95, DE: 70, MA: 120, ES: 55 },
-      projects: {
-        'Identité de marque': { views: 640, clicks: 88 }, 'Site portfolio': { views: 520, clicks: 60 },
-        'Motion reel': { views: 410, clicks: 95 }, 'Illustration': { views: 300, clicks: 22 }
-      }
-    };
-  },
-
   render() {
-    const d = this.demo ? this._demoData() : this.data;
+    const d = this.data;
     const has = d && d.summary && (Number(d.summary.views) || 0) > 0;
     const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
     const html = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
@@ -185,7 +162,6 @@ const Analytics = {
       const t0 = document.getElementById('an-trend-sub'); if (t0) t0.textContent = '';
       html('an-co', '<div class="an-empty-mini">Aucune donnée pour l\'instant</div>');
       html('an-proj', '<div class="an-empty-mini">Aucune vue projet pour l\'instant</div>');
-      html('an-ref', '<div class="an-empty-mini">Aucune donnée</div>');
       html('an-dev', '<div class="an-empty-mini">Aucune donnée</div>');
       return;
     }
@@ -198,7 +174,6 @@ const Analytics = {
 
     html('an-co', this._countries(d.countries));
     html('an-proj', this._projects(d.projects));
-    html('an-ref', this._bars(d.referrers, this._refIcons));
     html('an-dev', this._bars(d.devices, { desktop: '🖥️ Ordinateur', mobile: '📱 Mobile', tablet: '📲 Tablette' }));
   },
 
@@ -247,7 +222,6 @@ const Analytics = {
     }).join('');
   },
 
-  _refIcons: { direct: '↗ Direct', google: '🔍 Google', discord: '🎮 Discord', behance: '🎨 Behance', instagram: '📸 Instagram', linkedin: '💼 LinkedIn', twitter: '🐦 Twitter', youtube: '▶ YouTube', other: '🌐 Autres' },
   _bars(mapObj, icons) {
     const entries = Object.entries(mapObj || {}).filter(([, v]) => (Number(v) || 0) > 0).sort((a, b) => b[1] - a[1]);
     if (!entries.length) return '<div class="an-empty-mini">Aucune donnée</div>';

@@ -699,6 +699,30 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   color:var(--text);font-family:inherit;font-size:11px;outline:none;resize:vertical}
 .edw-in:focus{border-color:var(--accent)}
 .edw-tog{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--text);padding:4px 0;cursor:pointer}
+.edwin.wide{width:322px}
+/* ✎ Contact — une ligne par moyen */
+.edw-ct{margin-bottom:9px}
+.edw-ct .edw-tog{margin-bottom:4px}
+.edw-ct-ic{font-size:13px;line-height:1}
+.edw-ct-v{opacity:.5;transition:opacity .15s}
+.edw-ct:has(input[data-on]:checked) .edw-ct-v{opacity:1}
+/* ☰ Sections — une carte par section, dépliée */
+.edw-sec{border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--s2)}
+.edw-sec.off{opacity:.45}
+.edw-sec-h{display:flex;align-items:center;gap:4px;margin-bottom:6px}
+.edw-sec-b{display:flex;flex-direction:column;gap:6px}
+.edw-sec-t,.edw-sec-ic,.edw-sec-d{background:var(--s1);border:1px solid var(--border);border-radius:7px;
+  padding:6px 8px;color:var(--text);font-family:inherit;font-size:11px;outline:none;width:100%}
+.edw-sec-d{resize:vertical;line-height:1.5}
+.edw-sec-t:focus,.edw-sec-ic:focus,.edw-sec-d:focus{border-color:var(--accent)}
+.edw-sec-ic{width:34px;flex-shrink:0;text-align:center;padding:6px 2px}
+.edw-sec-mv,.edw-sec-eye{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;
+  padding:3px 4px;border-radius:5px;flex-shrink:0;line-height:1}
+.edw-sec-mv:hover:not(:disabled),.edw-sec-eye:hover{background:rgba(255,255,255,.08);color:var(--accent)}
+.edw-sec-mv:disabled{opacity:.25;cursor:default}
+.edw-sec-rst{background:none;border:none;color:var(--muted2);font-family:inherit;font-size:9px;
+  cursor:pointer;text-align:left;padding:2px 0}
+.edw-sec-rst:hover{color:var(--accent)}
 /* Zone de dépôt d'image / GIF */
 .edw-drop{position:relative;border:1.5px dashed var(--border2);border-radius:10px;min-height:86px;display:flex;
   align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:all .15s;background:var(--s2)}
@@ -729,7 +753,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .st-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
 .st-card{position:relative;background:var(--s1);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .15s}
 .st-card:hover{border-color:var(--accent);transform:translateY(-2px)}
-.st-th{height:96px;background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:30px}
+.st-th{height:96px;background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:30px;
+  position:relative;overflow:hidden;flex-direction:column;gap:4px}
+/* Étiquette sous l'icône : durée d'un audio, nombre de fichiers d'une archive */
+.st-th-b{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.3px}
+/* Aperçu textuel : les premières lignes suffisent à reconnaître le document */
+.st-th-tx{flex-direction:row;align-items:flex-start;gap:7px;padding:9px 10px;justify-content:flex-start}
+.st-th-tx .st-th-ic{font-size:17px;flex-shrink:0;line-height:1.2}
+.st-th-tx p{font-size:8.5px;line-height:1.55;color:var(--muted);overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;text-align:left}
 .st-meta{padding:9px 11px 11px}
 .st-n{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .st-s{font-size:9px;color:var(--muted2);margin:3px 0 6px}
@@ -1065,7 +1097,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <option value="365">Total</option>
         </select>
         <span class="an-sync" id="an-sync" title="Les statistiques se mettent à jour toutes seules"><i></i><b>En direct</b></span>
-        <button class="btn btn-ghost" style="font-size:10px" id="an-demo-btn" onclick="Analytics.toggleDemo()">👁 Aperçu démo</button>
       </div>
 
       <!-- Ligne 1 : cartes résumé -->
@@ -1083,7 +1114,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="an-card">
         <div class="an-card-h"><span>Évolution des vues</span><span id="an-trend-sub" class="an-card-sub"></span></div>
         <div id="an-trend"></div>
-        <div id="an-empty" class="ov-hint" style="display:none">Les statistiques de visites s'afficheront ici <b>automatiquement</b> dès les premières visites de ton site publié — aucun compte externe. En attendant, clique <b>« 👁 Aperçu démo »</b> pour voir le rendu.</div>
+        <div id="an-empty" class="ov-hint" style="display:none"><b>Aucune statistique pour le moment.</b><br>Publie ton site et partage-le pour commencer à recevoir des données.</div>
       </div>
 
       <!-- Ligne 3 : pays + projets populaires -->
@@ -1092,11 +1123,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div class="an-card"><div class="an-card-h"><span>🔥 Projets populaires</span><span class="an-card-sub">vues · clics</span></div><div id="an-proj"></div></div>
       </div>
 
-      <!-- Ligne 3b : référents + appareils -->
-      <div class="an-2col">
-        <div class="an-card"><div class="an-card-h"><span>↗ Sources</span><span class="an-card-sub">d'où viennent les visiteurs</span></div><div id="an-ref"></div></div>
-        <div class="an-card"><div class="an-card-h"><span>🖥️ Appareils</span></div><div id="an-dev"></div></div>
-      </div>
+      <!-- Ligne 3b : appareils -->
+      <div class="an-card"><div class="an-card-h"><span>🖥️ Appareils</span></div><div id="an-dev"></div></div>
 
       <!-- Ligne 4 : activité récente -->
       <div class="an-card"><div class="an-card-h"><span>Activité récente</span></div><div id="ov-activity"></div></div>
@@ -1135,6 +1163,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <span id="ed-canvas-status" style="font-size:9px;color:var(--muted2);min-width:54px;text-align:right"></span>
           <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinTheme(this)" title="Style, couleurs, colonnes">🎨 Thème</button>
           <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinFx(this)" title="Animations & effets">⚡ Effets</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinSections(this)" title="Renommer, décrire et réordonner les sections">☰ Sections</button>
           <button class="btn btn-ghost" id="ed-undo" style="font-size:11px;padding:5px 8px" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" disabled>↶</button>
           <button class="btn btn-ghost" id="ed-redo" style="font-size:11px;padding:5px 8px" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" disabled>↷</button>
           <div class="ed-modes">
@@ -1315,6 +1344,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button class="active" data-v="grid" onclick="StorageUI.setView('grid')" title="Grille">▦</button>
           <button data-v="list" onclick="StorageUI.setView('list')" title="Liste">☰</button>
         </div>
+        <button class="btn btn-ghost" style="font-size:10px" id="st-backfill" onclick="StorageUI.backfill()"
+                title="Fabriquer les aperçus des fichiers envoyés avant cette version">🖼 Aperçus manquants</button>
         <button class="btn btn-accent" style="font-size:10px" onclick="StorageUI.pick()">＋ Déposer des fichiers</button>
       </div>
 
@@ -1480,7 +1511,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div class="settings-nav-item active" onclick="settingsTab('compte',this)">👤 Compte</div>
           <div class="settings-nav-item" onclick="settingsTab('general',this)">Général</div>
           <div class="settings-nav-item" onclick="settingsTab('integrations',this)">🔗 Intégrations</div>
-          <div class="settings-nav-item" onclick="settingsTab('premium',this)">⭐ Premium</div>
+          <div class="settings-nav-item" onclick="settingsTab('soutien',this)">❤️ Soutenir</div>
           <div class="settings-nav-item" onclick="settingsTab('domain',this)">Domaine</div>
           <div class="settings-nav-item" onclick="settingsTab('privacy',this)">Confidentialité</div>
         </div>
@@ -1558,25 +1589,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
               <div class="hintbox">S'applique aux prochaines couvertures importées. Pour recompresser celles déjà en place avec ce réglage : <strong style="color:var(--accent);cursor:pointer" onclick="showPage('storage')">Stockage → Optimiser les images →</strong></div>
             </div>
           </div>
-          <div id="set-tab-premium" class="set-tab" style="display:none">
+          <div id="set-tab-soutien" class="set-tab" style="display:none">
             <div class="setting-group">
-              <div class="setting-group-title">⭐ Premium à vie</div>
-              <div id="prem-status" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;background:var(--s2);border:1px solid var(--border);margin-bottom:14px">
-                <div style="font-size:24px">⭐</div>
-                <div style="flex:1"><div style="font-size:13px;font-weight:700" id="prem-plan">Plan Gratuit</div><div style="font-size:10px;color:var(--muted2)" id="prem-sub">Tous les outils sont déjà gratuits.</div></div>
+              <div class="setting-group-title">❤️ Soutenir le projet</div>
+              <div class="hintbox" style="margin-bottom:14px">souanpt.hub est <strong style="color:var(--text)">gratuit</strong>, et le reste : <strong style="color:var(--text)">aucune fonctionnalité n'est réservée à un paiement</strong>. Les dons financent l'hébergement, le développement et la maintenance — ils ne débloquent rien, parce qu'il n'y a rien à débloquer.</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+                <a class="btn btn-ghost" style="font-size:11px;justify-content:flex-start;padding:14px" href="https://ko-fi.com/souanpt" target="_blank" rel="noopener noreferrer">☕ &nbsp;Soutenir sur Ko-fi</a>
+                <a class="btn btn-ghost" style="font-size:11px;justify-content:flex-start;padding:14px" href="https://www.paypal.com/paypalme/souanpt" target="_blank" rel="noopener noreferrer">💳 &nbsp;Soutenir avec PayPal</a>
               </div>
-              <div class="hintbox" style="margin-bottom:12px">Le Premium ne bloque <strong style="color:var(--text)">aucune</strong> fonctionnalité essentielle. Il débloque : thèmes &amp; styles exclusifs, animations premium, domaine perso, stockage étendu, badge Premium, stats avancées. <strong style="color:var(--accent)">Paiement unique, à vie.</strong></div>
-              <div id="prem-buy" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-                <a class="btn btn-accent" style="font-size:11px" href="https://www.paypal.com/paypalme/souanpt/4" target="_blank" onclick="premAwaitCode()">Passer à Premium — 4 € (PayPal)</a>
-                <a class="btn btn-ghost" style="font-size:11px" href="tarifs.html" target="_blank">Voir les tarifs</a>
-              </div>
-              <div class="setting-group-title" style="margin-top:6px">J'ai un code cadeau</div>
-              <div class="hintbox" style="margin-bottom:8px">Après paiement, tu reçois un <strong style="color:var(--text)">code</strong> à entrer ici → Premium débloqué immédiatement. Un code s'offre aussi : donne-le à qui tu veux 🎁.</div>
-              <div style="display:flex;gap:8px">
-                <input class="prop-input" id="prem-code" placeholder="ex : SOUANPT-XXXX" style="flex:1" onkeydown="if(event.key==='Enter')redeemCode()">
-                <button class="btn btn-accent" id="prem-redeem-btn" onclick="redeemCode()" style="white-space:nowrap">Activer</button>
-              </div>
-              <div id="prem-msg" style="font-size:10px;min-height:16px;text-align:center;margin-top:8px"></div>
+              <div class="hintbox">Tu peux aussi aider sans dépenser un centime : partage ton site, signale un bug, propose une idée.</div>
             </div>
           </div>
           <div id="set-tab-integrations" class="set-tab" style="display:none">
@@ -1687,7 +1708,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                   <input class="prop-input" id="int-stripe-inp" placeholder="https://buy.stripe.com/…" style="flex:1">
                   <button class="btn btn-accent" style="font-size:10px" onclick="saveIntLink('stripe')">Enregistrer</button>
                 </div>
-                <div class="hintbox">Crée un Payment Link gratuit sur <a href="https://stripe.com" target="_blank" style="color:var(--accent3)">stripe.com</a>. C'est aussi la clé du Premium 100% automatique (guide <code>cloudflare/README.md</code>).</div>
+                <div class="hintbox">Crée un Payment Link gratuit sur <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent3)">stripe.com</a> pour que <strong style="color:var(--text)">tes clients</strong> règlent tes factures en ligne.</div>
               </div>
             </div>
 
@@ -1700,7 +1721,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                 <span class="int-arrow">▾</span>
               </div>
               <div class="int-body">
-                <div class="hintbox" style="margin-top:10px">Prévu dans la roadmap : lier tes documents Drive sans les copier — aucun stockage consommé côté hub.</div>
+                <div class="hintbox" style="margin-top:10px">À venir : lier tes documents Drive sans les copier — aucun stockage consommé côté hub.</div>
               </div>
             </div>
           </div>
@@ -1759,7 +1780,6 @@ function settingsTab(name, el) {
   const tab = document.getElementById('set-tab-' + name);
   if (tab) tab.style.display = '';
   if (el) el.classList.add('active');
-  if (name === 'premium' && typeof renderPremium === 'function') renderPremium();
   if (name === 'compte') renderCompte();
   if (name === 'integrations') {
     renderIntegrations(); renderBehancePage?.(); renderLoginLog?.();
@@ -1780,9 +1800,9 @@ function renderCompte() {
   set('acc-handle', pseudo ? '@' + pseudo : '@—');
   const av = document.getElementById('acc-av');
   if (av) av.innerHTML = avatar ? `<img src="${esc(avatar)}" alt="">` : esc((name || '?')[0].toUpperCase());
+  // Plus de plan payant : tout le monde a exactement les mêmes fonctionnalités.
   const plan = document.getElementById('acc-plan');
-  const pro = typeof isPremium === 'function' && isPremium();
-  if (plan) { plan.textContent = pro ? '⭐ Premium' : 'Gratuit'; plan.classList.toggle('pro', pro); }
+  if (plan) { plan.textContent = 'Gratuit'; plan.classList.remove('pro'); }
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
   setVal('acc-pseudo', pseudo); setVal('acc-display', name === pseudo ? '' : name); setVal('acc-email', email);
   // Connexions
@@ -2840,40 +2860,9 @@ async function afterGoogleLogin(user) {
   let prof = null, loadErr = false;
   try { prof = await Cloud.loadProfile(user.uid); } catch (e) { loadErr = true; console.warn('[profil]', e); }
   _myProfile = prof;
-  renderPremium();
   if (prof && prof.pseudo) finishLogin(prof.pseudo);
   else if (!loadErr) pseudoShow(user);     // pas encore de profil → 1re connexion
   else finishLogin(null);                    // souci réseau → on entre quand même
-}
-function isPremium() { return !!(_myProfile && (_myProfile.plan === 'pro' || _myProfile.plan === 'premium')); }
-function renderPremium() {
-  const pro = isPremium();
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  set('prem-plan', pro ? '⭐ Premium à vie' : 'Plan Gratuit');
-  set('prem-sub', pro ? 'Merci ! Toutes les options premium sont débloquées.' : 'Tous les outils sont déjà gratuits.');
-  const buy = document.getElementById('prem-buy'); if (buy) buy.style.display = pro ? 'none' : 'flex';
-}
-function premAwaitCode() { showToast('Après le paiement, entre le code reçu ci-dessous pour activer Premium ⭐', '#e4b24a', 5000); }
-async function redeemCode() {
-  const inp = document.getElementById('prem-code'), msg = document.getElementById('prem-msg'), btn = document.getElementById('prem-redeem-btn');
-  const code = (inp?.value || '').trim().toUpperCase();
-  const say = (t, c) => { if (msg) { msg.style.color = c || 'var(--muted2)'; msg.textContent = t; } };
-  if (!code) { say('Entre ton code', '#c0392b'); return; }
-  if (!(window.Cloud && Cloud.enabled && Cloud.user())) { say('Connecte-toi avec Google d\'abord', '#c0392b'); return; }
-  if (btn) btn.disabled = true; say('Vérification…');
-  try {
-    const ref = Cloud._db.collection('codes').doc(code);
-    const d = await ref.get();
-    if (!d.exists) { say('✗ Code inconnu', '#c0392b'); if (btn) btn.disabled = false; return; }
-    if (d.data().used) { say('✗ Code déjà utilisé', '#c0392b'); if (btn) btn.disabled = false; return; }
-    await ref.set({ used: true, usedBy: Cloud.user().uid, usedAt: Date.now() }, { merge: true });
-    await Cloud.saveProfile(Cloud.user().uid, { plan: 'pro', premiumSince: Date.now() });
-    _myProfile = { ...(_myProfile || {}), plan: 'pro' };
-    renderPremium();
-    say('✓ Premium activé ! Merci 🎉', '#2e9a63');
-    showToast('⭐ Premium activé — merci !', '#2e9a63', 4000);
-    if (inp) inp.value = '';
-  } catch (e) { say('✗ ' + (e.message || 'Erreur'), '#c0392b'); if (btn) btn.disabled = false; }
 }
 function finishLogin(pseudo) {
   document.getElementById('pseudo-gate').style.display = 'none';
@@ -2930,10 +2919,10 @@ async function pseudoClaim() {
     await Cloud.saveProfile(u.uid, {
       uid: u.uid, owner: u.uid, pseudo,
       email: u.email || '', name: u.displayName || '', avatar: u.photoURL || '',
-      plan: 'free', createdAt: Date.now(),
+      createdAt: Date.now(),   // plus de champ `plan` : il n'y a plus d'offre payante
       // Champs classement (remplis au fil de l'activité)
       public: true, verified: false, country: '',
-      score: 0, views: 0, visitors: 0, projects: 0, clicks: 0, reviewsCount: 0, reviewsAvg: 0,
+      views: 0, visitors: 0, projects: 0, clicks: 0, reviewsCount: 0, reviewsAvg: 0,
     });
     finishLogin(pseudo);
   } catch (e) {
