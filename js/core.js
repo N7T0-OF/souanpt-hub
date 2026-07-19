@@ -387,6 +387,14 @@ const SiteConfig = {
     avisMode: 'defile',
     about: '', goatcounter: '',
     layoutStyle: 'float', heroImage: '', projectsLimit: 0,
+    // Bannière du thème Latérale : action au clic (voir heroLinkHref).
+    // { type:'none'|'url'|'section'|'project'|'file'|'contact', url, section, projectId, blank }
+    heroLink: { type: 'none' },
+    // Moyens de contact. RIEN n'est publié sans `on: true` : une valeur saisie
+    // puis désactivée n'apparaît pas dans le HTML généré.
+    // [{ id:'email'|'discord'|'whatsapp'|'phone'|'telegram', on, value, label?, icon?, color? }]
+    contactMethods: null,          // null = retombe sur l'email seul (compat)
+    contactVariant: 'boutons',     // boutons · liste · cartes · icones · barre
     animLevel: 'smooth', fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
@@ -601,6 +609,40 @@ function migrateBlocksSummary(cfg, projects, links) {
    SITE GENERATOR — navbar style haunt.gg + projets cliquables + avis visiteurs
 ══════════════════════════════════════════════════════ */
 /** Rendu de la grille Bento depuis les blocs. Conserve data-p / data-l pour l'analytics. */
+/* ══════════════════════════════════════════════════════════════
+   Moyens de contact — registre unique (générateur + éditeur).
+
+   `href(valeur)` renvoie null quand la valeur ne permet pas de construire
+   une destination : on n'affiche alors PAS le moyen, plutôt qu'un lien
+   mort. Aucun de ces liens n'expose de donnée que l'utilisateur n'a pas
+   explicitement activée.
+══════════════════════════════════════════════════════════════ */
+const CONTACT_KINDS = {
+  email: {
+    label: 'Email', icon: '✉', color: '#C8FF00', placeholder: 'toi@exemple.fr',
+    href: v => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? 'mailto:' + v : null,
+  },
+  discord: {
+    label: 'Discord', icon: '🎮', color: '#5865F2', placeholder: 'discord.gg/xxxx ou pseudo',
+    // Un pseudo Discord n'est pas cliquable : on ne fabrique un lien que
+    // pour une vraie invitation, sinon le moyen ne s'affiche pas.
+    href: v => /discord\.(gg|com)\//i.test(v) ? (/^https?:/i.test(v) ? v : 'https://' + v.replace(/^\/+/, '')) : null,
+  },
+  whatsapp: {
+    label: 'WhatsApp', icon: '💬', color: '#25D366', placeholder: '+33 6 12 34 56 78',
+    href: v => { const d = v.replace(/[^\d]/g, ''); return d.length >= 8 ? 'https://wa.me/' + d : null; },
+  },
+  phone: {
+    label: 'Téléphone', icon: '📞', color: '#38bdf8', placeholder: '+33 6 12 34 56 78',
+    href: v => { const d = v.replace(/[^\d+]/g, ''); return d.length >= 6 ? 'tel:' + d : null; },
+  },
+  telegram: {
+    label: 'Telegram', icon: '✈', color: '#2AABEE', placeholder: '@pseudo',
+    href: v => { const u = v.replace(/^@/, '').replace(/^https?:\/\/t\.me\//i, ''); return u ? 'https://t.me/' + u : null; },
+  },
+};
+const CONTACT_ORDER = ['email', 'discord', 'whatsapp', 'phone', 'telegram'];
+
 function renderBentoGrid(blocks, ctx) {
   const { cfg, projects, links, approved, GRADS, editor } = ctx;
   // Bento n'a pas de <section> : ce sont les BLOCS qui portent les titres. On
@@ -662,9 +704,20 @@ function renderBentoGrid(blocks, ctx) {
         `<div class="bn-rvi"><b>${esc(r.author)}</b> <span class="bn-st">${'★'.repeat(r.rating || 5)}</span><p>${esc(r.text)}</p></div>`).join('')}</div>`);
     }
     if (b.type === 'contact') {
-      if (!cfg.email) return '';
-      return cell(b, `<span class="bn-ic">✉</span><div class="bn-t">${esc(sTOr('contact', 'Me contacter'))}</div><div class="bn-sub">${esc(cfg.email)}</div>`,
-        ` onclick="location.href='mailto:${esc(cfg.email)}'"`);
+      // Bento : une carte compacte listant les moyens ACTIVÉS. Le premier sert
+      // de destination au clic sur la carte ; les autres restent cliquables.
+      const cl = ctx.contactList ? ctx.contactList() : [];
+      if (!cl.length) return '';
+      const first = cl[0];
+      const rest = cl.slice(1);
+      return cell(b, `<span class="bn-ic">${esc(first.icon)}</span>
+        <div class="bn-t">${esc(sTOr('contact', 'Me contacter'))}</div>
+        <div class="bn-sub">${esc(first.value)}</div>
+        ${rest.length ? `<div class="bn-ct">${rest.map(it =>
+          `<a href="${esc(it.href)}"${it.blank ? ' target="_blank" rel="noopener noreferrer"' : ''}
+              title="${esc(it.label)}" aria-label="${esc(it.label)}"
+              style="--ct:${esc(it.color)}" onclick="event.stopPropagation()">${esc(it.icon)}</a>`).join('')}</div>` : ''}`,
+        ` onclick="location.href='${esc(first.href)}'"`);
     }
     if (b.type === 'file') {
       // Bloc Document / CV — l'URL est figée dans le bloc à la création : le site
@@ -719,6 +772,36 @@ function generateSite(cfg, projects, reviews, opts) {
   const links       = getLinks();
   const blocks      = getBlocks(cfg, projects, links);   // même modèle pour tous les styles
   const heroImage   = String(cfg.heroImage || '').trim();
+  /* ── Bannière cliquable (thème Latérale) ──────────────────────────────
+     Résout l'action configurée en une simple destination. Retourne null si
+     aucune action : la bannière reste alors un <div>, sans curseur main ni
+     rôle de lien — une bannière « cliquable » qui ne mène nulle part est
+     pire que pas de lien du tout.
+     Dans l'éditeur, le clic est neutralisé en amont (mode Édition) : le lien
+     ne s'active qu'en Aperçu et sur le site publié.                        */
+  const heroLinkHref = () => {
+    const L = cfg.heroLink || {};
+    const t = L.type || 'none';
+    if (t === 'none') return null;
+    if (t === 'url') {
+      const u = String(L.url || '').trim();
+      if (!u) return null;
+      // Une URL sans schéma ne doit pas devenir un lien relatif cassé.
+      return /^(https?:|mailto:|tel:)/i.test(u) ? u : 'https://' + u;
+    }
+    if (t === 'section') return SEC_KEYS.includes(L.section) ? '#' + L.section : null;
+    if (t === 'project') {
+      const p = projects.find(x => String(x.id) === String(L.projectId));
+      return p && p.url ? String(p.url) : null;
+    }
+    if (t === 'file')    return String(L.url || '').trim() || null;
+    if (t === 'contact') return cfg.email ? 'mailto:' + cfg.email : '#contact';
+    return null;
+  };
+  const heroHref = heroLinkHref();
+  // Nouvel onglet uniquement pour ce qui sort du site (jamais pour une ancre).
+  const heroBlank = heroHref && !heroHref.startsWith('#')
+    && (cfg.heroLink || {}).blank !== false && !heroHref.startsWith('mailto:');
   const projLimit   = parseInt(cfg.projectsLimit) || 0;   // 0 = tous
   const hiddenCount = projLimit && projects.length > projLimit ? projects.length - projLimit : 0;
   const animLevel   = cfg.animLevel || 'smooth';
@@ -785,6 +868,49 @@ function generateSite(cfg, projects, reviews, opts) {
       : `<p class="ssub">${esc(String(m.desc)).replace(/\n/g, '<br>')}</p>`;
     return head + desc;
   };
+
+  /* ══ Moyens de contact ═══════════════════════════════════════════════
+     Rien n'est publié sans activation explicite : un moyen dont `on` n'est
+     pas vrai n'est PAS rendu, et sa valeur n'apparaît nulle part dans le
+     HTML généré. Un numéro de téléphone saisi puis désactivé ne fuite donc
+     pas dans le code source de la page.                                   */
+  const contactList = () => {
+    const conf = Array.isArray(cfg.contactMethods) ? cfg.contactMethods : null;
+    // Config absente (site d'avant cette version) : on retombe sur l'email
+    // seul, exactement ce qui était affiché auparavant.
+    const src = conf || (cfg.email ? [{ id: 'email', on: true, value: cfg.email }] : []);
+    return src
+      .filter(m => m && m.on === true && String(m.value || '').trim())
+      .map(m => {
+        const k = CONTACT_KINDS[m.id]; if (!k) return null;
+        const v = String(m.value).trim();
+        const href = k.href(v);
+        if (!href) return null;
+        return {
+          href, label: String(m.label || k.label), icon: String(m.icon || k.icon),
+          color: String(m.color || k.color), value: v,
+          blank: !/^(mailto:|tel:)/.test(href),
+        };
+      })
+      .filter(Boolean);
+  };
+  const contactHtml = () => {
+    const items = contactList();
+    if (!items.length) return '';
+    const variant = ['boutons', 'liste', 'cartes', 'icones', 'barre'].includes(cfg.contactVariant)
+      ? cfg.contactVariant : 'boutons';
+    const a = (it, inner, extra) =>
+      `<a class="ct-i" href="${esc(it.href)}"${it.blank ? ' target="_blank" rel="noopener noreferrer"' : ''}` +
+      ` style="--ct:${esc(it.color)}"${extra || ''}>${inner}</a>`;
+    const body = items.map(it => {
+      const ic = `<span class="ct-ic">${esc(it.icon)}</span>`;
+      if (variant === 'icones') return a(it, ic, ` title="${esc(it.label)}" aria-label="${esc(it.label)}"`);
+      if (variant === 'cartes') return a(it, `${ic}<span class="ct-l">${esc(it.label)}</span><span class="ct-v">${esc(it.value)}</span>`);
+      if (variant === 'liste')  return a(it, `${ic}<span class="ct-l">${esc(it.label)}</span><span class="ct-v">${esc(it.value)}</span>`);
+      return a(it, `${ic}<span class="ct-l">${esc(it.label)}</span>`);   // boutons & barre
+    }).join('');
+    return `<div class="ct ct-${variant}">${body}</div>`;
+  };
   // Compat : le reste du générateur lit encore ces tables.
   const SEC_LABELS = {}; const SEC_ICONS = {};
   ['about', 'projects', 'avis', 'contact'].forEach(k => { SEC_LABELS[k] = secTitle(k); SEC_ICONS[k] = secIcon(k); });
@@ -807,7 +933,9 @@ function generateSite(cfg, projects, reviews, opts) {
     </form>`:''}
   </div>
 </section>`,
-    contact: `<section id="contact" class="ci rev">${secHead('contact')}<div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>`,
+    contact: `<section id="contact" class="ci rev">${secHead('contact')}${contactHtml()}${
+      behanceUser ? `<div class="ctas" style="margin-top:16px"><a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" rel="noopener noreferrer" class="bg">Behance →</a></div>` : ''
+    }</section>`,
   };
   /* Corps des styles Flottante & Latérale rendu DEPUIS LES BLOCS (même moteur que
      Bento) : un bloc texte créé via la palette apparaît donc AUSSI ici, dans
@@ -878,6 +1006,26 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
 /* Description de section (facultative). La marge négative rattrape celle du h2
    pour rapprocher la description de son titre, sans dépendre de :has(). */
 .ssub{font-size:13px;color:var(--m);line-height:1.7;max-width:640px;margin:-16px 0 26px}
+/* ── MOYENS DE CONTACT (5 présentations) ── */
+.ct{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.ct-i{display:inline-flex;align-items:center;gap:9px;text-decoration:none;color:var(--t);
+  border:1px solid var(--b2);border-radius:12px;padding:12px 16px;transition:.2s;background:var(--s1)}
+.ct-i:hover{border-color:var(--ct);color:var(--ct);transform:translateY(-2px)}
+.ct-i:focus-visible{outline:2px solid var(--ct);outline-offset:2px}
+.ct-ic{font-size:16px;line-height:1}
+.ct-l{font-size:13px;font-weight:700}
+.ct-v{font-size:12px;color:var(--m)}
+.ct-liste{flex-direction:column;gap:6px}
+.ct-liste .ct-i{width:100%;padding:9px 13px;border-radius:10px}
+.ct-liste .ct-v{margin-left:auto}
+.ct-cartes{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.ct-cartes .ct-i{flex-direction:column;align-items:flex-start;gap:5px;padding:18px}
+.ct-cartes .ct-ic{font-size:22px}
+.ct-icones .ct-i{padding:0;width:46px;height:46px;justify-content:center;border-radius:50%}
+.ct-icones .ct-ic{font-size:19px}
+.ct-barre{flex-wrap:nowrap;overflow-x:auto;gap:8px;padding-bottom:4px}
+.ct-barre .ct-i{flex:0 0 auto;padding:10px 14px}
+@media(max-width:600px){.ct-cartes{grid-template-columns:1fr}}
 .prow h2{margin-bottom:0}
 .prow .ssub{margin:6px 0 0}
 /* ── PROJETS ── */
@@ -973,6 +1121,11 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .bn-t{font-size:14px;font-weight:800;letter-spacing:-.2px;color:var(--t)}
 .bn-sub{font-size:11px;color:${mutedC};white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bn-txt{font-size:12px;line-height:1.7;color:${mutedC}}
+/* Moyens de contact secondaires dans la carte Bento */
+.bn-ct{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.bn-ct a{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
+  border:1px solid var(--b2);font-size:12px;text-decoration:none;transition:.18s}
+.bn-ct a:hover{border-color:var(--ct);transform:translateY(-1px)}
 .bn-ic{font-size:22px;line-height:1}
 .bn-av{width:52px;height:52px;border-radius:50%;background:var(--a);color:#060606;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;font-family:'Syne',sans-serif}
 .bn-htag{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--a)}
@@ -1030,6 +1183,10 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .sb-hero{border-radius:14px;min-height:min(56vh,420px);display:flex;align-items:flex-end;padding:34px;position:relative;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35)}
 .sb-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,.72))}
 .sb-hero-in{position:relative;z-index:1}
+/* Bannière cliquable : seul cas où le curseur devient une main. */
+.sb-hero-link{cursor:pointer;text-decoration:none;transition:transform .25s ease,box-shadow .25s ease}
+.sb-hero-link:hover{transform:translateY(-3px);box-shadow:0 26px 60px rgba(0,0,0,.45)}
+.sb-hero-link:focus-visible{outline:3px solid var(--a);outline-offset:3px}
 .sb-hero-in .htag{color:#fff;opacity:.85}
 .sb-hero-in h1{color:#fff;font-size:clamp(34px,5vw,60px)}
 .sb-hero-in .hsub{color:rgba(255,255,255,.8);margin-bottom:0}
@@ -1043,7 +1200,7 @@ ${layoutStyle === 'bento' ? `
     <div class="nl"></div>
     ${cfg.email ? `<a class="ncta" href="mailto:${esc(cfg.email)}">Me contacter</a>` : ''}
   </nav></div>
-  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor, secTitle, secTitleOr })}
+  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor, secTitle, secTitleOr, contactList })}
   <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
 </div>` : layoutStyle === 'sidebar' ? `
 <div class="sb-wrap" id="sbw">
@@ -1057,9 +1214,11 @@ ${layoutStyle === 'bento' ? `
     ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
   </aside>
   <main class="sb-main">
-    <div class="sb-hero" data-b="b_profile" data-no-drag style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
+    <${heroHref ? 'a' : 'div'} class="sb-hero${heroHref ? ' sb-hero-link' : ''}" data-b="b_profile" data-no-drag${
+        heroHref ? ` href="${esc(heroHref)}"${heroBlank ? ' target="_blank" rel="noopener noreferrer"' : ''}` : ''
+      } style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
       <div class="sb-hero-in"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}</h1><p class="hsub">${esc(cfg.bio)}</p></div>
-    </div>
+    </${heroHref ? 'a' : 'div'}>
     ${bodySections}
     <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
   </main>

@@ -188,6 +188,11 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 .ed-h:active{cursor:grabbing}
 .ed-on [data-b]:hover>.ed-h,.ed-on [data-b].ed-sel>.ed-h{display:flex}
 .ed-drag{opacity:.5;box-shadow:0 22px 55px rgba(0,0,0,.55)!important;z-index:50}
+/* Repère « bannière cliquable » — visible dans l'éditeur seulement. */
+.ed-linkflag{display:none;position:absolute;top:10px;right:10px;z-index:60;background:rgba(15,15,15,.86);
+      color:#C8FF00;border:1px solid rgba(200,255,0,.32);border-radius:999px;padding:4px 10px;
+      font:600 10px/1 system-ui;pointer-events:none}
+.ed-on .ed-linkflag{display:block}
 .ed-tb{position:absolute;z-index:9999;display:flex;gap:2px;align-items:center;background:rgba(15,15,15,.94);
       -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.14);
       border-radius:10px;padding:4px;box-shadow:0 12px 34px rgba(0,0,0,.5);font-family:system-ui,sans-serif}
@@ -232,6 +237,15 @@ body:not(.ed-on) [data-add]{display:none!important}
 
   /* poignée ⋮⋮ sur chaque bloc (le drag ne part QUE de là → pas de conflit avec les textes/liens) */
   _decorate(doc) {
+    // Repère discret : dans l'éditeur, le clic sélectionne le bloc, donc rien
+    // ne laisse deviner que la bannière est cliquable sur le site publié.
+    const hero = doc.querySelector('.sb-hero-link');
+    if (hero && !hero.querySelector(':scope>.ed-linkflag')) {
+      const f = doc.createElement('div');
+      f.className = 'ed-linkflag'; f.textContent = '🔗 Bannière cliquable';
+      f.title = 'Le lien s’active en Aperçu et sur le site publié';
+      hero.appendChild(f);
+    }
     doc.querySelectorAll('[data-b]').forEach(el => {
       if (!el.getAttribute('data-b') || el.querySelector(':scope>.ed-h')) return;
       if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
@@ -1017,9 +1031,44 @@ function edWinEdit(blockId) {
 
   if (b.type === 'profile') {
     title = '✎ Profil';
-    html = F('e1', 'Nom du site', c.siteName) + F('e2', 'Accroche (hero)', c.heroText) + F('e3', 'Bio', c.bio, 'area');
+    // L'action de la bannière ne concerne que le thème Latérale (seul thème
+    // qui affiche une grande bannière) : inutile de l'imposer aux autres.
+    const isSidebar = c.layoutStyle === 'sidebar';
+    const hl = c.heroLink || { type: 'none' };
+    const projOpts = getProjects().map(p =>
+      `<option value="${_eesc(p.id)}"${String(hl.projectId) === String(p.id) ? ' selected' : ''}>${_eesc(p.title || 'Projet')}</option>`).join('');
+    const banner = !isSidebar ? '' : `
+      <div class="edw-l">Action de la bannière</div>
+      <select class="edw-in" id="hl-type">
+        ${[['none', 'Aucune'], ['url', 'Ouvrir un lien'], ['section', 'Aller vers une section'],
+           ['project', 'Ouvrir un projet'], ['file', 'Télécharger un document'], ['contact', 'Ouvrir le contact']]
+          .map(([v, n]) => `<option value="${v}"${(hl.type || 'none') === v ? ' selected' : ''}>${n}</option>`).join('')}
+      </select>
+      <div id="hl-url" style="display:none">
+        ${F('hl-u', 'Adresse', hl.url || '')}
+        <label class="edw-tog"><input type="checkbox" id="hl-blank"${hl.blank === false ? '' : ' checked'}> Ouvrir dans un nouvel onglet</label>
+      </div>
+      <div id="hl-sec" style="display:none">
+        <div class="edw-l">Section visée</div>
+        <select class="edw-in" id="hl-s">${ED_SEC_KEYS.map(k =>
+          `<option value="${k}"${hl.section === k ? ' selected' : ''}>${_eesc(edSecMeta(k).title)}</option>`).join('')}</select>
+      </div>
+      <div id="hl-proj" style="display:none">
+        <div class="edw-l">Projet visé</div>
+        <select class="edw-in" id="hl-p">${projOpts || '<option value="">(aucun projet)</option>'}</select>
+      </div>
+      <p class="edw-hint" id="hl-note" style="margin-top:8px"></p>`;
+    html = F('e1', 'Nom du site', c.siteName) + F('e2', 'Accroche (hero)', c.heroText) + F('e3', 'Bio', c.bio, 'area') + banner;
     save = w => { const g = i => w.querySelector('#' + i).value;
-      SiteConfig.set('siteName', g('e1')); SiteConfig.set('heroText', g('e2')); SiteConfig.set('bio', g('e3')); };
+      SiteConfig.set('siteName', g('e1')); SiteConfig.set('heroText', g('e2')); SiteConfig.set('bio', g('e3'));
+      if (!isSidebar) return;
+      const t = g('hl-type');
+      const next = { type: t };
+      if (t === 'url' || t === 'file') { next.url = g('hl-u'); next.blank = w.querySelector('#hl-blank').checked; }
+      if (t === 'section') next.section = g('hl-s');
+      if (t === 'project') next.projectId = g('hl-p');
+      SiteConfig.set('heroLink', next);
+    };
   } else if (b.type === 'text') {
     title = '✎ Texte';
     html = F('e1', 'Titre', bProps(b).title || '') + F('e2', 'Texte', bProps(b).text || '', 'area');
@@ -1039,8 +1088,38 @@ function edWinEdit(blockId) {
     };
   } else if (b.type === 'contact') {
     title = '✎ Contact';
-    html = F('e1', 'Adresse e-mail', c.email);
-    save = w => SiteConfig.set('email', w.querySelector('#e1').value);
+    // Config absente (site antérieur) → on part de l'email déjà saisi, activé.
+    const saved = Array.isArray(c.contactMethods) ? c.contactMethods : null;
+    const cur = id => (saved || []).find(m => m && m.id === id)
+      || (id === 'email' && !saved && c.email ? { id: 'email', on: true, value: c.email } : null);
+    const variants = [['boutons', 'Boutons'], ['liste', 'Liste compacte'], ['cartes', 'Cartes'],
+                      ['icones', 'Icônes seules'], ['barre', 'Barre horizontale']];
+    html = `<p class="edw-hint" style="margin-bottom:8px">Coche uniquement ce que tu veux rendre public. Une valeur décochée n'apparaît nulle part sur le site.</p>`
+      + CONTACT_ORDER.map(id => {
+          const k = CONTACT_KINDS[id], m = cur(id) || {};
+          return `<div class="edw-ct" data-id="${id}">
+            <label class="edw-tog"><input type="checkbox" data-on="${id}"${m.on ? ' checked' : ''}>
+              <span class="edw-ct-ic">${k.icon}</span> ${k.label}</label>
+            <input class="edw-in edw-ct-v" data-v="${id}" value="${_eesc(m.value || '')}" placeholder="${_eesc(k.placeholder)}">
+          </div>`;
+        }).join('')
+      + `<div class="edw-l">Présentation</div>
+         <select class="edw-in" id="ct-var">${variants.map(([v, n]) =>
+           `<option value="${v}"${(c.contactVariant || 'boutons') === v ? ' selected' : ''}>${n}</option>`).join('')}</select>
+         <p class="edw-hint" id="ct-note" style="margin-top:8px"></p>`;
+    save = w => {
+      const out = CONTACT_ORDER.map(id => ({
+        id,
+        on: w.querySelector(`[data-on="${id}"]`).checked,
+        value: w.querySelector(`[data-v="${id}"]`).value.trim(),
+      }));
+      SiteConfig.set('contactMethods', out);
+      SiteConfig.set('contactVariant', w.querySelector('#ct-var').value);
+      // `email` reste la source de vérité pour le formulaire d'avis et le
+      // bouton « Me contacter » de la barre latérale : on le garde aligné.
+      const mail = out.find(m => m.id === 'email');
+      SiteConfig.set('email', mail && mail.on ? mail.value : '');
+    };
   } else if (b.type === 'link') {
     const l = getLinks().find(x => String(x.id) === String(bRef(b))) || {};
     title = '✎ Lien';
@@ -1095,6 +1174,43 @@ function edWinEdit(blockId) {
     if (fx && fy && fp) {
       const upd = () => { fp.style.backgroundPosition = fx.value + '% ' + fy.value + '%'; };
       fx.oninput = upd; fy.oninput = upd;
+    }
+    // Action de la bannière : n'afficher que les champs de l'action choisie.
+    const hlT = w.querySelector('#hl-type');
+    if (hlT) {
+      const note = w.querySelector('#hl-note');
+      const show = () => {
+        const t = hlT.value;
+        w.querySelector('#hl-url').style.display  = (t === 'url' || t === 'file') ? '' : 'none';
+        w.querySelector('#hl-sec').style.display  = t === 'section' ? '' : 'none';
+        w.querySelector('#hl-proj').style.display = t === 'project' ? '' : 'none';
+        note.textContent = t === 'none' ? 'La bannière n’est pas cliquable.'
+          : 'Dans l’éditeur le clic sélectionne le bloc — le lien ne s’active qu’en Aperçu et sur le site publié.';
+      };
+      hlT.onchange = show; show();
+    }
+    // Contact : signaler tout de suite une valeur activée mais inutilisable —
+    // sinon le moyen disparaît du site sans que rien ne l'explique.
+    const ctVar = w.querySelector('#ct-var');
+    if (ctVar) {
+      const note = w.querySelector('#ct-note');
+      const check = () => {
+        const bad = CONTACT_ORDER.filter(id => {
+          const on = w.querySelector(`[data-on="${id}"]`).checked;
+          const v = w.querySelector(`[data-v="${id}"]`).value.trim();
+          return on && v && !CONTACT_KINDS[id].href(v);
+        });
+        const vide = CONTACT_ORDER.filter(id =>
+          w.querySelector(`[data-on="${id}"]`).checked && !w.querySelector(`[data-v="${id}"]`).value.trim());
+        const msg = [];
+        if (vide.length) msg.push('À remplir : ' + vide.map(i => CONTACT_KINDS[i].label).join(', ') + '.');
+        if (bad.length) msg.push('Format non reconnu, ne sera pas affiché : '
+          + bad.map(i => CONTACT_KINDS[i].label).join(', ') + '.');
+        note.textContent = msg.join(' ');
+        note.style.color = msg.length ? '#e4b24a' : '';
+      };
+      w.querySelectorAll('[data-on],[data-v]').forEach(el => { el.oninput = check; el.onchange = check; });
+      check();
     }
     const ok = w.querySelector('#edw-save');
     if (ok) ok.onclick = () => { save(w); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
