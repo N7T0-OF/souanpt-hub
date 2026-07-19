@@ -623,6 +623,9 @@ function showPage(id) {
     }, 80);
     return;
   }
+  // Changer de page ferme toute couche flottante (micro-fenêtre, menu
+  // contextuel) : elle appartenait à la page qu'on quitte.
+  window.DismissLayer?.close('page');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   const page=document.getElementById('page-'+id); if(page)page.classList.add('active');

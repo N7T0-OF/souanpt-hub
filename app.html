@@ -699,6 +699,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   color:var(--text);font-family:inherit;font-size:11px;outline:none;resize:vertical}
 .edw-in:focus{border-color:var(--accent)}
 .edw-tog{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--text);padding:4px 0;cursor:pointer}
+.edwin.wide{width:322px}
+/* ☰ Sections — une carte par section, dépliée */
+.edw-sec{border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;background:var(--s2)}
+.edw-sec.off{opacity:.45}
+.edw-sec-h{display:flex;align-items:center;gap:4px;margin-bottom:6px}
+.edw-sec-b{display:flex;flex-direction:column;gap:6px}
+.edw-sec-t,.edw-sec-ic,.edw-sec-d{background:var(--s1);border:1px solid var(--border);border-radius:7px;
+  padding:6px 8px;color:var(--text);font-family:inherit;font-size:11px;outline:none;width:100%}
+.edw-sec-d{resize:vertical;line-height:1.5}
+.edw-sec-t:focus,.edw-sec-ic:focus,.edw-sec-d:focus{border-color:var(--accent)}
+.edw-sec-ic{width:34px;flex-shrink:0;text-align:center;padding:6px 2px}
+.edw-sec-mv,.edw-sec-eye{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;
+  padding:3px 4px;border-radius:5px;flex-shrink:0;line-height:1}
+.edw-sec-mv:hover:not(:disabled),.edw-sec-eye:hover{background:rgba(255,255,255,.08);color:var(--accent)}
+.edw-sec-mv:disabled{opacity:.25;cursor:default}
+.edw-sec-rst{background:none;border:none;color:var(--muted2);font-family:inherit;font-size:9px;
+  cursor:pointer;text-align:left;padding:2px 0}
+.edw-sec-rst:hover{color:var(--accent)}
 /* Zone de dépôt d'image / GIF */
 .edw-drop{position:relative;border:1.5px dashed var(--border2);border-radius:10px;min-height:86px;display:flex;
   align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:all .15s;background:var(--s2)}
@@ -1131,6 +1149,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <span id="ed-canvas-status" style="font-size:9px;color:var(--muted2);min-width:54px;text-align:right"></span>
           <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinTheme(this)" title="Style, couleurs, colonnes">🎨 Thème</button>
           <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinFx(this)" title="Animations & effets">⚡ Effets</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinSections(this)" title="Renommer, décrire et réordonner les sections">☰ Sections</button>
           <button class="btn btn-ghost" id="ed-undo" style="font-size:11px;padding:5px 8px" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" disabled>↶</button>
           <button class="btn btn-ghost" id="ed-redo" style="font-size:11px;padding:5px 8px" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" disabled>↷</button>
           <div class="ed-modes">

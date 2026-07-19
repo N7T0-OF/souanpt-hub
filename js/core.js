@@ -380,6 +380,10 @@ const SiteConfig = {
     behance: '', email: '', repo: '',
     sections: { projects: true, avis: true, contact: true, about: true },
     sectionOrder: ['about', 'projects', 'avis', 'contact'],
+    // Personnalisation des sections. Vide = on garde les valeurs d'origine
+    // (voir SEC_DEFAULTS) : un site déjà publié ne change pas d'apparence.
+    // Par section : { title, heading, desc, icon, showTitle, showDesc }
+    sectionMeta: {},
     avisMode: 'defile',
     about: '', goatcounter: '',
     layoutStyle: 'float', heroImage: '', projectsLimit: 0,
@@ -599,6 +603,12 @@ function migrateBlocksSummary(cfg, projects, links) {
 /** Rendu de la grille Bento depuis les blocs. Conserve data-p / data-l pour l'analytics. */
 function renderBentoGrid(blocks, ctx) {
   const { cfg, projects, links, approved, GRADS, editor } = ctx;
+  // Bento n'a pas de <section> : ce sont les BLOCS qui portent les titres. On
+  // reçoit quand même le résolveur de noms de sections pour que renommer
+  // « Portfolio » dans ☰ Sections se voie AUSSI ici, et pas seulement dans
+  // les thèmes Flottante et Latérale.
+  const sT = ctx.secTitle || (k => k);
+  const sTOr = ctx.secTitleOr || ((k, f) => f);
   const P = id => projects.find(p => String(p.id) === String(id));
   const L = id => links.find(l => String(l.id) === String(id));
   const platIcon = (t, u) => {
@@ -630,7 +640,9 @@ function renderBentoGrid(blocks, ctx) {
         ${cfg.bio ? `<p class="bn-bio">${esc(cfg.bio)}</p>` : ''}`);
     if (b.type === 'text') {
       const pr = bProps(b);
-      return cell(b, `${pr.title ? `<div class="bn-t">${esc(pr.title)}</div>` : ''}<p class="bn-txt">${esc(pr.text || '').replace(/\n/g, '<br>')}</p>`);
+      // b_about EST la section « À propos » : son titre suit ☰ Sections.
+      const t = b.id === 'b_about' ? sT('about') : pr.title;
+      return cell(b, `${t ? `<div class="bn-t">${esc(t)}</div>` : ''}<p class="bn-txt">${esc(pr.text || '').replace(/\n/g, '<br>')}</p>`);
     }
     if (b.type === 'link') {
       const l = L(bRef(b)); if (!l) return '';
@@ -646,12 +658,12 @@ function renderBentoGrid(blocks, ctx) {
     }
     if (b.type === 'reviews') {
       if (!approved.length) return '';
-      return cell(b, `<div class="bn-t">★ Avis</div><div class="bn-rv">${approved.slice(0, 3).map(r =>
+      return cell(b, `<div class="bn-t">★ ${esc(sTOr('avis', 'Avis'))}</div><div class="bn-rv">${approved.slice(0, 3).map(r =>
         `<div class="bn-rvi"><b>${esc(r.author)}</b> <span class="bn-st">${'★'.repeat(r.rating || 5)}</span><p>${esc(r.text)}</p></div>`).join('')}</div>`);
     }
     if (b.type === 'contact') {
       if (!cfg.email) return '';
-      return cell(b, `<span class="bn-ic">✉</span><div class="bn-t">Me contacter</div><div class="bn-sub">${esc(cfg.email)}</div>`,
+      return cell(b, `<span class="bn-ic">✉</span><div class="bn-t">${esc(sTOr('contact', 'Me contacter'))}</div><div class="bn-sub">${esc(cfg.email)}</div>`,
         ` onclick="location.href='mailto:${esc(cfg.email)}'"`);
     }
     if (b.type === 'file') {
@@ -743,14 +755,44 @@ function generateSite(cfg, projects, reviews, opts) {
     ? `<div class="mq"><div class="mqtrack" style="animation-duration:${Math.max(20, approved.length*7)}s">${mqHalf}${mqHalf}</div></div>`
     : `<div class="rg">${reviewCards}</div>`;
 
-  // ── Sections modulaires : visibilité + ordre pilotés par l'éditeur ──
-  const SEC_LABELS = { about: 'À propos', projects: 'Projets', avis: 'Avis', contact: 'Contact' };
-  const SEC_ICONS  = { about: '◈', projects: '▦', avis: '★', contact: '✉' };
+  // ── Sections modulaires : nom, description, icône, visibilité, ordre ──
+  // Les noms ne sont plus imposés : `cfg.sectionMeta` peut redéfinir chaque
+  // champ. Ce qui n'est PAS redéfini retombe sur ces valeurs d'origine, donc
+  // un site publié avant cette version s'affiche exactement pareil.
+  const SEC_DEFAULTS = {
+    about:    { title: 'À propos',    heading: 'Qui suis-je ?',        icon: '◈' },
+    projects: { title: 'Portfolio',   heading: 'Mes projets',          icon: '▦' },
+    avis:     { title: 'Témoignages', heading: 'Avis clients',         icon: '★' },
+    contact:  { title: 'Contact',     heading: 'Travaillons ensemble', icon: '✉' },
+  };
+  const meta = k => ({ ...(SEC_DEFAULTS[k] || {}), ...((cfg.sectionMeta || {})[k] || {}) });
+  const secTitle = k => String(meta(k).title || SEC_DEFAULTS[k]?.title || k);
+  /* Titre PERSONNALISÉ s'il existe, sinon le libellé d'origine passé en second
+     argument. Sert aux endroits (cartes Bento) dont le texte par défaut diffère
+     du nom de la section — « Me contacter » plutôt que « Contact » — pour ne pas
+     changer l'apparence d'un site que personne n'a renommé. */
+  const secTitleOr = (k, fallback) => {
+    const custom = ((cfg.sectionMeta || {})[k] || {}).title;
+    return String(custom || fallback);
+  };
+  const secIcon  = k => String(meta(k).icon || '•');
+  /** En-tête d'une section : surtitre + titre + description, chacun masquable. */
+  const secHead = k => {
+    const m = meta(k);
+    const head = m.showTitle === false ? '' :
+      `<div class="sl">${esc(m.title || '')}</div><h2>${esc(m.heading || m.title || '')}</h2>`;
+    const desc = (m.showDesc === false || !String(m.desc || '').trim()) ? ''
+      : `<p class="ssub">${esc(String(m.desc)).replace(/\n/g, '<br>')}</p>`;
+    return head + desc;
+  };
+  // Compat : le reste du générateur lit encore ces tables.
+  const SEC_LABELS = {}; const SEC_ICONS = {};
+  ['about', 'projects', 'avis', 'contact'].forEach(k => { SEC_LABELS[k] = secTitle(k); SEC_ICONS[k] = secIcon(k); });
   const tagList = [...new Set(projects.flatMap(p => (p.tags || []).slice(0, 3)).filter(Boolean))].slice(0, 8);
   const secHtml = {
-    about: `<section id="about" class="rev" style="max-width:760px"><div class="sl">À propos</div><h2>Qui suis-je ?</h2><p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
-    projects: `<section id="projects" class="rev"><div class="prow"><div><div class="sl">Portfolio</div><h2 style="margin-bottom:0">Mes projets</h2></div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div><div class="pg" style="margin-top:20px">${cards}</div></section>`,
-    avis: `<section id="avis" class="rev"><div class="sl">Témoignages</div><h2>Avis clients</h2>
+    about: `<section id="about" class="rev" style="max-width:760px">${secHead('about')}<p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
+    projects: `<section id="projects" class="rev"><div class="prow"><div>${secHead('projects')}</div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div><div class="pg" style="margin-top:20px">${cards}</div></section>`,
+    avis: `<section id="avis" class="rev">${secHead('avis')}
   ${avisDisplay}
   <div class="leave">
     ${repoFull?`<button class="bg" onclick="document.getElementById('revform').classList.toggle('open')">✎ Laisser un avis</button>
@@ -765,7 +807,7 @@ function generateSite(cfg, projects, reviews, opts) {
     </form>`:''}
   </div>
 </section>`,
-    contact: `<section id="contact" class="ci rev"><div class="sl">Contact</div><h2>Travaillons ensemble</h2><div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>`,
+    contact: `<section id="contact" class="ci rev">${secHead('contact')}<div class="ctas" style="margin-top:20px">${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bp">${esc(cfg.email)}</a>`:''} ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" class="bg">Behance →</a>`:''}</div></section>`,
   };
   /* Corps des styles Flottante & Latérale rendu DEPUIS LES BLOCS (même moteur que
      Bento) : un bloc texte créé via la palette apparaît donc AUSSI ici, dans
@@ -780,6 +822,10 @@ function generateSite(cfg, projects, reviews, opts) {
     return blocks.filter(b => editor || !bHidden(b)).map(b => {
       if (b.type === 'profile' || b.type === 'link') return '';        // hero + nav
       if (b.type === 'project') { if (projectsShown || !sec.projects) return ''; projectsShown = true; return secHtml.projects; }
+      // « À propos » est un bloc texte particulier : c'est LA section about.
+      // Sans ce cas, son titre viendrait des props du bloc (figées à
+      // « À propos ») et la renommer dans ☰ Sections n'aurait aucun effet.
+      if (b.id === 'b_about') return sec.about ? secHtml.about : '';
       if (b.type === 'text')    return flowText(b);
       if (b.type === 'file') {
         const p = bProps(b); if (!p.url) return '';
@@ -829,6 +875,11 @@ h1{font-size:clamp(40px,7vw,76px);font-weight:800;letter-spacing:-2px;line-heigh
 section{padding:48px 32px;max-width:1100px;margin:0 auto}
 .sl{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--a);margin-bottom:8px}
 h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
+/* Description de section (facultative). La marge négative rattrape celle du h2
+   pour rapprocher la description de son titre, sans dépendre de :has(). */
+.ssub{font-size:13px;color:var(--m);line-height:1.7;max-width:640px;margin:-16px 0 26px}
+.prow h2{margin-bottom:0}
+.prow .ssub{margin:6px 0 0}
 /* ── PROJETS ── */
 .pg{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:16px}
 .pc{background:var(--s);border:1px solid var(--b);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .25s;position:relative}
@@ -992,7 +1043,7 @@ ${layoutStyle === 'bento' ? `
     <div class="nl"></div>
     ${cfg.email ? `<a class="ncta" href="mailto:${esc(cfg.email)}">Me contacter</a>` : ''}
   </nav></div>
-  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor })}
+  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor, secTitle, secTitleOr })}
   <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
 </div>` : layoutStyle === 'sidebar' ? `
 <div class="sb-wrap" id="sbw">
