@@ -1067,6 +1067,17 @@ function generateSite(cfg, projects, reviews, opts) {
   const links       = getLinks();
   const blocks      = getBlocks(cfg, projects, links);   // même modèle pour tous les styles
   const heroImage   = String(cfg.heroImage || '').trim();
+  /* ── Visibilité de la bannière / du hero ──────────────────────────────
+     Le hero était écrit EN DUR dans le gabarit, alors qu'il porte
+     `data-b="b_profile"`. Résultat : masquer ou supprimer le bloc le
+     retirait de la liste des blocs — donc de la sélection et de l'édition —
+     mais il restait affiché. La bannière devenait « toujours là, mais plus
+     modifiable ». Elle suit désormais son bloc, comme tous les autres.     */
+  const heroBlock   = blocks.find(b => b.id === 'b_profile') || null;
+  const heroHidden  = heroBlock ? bHidden(heroBlock) : true;   // absent = masqué
+  // En mode éditeur on le garde, grisé, sinon on ne pourrait plus le réafficher.
+  const heroShow    = editor ? !!heroBlock : (!!heroBlock && !heroHidden);
+  const heroCls     = heroHidden ? ' bl-hidden' : '';
   /* ── Bannière cliquable (thème Latérale) ──────────────────────────────
      Résout l'action configurée en une simple destination. Retourne null si
      aucune action : la bannière reste alors un <div>, sans curseur main ni
@@ -1509,11 +1520,11 @@ ${layoutStyle === 'bento' ? `
     ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
   </aside>
   <main class="sb-main">
-    <${heroHref ? 'a' : 'div'} class="sb-hero${heroHref ? ' sb-hero-link' : ''}" data-b="b_profile" data-no-drag${
+    ${!heroShow ? '' : `<${heroHref ? 'a' : 'div'} class="sb-hero${heroHref ? ' sb-hero-link' : ''}${heroCls}" data-b="b_profile" data-no-drag${
         heroHref ? ` href="${esc(heroHref)}"${heroBlank ? ' target="_blank" rel="noopener noreferrer"' : ''}` : ''
       } style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
       <div class="sb-hero-in"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}</h1><p class="hsub">${esc(cfg.bio)}</p></div>
-    </${heroHref ? 'a' : 'div'}>
+    </${heroHref ? 'a' : 'div'}>`}
     ${bodySections}
     <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
   </main>
@@ -1532,8 +1543,8 @@ ${layoutStyle === 'bento' ? `
   ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
   ${cfg.email?`<a href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
 </div>
-<div class="hero" data-b="b_profile" data-no-drag><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
-<div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>
+${!heroShow ? '' : `<div class="hero${heroCls}" data-b="b_profile" data-no-drag><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
+<div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>`}
 ${bodySections}
 <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>`}
 <a class="made" href="${HUB_HOME_URL}" target="_blank" rel="noopener" title="Créé avec Souanpt HUB — clique pour découvrir"><span class="mic">✳</span>Made by <b>Souanpt&nbsp;HUB</b></a>

@@ -102,7 +102,9 @@ const EdCanvas = {
       ['front', '↑ Déplacer vers l\'avant', ''], ['back', '↓ Déplacer vers l\'arrière', ''], null,
       ['lock', bLocked(b) ? '🔓 Déverrouiller' : '🔒 Verrouiller', ''],
       ['hide', bHidden(b) ? '👁 Réafficher' : '👁 Masquer', ''],
-      ['del', '🗑 Supprimer', 'Suppr'],
+      // Le profil se masque, il ne se supprime pas (voir _ctxAct : irrécupérable).
+      [b.type === 'profile' ? 'hide' : 'del',
+       b.type === 'profile' ? (bHidden(b) ? '👁 Réafficher la bannière' : '🗑 Retirer la bannière') : '🗑 Supprimer', 'Suppr'],
     ] : [
       ['add', '＋ Ajouter un bloc', ''], ['paste', '📋 Coller', 'Ctrl+V'], null,
       ['undo', '↶ Annuler', 'Ctrl+Z'], ['redo', '↷ Rétablir', 'Ctrl+Maj+Z'], null,
@@ -366,6 +368,15 @@ body:not(.ed-on) [data-add]{display:none!important}
       showToast?.(bHidden(blocks[i]) ? 'Bloc masqué — grisé ici, absent du site public' : 'Bloc réaffiché ✓', '#666', 2200);
     } else if (a === 'del') {
       const b = blocks[i];
+      /* Le bloc profil (bannière / hero) ne se supprime PAS : rien ne permettrait
+         de le recréer ensuite — il ne dérive d'aucune donnée, contrairement à un
+         projet ou un lien. On le MASQUE, ce qui donne le même résultat visible
+         (absent du site publié) tout en restant réversible d'un clic. */
+      if (b.type === 'profile') {
+        if (!bHidden(b)) this._ctxAct('hide');
+        showToast?.('Bannière masquée — elle disparaît du site publié. Clic dessus ici puis 👁 pour la remettre.', '#666', 4200);
+        return;
+      }
       // Un bloc projet/lien référence une donnée réelle : la supprimer aussi,
       // sinon la réconciliation de getBlocks recréerait le bloc aussitôt.
       if (b.type === 'project' || b.type === 'link') {
