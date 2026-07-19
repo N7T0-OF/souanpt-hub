@@ -699,6 +699,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   color:var(--text);font-family:inherit;font-size:11px;outline:none;resize:vertical}
 .edw-in:focus{border-color:var(--accent)}
 .edw-tog{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--text);padding:4px 0;cursor:pointer}
+/* ── Demandes & Devis ── */
+.qf-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:900px){.qf-cols{grid-template-columns:1fr}}
+.qf-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
+.qf-row:last-child{border-bottom:none}
+.qf-row .qf-l{font-size:11px;color:var(--text);flex:1;min-width:0}
+.qf-row .qf-q{width:52px;flex-shrink:0}
+.qf-row .qf-p{width:66px;flex-shrink:0;text-align:right;font-size:11px;font-weight:700}
+.qf-tag{display:inline-block;font-size:9px;padding:2px 7px;border-radius:999px;margin:2px 4px 2px 0;
+  background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
+.qf-tag.ok{color:var(--accent);border-color:rgba(200,255,0,.3)}
+.qf-tag.warn{color:#e4b24a;border-color:rgba(228,178,74,.32)}
+.qf-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;
+  padding-top:10px;border-top:1px solid var(--border2);font-size:16px;font-weight:800}
+.qf-msg{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px;
+  margin-top:10px;font-family:inherit;font-size:11px;line-height:1.65;color:var(--text);
+  white-space:pre-wrap;max-height:280px;overflow:auto}
+.qf-msg:empty{display:none}
 .edwin.wide{width:322px}
 /* ✎ Contact — une ligne par moyen */
 .edw-ct{margin-bottom:9px}
@@ -1032,6 +1050,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
   <div class="nav-section">
     <div class="nav-label">Business</div>
+    <button class="ni" data-page="devis" onclick="showPage('devis')">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.2"/><path d="M9 2v4h4M5 9h6M5 11.5h4" stroke="currentColor" stroke-width="1.2"/></svg>
+      Demandes &amp; Devis
+    </button>
     <button class="ni" data-page="clients" onclick="showPage('clients')">
       <svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M1 14c0-3 2-5 5-5s5 2 5 5" stroke="currentColor" stroke-width="1.2"/><path d="M11 7l2 2 3-3" stroke="currentColor" stroke-width="1.2"/></svg>
       Clients
@@ -1204,6 +1226,62 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ══ PAGE: DEMANDES & DEVIS ══ -->
+    <div class="page" id="page-devis">
+      <div class="section-header">
+        <div class="section-title">Demandes &amp; Devis</div><div class="section-line"></div>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copyQuestions()">📋 Copier les questions</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.togglePricing()">⚙ Ma grille tarifaire</button>
+      </div>
+
+      <!-- Grille tarifaire — PRIVÉE, ne quitte jamais ce navigateur -->
+      <div class="form-box" id="qf-pricing" style="display:none">
+        <div class="hintbox" style="margin-bottom:10px">🔒 Ces tarifs restent <strong style="color:var(--text)">sur ton appareil</strong>. Le client ne voit jamais ton temps estimé, ton taux horaire ni ton prix plancher — uniquement le prix que tu décides de lui envoyer.</div>
+        <div id="qf-pricing-list"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px">
+          <div><div class="edw-l">Supplément urgence (%)</div><input class="prop-input" id="qf-urg" type="number" min="0" max="200"></div>
+          <div><div class="edw-l">Remise lot dès 4 (%)</div><input class="prop-input" id="qf-pack" type="number" min="0" max="90"></div>
+          <div><div class="edw-l">Taux horaire visé (privé)</div><input class="prop-input" id="qf-rate" type="number" min="0" placeholder="0 = pas d'alerte"></div>
+        </div>
+        <button class="btn btn-accent" style="font-size:10px;margin-top:10px" onclick="QuoteUI.savePricing()">Enregistrer la grille</button>
+      </div>
+
+      <!-- Zone d'analyse -->
+      <div class="form-box" style="display:block">
+        <div class="edw-l" style="margin-top:0">Colle ici le message du client</div>
+        <textarea class="prop-input" id="qf-input" rows="5" placeholder="Exemple : « Il me faudrait une bannière YouTube, une photo de profil et deux miniatures. J'en aurais besoin avant vendredi, et j'aimerais récupérer les PSD. »"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-accent" style="font-size:10px" onclick="QuoteUI.analyze()">⚡ Analyser la demande</button>
+          <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.clear()">Effacer</button>
+        </div>
+      </div>
+
+      <div id="qf-result" style="display:none">
+        <div class="qf-cols">
+          <!-- Analyse -->
+          <div class="an-card">
+            <div class="an-card-h"><span>🔎 Ce que j'ai compris</span><span class="an-card-sub" id="qf-conf"></span></div>
+            <div id="qf-analysis"></div>
+          </div>
+          <!-- Estimation -->
+          <div class="an-card">
+            <div class="an-card-h"><span>💶 Estimation</span><span class="an-card-sub" id="qf-priv"></span></div>
+            <div id="qf-estimate"></div>
+          </div>
+        </div>
+        <div class="an-card">
+          <div class="an-card-h"><span>✉ Messages à envoyer</span><span class="an-card-sub">copier-coller vers Discord, Instagram, WhatsApp…</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copyFollowUp()">📋 Demander ce qui manque</button>
+            <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copySummary()">📋 Envoyer l'estimation</button>
+            <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copySummary(true)">📋 Envoyer le prix ferme</button>
+          </div>
+          <pre id="qf-msg" class="qf-msg"></pre>
+        </div>
+      </div>
+      <div class="ov-hint" id="qf-empty">Colle un message et clique sur <b>Analyser</b>. Tout se passe sur ton appareil : aucun envoi, aucune IA payante, aucune donnée qui sort.</div>
     </div>
 
     <!-- ══ PAGE: ANALYTICS ══ -->
@@ -1772,6 +1850,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/canvas.js"></script>
 <script src="js/storage-ui.js"></script>
 <script src="js/analytics.js"></script>
+<script src="js/quote.js"></script>
 <script>
 /* ═══ SETTINGS ═══ */
 function settingsTab(name, el) {

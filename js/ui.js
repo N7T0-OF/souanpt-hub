@@ -630,13 +630,14 @@ function showPage(id) {
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   const page=document.getElementById('page-'+id); if(page)page.classList.add('active');
   const navBtn=document.querySelector(`.ni[data-page="${id}"]`); if(navBtn)navBtn.classList.add('active');
-  const titles={overview:"Vue d'ensemble",analytics:'Analytics',portfolio:'Portfolio',links:'Profil Links',editor:'Éditeur de site',clients:'Clients',facturation:'Facturation',avis:'Avis',portals:'Portails Clients',media:'Médias',storage:'Stockage',behance:'Behance Sync',github:'GitHub & Déploiement',settings:'Paramètres'};
+  const titles={overview:"Vue d'ensemble",analytics:'Analytics',portfolio:'Portfolio',links:'Profil Links',editor:'Éditeur de site',devis:'Demandes & Devis',clients:'Clients',facturation:'Facturation',avis:'Avis',portals:'Portails Clients',media:'Médias',storage:'Stockage',behance:'Behance Sync',github:'GitHub & Déploiement',settings:'Paramètres'};
   const t=document.getElementById('topbar-title'); if(t)t.textContent=titles[id]||id;
   document.querySelector('.scroll-area')?.scrollTo({top:0});
   if(id==='github') setTimeout(()=>GHPage.init(),50);
   if(id==='editor') { edResetPanels(); edLoad(); setTimeout(edRefreshPreview,100); }
   if(id==='overview') { window.Analytics?.refresh(); if(typeof syncKPIs==='function')syncKPIs(); if(typeof renderActivity==='function')renderActivity(); }
   if(id==='storage')  { window.StorageUI?.init(); window.StorageUI?.render(); }
+  if(id==='devis')    { window.QuoteUI?.init(); }
 }
 
 async function syncBehance(){

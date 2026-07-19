@@ -93,6 +93,9 @@ const Cloud = {
     hub_clients: 'clients', hub_invoices: 'invoices', hub_catalog: 'catalog',
     hub_reviews: 'reviews', hub_links: 'links', hub_media: 'media', hub_portals: 'portals',
     hub_files: 'files',   // métadonnées des fichiers stockés sur GitHub (HubFiles)
+    // Grille tarifaire — vit dans users/{uid}/data, donc PRIVÉE (règles Firestore).
+    // Elle ne doit jamais atteindre une page vue par un client.
+    hub_pricing: 'pricing',
   },
   _pushTimers: {}, _mirroring: false, _origSet: null,
 
@@ -124,7 +127,11 @@ const Cloud = {
   async _pushKey(k) {
     if (!this._user) return;
     const name = this.SYNC_KEYS[k]; if (!name) return;
-    let items = []; try { items = JSON.parse(localStorage.getItem(k) || '[]'); } catch {}
+    // Certaines clés sont des LISTES (clients, factures…), d'autres un OBJET de
+    // réglages (grille tarifaire). Les deux doivent voyager, sinon la clé est
+    // poussée mais jamais relue au login → perte silencieuse sur un 2e appareil.
+    let items = null; try { items = JSON.parse(localStorage.getItem(k) || 'null'); } catch {}
+    if (items === null) items = [];
     try {
       await this._db.collection('users').doc(this._user.uid).collection('data').doc(name)
         .set({ items, updatedAt: Date.now() });
@@ -138,8 +145,9 @@ const Cloud = {
     for (const [k, name] of Object.entries(this.SYNC_KEYS)) {
       try {
         const d = await this._db.collection('users').doc(this._user.uid).collection('data').doc(name).get();
-        if (d.exists && Array.isArray(d.data().items)) {
-          setRaw(k, JSON.stringify(d.data().items));  // écrit sans re-déclencher un push
+        const it = d.exists ? d.data().items : undefined;
+        if (Array.isArray(it) || (it && typeof it === 'object')) {
+          setRaw(k, JSON.stringify(it));  // écrit sans re-déclencher un push
           changed = true;
         }
       } catch (e) { console.warn('[sync] pull ' + name, e); }
