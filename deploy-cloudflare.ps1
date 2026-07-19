@@ -25,8 +25,9 @@ $dist = Join-Path $env:TEMP "souanpt-hub-dist"
 if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
 New-Item -ItemType Directory $dist | Out-Null
 
+# .claude et scripts sont des outils de developpement : rien a faire en ligne.
 robocopy $src $dist /E `
-  /XD .git .github cloudflare node_modules docs .wrangler `
+  /XD .git .github .claude cloudflare node_modules docs scripts .wrangler `
   /XF deploy-cloudflare.ps1 *.md | Out-Null
 
 Write-Host ""

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Page introuvable — souanpt.hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060606;--s1:#0d0d0d;--a:#C8FF00;--t:#f0ece4;--m:rgba(240,236,228,.6);--b:rgba(255,255,255,.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t);font-family:'Syne',system-ui,sans-serif;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+a{color:inherit;text-decoration:none}
+.glow{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse 60% 40% at 50% -5%,rgba(120,80,200,.14),transparent 60%)}
+.n{font-size:clamp(64px,14vw,120px);font-weight:800;letter-spacing:-4px;color:var(--a);line-height:1}
+h1{font-size:clamp(20px,4vw,28px);font-weight:800;letter-spacing:-1px;margin:10px 0 12px}
+p{font-size:14px;color:var(--m);line-height:1.7;max-width:420px;margin:0 auto 28px}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.b{padding:12px 24px;border-radius:12px;font-size:13px;font-weight:800;transition:.2s}
+.b1{background:var(--a);color:#060606}
+.b1:hover{opacity:.85;transform:translateY(-2px)}
+.b2{border:1px solid var(--b);color:var(--t)}
+.b2:hover{border-color:var(--a);color:var(--a)}
+</style></head><body>
+<div class="glow"></div>
+<div>
+  <div class="n">404</div>
+  <h1>Cette page n'existe pas</h1>
+  <p>Le lien est peut-être erroné, ou la page a été retirée. Rien n'est perdu : tout le reste du site fonctionne.</p>
+  <div class="btns">
+    <a class="b b1" href="/">← Retour à l'accueil</a>
+    <a class="b b2" href="/app.html">Tableau de bord</a>
+  </div>
+</div>
+</body></html>
