@@ -50,16 +50,16 @@ export async function onRequestGet(ctx) {
     return notFound('Ce lien n’est pas valide. Vérifie l’adresse que tu as reçue.');
   }
 
-  // 1. Étape commerciale — rendue ICI pour que l'adresse reste /c/<token>.
-  if (await exists('estimates', token)) {
-    return renderEstimate({ ...ctx, params: { code: token } });
-  }
-
-  // 2. Étape production — la page portail existe déjà et lit son id en
-  //    paramètre ; on redirige plutôt que de la réécrire. Elle sera absorbée
-  //    ici quand le portail passera au même moteur de rendu.
+  // 1. Étape production D'ABORD : une fois la mission lancée, un portail existe
+  //    avec le MÊME jeton que l'estimation. Le portail l'emporte donc — sinon
+  //    le client verrait encore l'estimation après le lancement.
   if (await exists('portals', token)) {
     return Response.redirect(new URL('/portal.html?id=' + encodeURIComponent(token), ctx.request.url).toString(), 302);
+  }
+
+  // 2. Étape commerciale — rendue ICI pour que l'adresse reste /c/<token>.
+  if (await exists('estimates', token)) {
+    return renderEstimate({ ...ctx, params: { code: token } });
   }
 
   return notFound('Ce dossier n’existe pas, ou il a été retiré par son auteur.');

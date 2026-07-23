@@ -635,7 +635,7 @@ function showPage(id) {
   document.querySelector('.scroll-area')?.scrollTo({top:0});
   if(id==='github') setTimeout(()=>GHPage.init(),50);
   if(id==='editor') { edResetPanels(); edLoad(); setTimeout(edRefreshPreview,100); }
-  if(id==='overview') { window.Analytics?.refresh(); if(typeof syncKPIs==='function')syncKPIs(); if(typeof renderActivity==='function')renderActivity(); }
+  if(id==='overview') { window.Analytics?.refresh(); if(typeof syncKPIs==='function')syncKPIs(); if(typeof renderActivity==='function')renderActivity(); window.QuoteUI?.loadAcceptances?.(); }
   if(id==='storage')  { window.StorageUI?.init(); window.StorageUI?.render(); }
   if(id==='devis')    { window.QuoteUI?.init(); }
 }

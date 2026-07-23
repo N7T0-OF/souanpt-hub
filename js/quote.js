@@ -359,7 +359,18 @@ const QuoteUI = {
   _esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); },
   _el(id) { return document.getElementById(id); },
 
-  init() { this.renderPricing(); },
+  init() {
+    this.renderPricing();
+    const m = this._el('qf-mode'); if (m) m.value = SiteConfig.get().acceptanceMode || 'manual';
+    this.loadAcceptances();   // repère les acceptations entrantes à confirmer
+  },
+  setMode(v) {
+    SiteConfig.set('acceptanceMode', v === 'automatic' ? 'automatic' : 'manual');
+    showToast?.(v === 'automatic'
+      ? 'Lancement automatique activé — les acceptations créent la mission sans confirmation.'
+      : 'Validation manuelle : tu confirmes chaque acceptation.', '#666', 3500);
+    if (v === 'automatic') this.loadAcceptances();
+  },
 
   /* ── Grille tarifaire ── */
   togglePricing() {
@@ -512,9 +523,10 @@ const QuoteUI = {
     if (!this._a || !this._e) return;
     if (!(window.Cloud && Cloud.enabled && Cloud.user()))
       return showToast?.('Connecte-toi (Google ou Discord) pour créer un lien d\'estimation', '#e4b24a', 4000);
-    if (this._a.missing.length &&
-        !confirm('Le brief est encore incomplet :\n\n- ' + this._a.missing.join('\n- ')
-          + '\n\nPublier quand même ? Le client verra une FOURCHETTE, pas un prix ferme.')) return;
+    // Brief incomplet → le client verra une FOURCHETTE, ce qui est honnête et
+    // déjà signalé sur sa page. Pas de confirm() natif (§3).
+    if (this._a.missing.length)
+      showToast?.('Brief incomplet : le client verra une fourchette, pas un prix ferme.', '#e4b24a', 3500);
 
     const e = this._e, a = this._a;
     const code = (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
@@ -538,6 +550,10 @@ const QuoteUI = {
     };
     try {
       await Cloud._db.collection('estimates').doc(code).set(doc);
+      // On garde une trace locale des estimations créées ici : le tableau de
+      // bord sait ainsi lesquelles surveiller (acceptations entrantes) sans
+      // interroger toute la base.
+      this._track(code, doc);
       /* Lien /c/<token> et non /estimate/<code> : c'est LE lien unique du
          dossier. Il suivra le client jusqu'à la livraison — il n'aura jamais
          à en recevoir un nouveau. /estimate/<code> reste valable pour les
@@ -554,13 +570,257 @@ const QuoteUI = {
 
   copySummary(final) {
     if (!this._a || !this._e) return;
-    if (final && this._a.missing.length &&
-        !confirm('Le brief est encore incomplet :\n\n- ' + this._a.missing.join('\n- ')
-          + '\n\nEnvoyer quand même un prix FERME ? Tu t\'engages alors sur ce que tu n\'as pas encore confirmé.')) return;
+    // Prix ferme sur brief incomplet → avertissement non bloquant, pas de
+    // confirm() natif (§3). Le créateur reste libre d'envoyer.
+    if (final && this._a.missing.length)
+      showToast?.('Attention : brief incomplet, tu envoies un prix ferme.', '#e4b24a', 3500);
     this._copy(QuoteEngine.summary(this._a, this._e, { final: !!final }), final ? 'Prix ferme' : 'Estimation');
+  },
+
+  /* ══════════════════════════════════════════════════════════════════════
+     ACCEPTATIONS & LANCEMENT DE MISSION (côté créateur)
+  ══════════════════════════════════════════════════════════════════════ */
+  ESTK: 'hub_estimates',
+  _tracked() { try { return JSON.parse(localStorage.getItem(this.ESTK) || '[]'); } catch (e) { return []; } },
+  _track(code, doc) {
+    const l = this._tracked().filter(x => x.code !== code);
+    l.unshift({ code, project: doc.projectName || '', total: doc.total, currency: doc.currency,
+                createdAt: doc.createdAt, launched: false });
+    localStorage.setItem(this.ESTK, JSON.stringify(l.slice(0, 100)));
+  },
+  _markLaunched(code) {
+    const l = this._tracked().map(x => x.code === code ? { ...x, launched: true } : x);
+    localStorage.setItem(this.ESTK, JSON.stringify(l));
+  },
+
+  _acc: [],   // acceptations en attente, chargées depuis Firestore
+
+  /** Lit les estimations du créateur et repère les acceptations à confirmer. */
+  async loadAcceptances() {
+    this._acc = [];
+    if (!(window.Cloud && Cloud.enabled && Cloud.user())) { this._renderAcc(); return; }
+    const uid = Cloud.user().uid;
+    try {
+      // Requête par propriétaire (filtre à champ unique, pas d'index composite).
+      const snap = await Cloud._db.collection('estimates').where('owner', '==', uid).limit(60).get();
+      const estimates = [];
+      snap.forEach(d => estimates.push({ code: d.id, ...d.data() }));
+      // Un portail déjà créé = mission lancée → on n'a plus à confirmer.
+      const launched = new Set(this.getPortals().map(p => p.id));
+      for (const est of estimates) {
+        if (est.status === 'confirmed' || launched.has(est.code)) continue;
+        const offs = await Cloud._db.collection('estimates').doc(est.code).collection('offers').get();
+        let accept = null;
+        offs.forEach(o => { const v = o.data(); if (v.author === 'client' && v.kind === 'acceptance') accept = v; });
+        if (accept) this._acc.push({ est, accept });
+      }
+    } catch (e) { console.warn('[quote] loadAcceptances', e); }
+    // Mode automatique : lancer sans intervention pour les prestations simples.
+    if (SiteConfig.get().acceptanceMode === 'automatic') {
+      for (const a of this._acc.slice()) { await this.launch(a.est.code, {}, true); }
+      // Recharge pour retirer celles qui viennent d'être lancées.
+      if (this._acc.length) return this.loadAcceptances();
+    }
+    this._renderAcc();
+  },
+  getPortals() { try { return JSON.parse(localStorage.getItem('hub_portals') || '[]'); } catch (e) { return []; } },
+
+  _renderAcc() {
+    const box = this._el('qf-acc'); if (!box) return;
+    const n = this._acc.length;
+    const badge = this._el('devis-badge');
+    if (badge) { badge.textContent = n || ''; badge.style.display = n ? '' : 'none'; }
+    if (!n) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'block';
+    box.innerHTML = `<div class="an-card" style="border-color:rgba(200,255,0,.3)">
+      <div class="an-card-h"><span>✅ Acceptations à confirmer</span><span class="an-card-sub">${n} en attente</span></div>
+      ${this._acc.map(({ est, accept }) => {
+        const parts = String(accept.message || '').split('·').map(s => s.trim());
+        const name = this._esc(parts[0] || 'Client'), mail = this._esc(parts[1] || '');
+        return `<div class="qf-row" style="align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:700">${this._esc(est.projectName || est.title || 'Projet')}</div>
+            <div style="font-size:10px;color:var(--muted2)">${name}${mail ? ' · ' + mail : ''} · accepté ${this._when(accept.createdAt)}</div>
+          </div>
+          <div style="font-size:13px;font-weight:800;white-space:nowrap;margin:0 10px">${this._esc(accept.amount)} ${this._esc(est.currency || '€')}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-ghost" style="font-size:10px" onclick="window.open('/c/${this._esc(est.code)}','_blank')">Voir</button>
+            <button class="btn btn-accent" style="font-size:10px" onclick="QuoteUI.launchDialog('${this._esc(est.code)}')">🚀 Lancer la mission</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  },
+  _when(ts) {
+    const s = Math.round((Date.now() - Number(ts || 0)) / 1000);
+    if (s < 60) return 'à l\'instant';
+    if (s < 3600) return 'il y a ' + Math.round(s / 60) + ' min';
+    if (s < 86400) return 'il y a ' + Math.round(s / 3600) + ' h';
+    return new Date(Number(ts)).toLocaleDateString('fr-FR');
+  },
+
+  /** Fenêtre intégrée de lancement (jamais confirm/alert/prompt — §4). */
+  launchDialog(code) {
+    const item = this._acc.find(a => a.est.code === code); if (!item) return;
+    const { est, accept } = item;
+    const cur = est.currency || '€';
+    const parts = String(accept.message || '').split('·').map(s => s.trim());
+    const defDate = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const html = `
+      <div class="ql-r"><span>Client</span><b>${this._esc(parts[0] || 'Client')}</b></div>
+      <div class="ql-r"><span>Prestation</span><b>${this._esc(est.projectName || est.title || 'Projet')}</b></div>
+      <div class="ql-r"><span>Prix accepté</span><b>${this._esc(accept.amount)} ${this._esc(cur)}</b></div>
+      <div class="edw-l">Livraison estimée</div>
+      <input class="prop-input" id="ql-date" type="date" value="${defDate}">
+      <div class="edw-l">Acompte</div>
+      <select class="prop-input" id="ql-ac">
+        <option value="0">Aucun</option>
+        <option value="30">30 %</option>
+        <option value="50" selected>50 %</option>
+      </select>
+      <div class="edw-l">Retours inclus</div>
+      <input class="prop-input" id="ql-rev" type="number" min="0" value="${Number(est.revisions) || 2}">
+      <label class="edw-tog" style="margin-top:10px"><input type="checkbox" id="ql-portal" checked> Créer l'espace mission (même lien /c/)</label>`;
+    QDialog.open({
+      title: '🚀 Lancer cette mission ?',
+      body: html,
+      confirm: 'Confirmer et lancer',
+      onConfirm: async (dlg) => {
+        const opts = {
+          deliveryDate: dlg.querySelector('#ql-date').value,
+          acomptePct: Number(dlg.querySelector('#ql-ac').value) || 0,
+          revisions: Number(dlg.querySelector('#ql-rev').value) || 0,
+        };
+        return this.launch(code, opts);
+      },
+    });
+  },
+
+  /**
+   * Lance la mission. IDEMPOTENT : si un portail existe déjà pour ce code,
+   * on ne recrée rien (protection double-clic / rechargement).
+   * Réutilise le MÊME code comme id de portail → /c/<code> continue de marcher.
+   */
+  async launch(code, opts, silent) {
+    opts = opts || {};
+    if (!(window.Cloud && Cloud.enabled && Cloud.user())) {
+      if (!silent) showToast?.('Connecte-toi pour lancer la mission', '#e4b24a', 3500);
+      return false;
+    }
+    // Déjà lancée ? (local d'abord, puis Firestore)
+    if (this.getPortals().some(p => p.id === code)) { if (!silent) showToast?.('Mission déjà lancée', '#666', 2500); return true; }
+    let est = (this._acc.find(a => a.est.code === code) || {}).est;
+    const accept = (this._acc.find(a => a.est.code === code) || {}).accept || {};
+    try {
+      if (!est) { const d = await Cloud._db.collection('estimates').doc(code).get(); est = d.exists ? { code, ...d.data() } : null; }
+      if (!est) { if (!silent) showToast?.('Estimation introuvable', '#c0392b', 3000); return false; }
+      const remote = await Cloud._db.collection('portals').doc(code).get();
+      if (remote.exists) { this._syncPortalLocal(remote.data()); this._markLaunched(code);
+        if (!silent) showToast?.('Mission déjà lancée', '#666', 2500); return true; }
+
+      const parts = String(accept.message || '').split('·').map(s => s.trim());
+      const cfg = SiteConfig.get();
+      // Identité UNIQUE : le portail reprend le nom du créateur, pas « FOLIO »
+      // par défaut (§16 — plus de souanpt d'un côté, FOLIO de l'autre).
+      const siteName = localStorage.getItem('souanpt_pseudo') || Cloud.user().displayName || est.creatorName || 'Mon studio';
+      const acPct = opts.acomptePct || 0;
+      const portal = {
+        id: code, owner: Cloud.user().uid,
+        mission: est.projectName || est.title || 'Mission',
+        client: parts[0] || 'Client',
+        total: Number(accept.amount) || Number(est.total) || 0,
+        acomptePct: acPct,
+        // Étape « Acompte » si un acompte est demandé, sinon « Production ».
+        stepIndex: acPct > 0 ? 2 : 3,
+        revisions: opts.revisions,
+        deliveryDate: opts.deliveryDate || '',
+        siteName, accent: cfg.accentColor || '#C8FF00', theme: cfg.theme || '#060606',
+        active: true, sourceAcceptanceId: code,
+        deliverables: [], createdAt: Date.now(),
+      };
+      // Écriture atomique : le portail Firestore d'abord (source de vérité du
+      // lien public), puis le miroir local, puis le statut de l'estimation.
+      await Cloud.savePortalDoc(portal);
+      this._syncPortalLocal(portal);
+      await Cloud._db.collection('estimates').doc(code).set({ status: 'confirmed', confirmedAt: Date.now() }, { merge: true });
+      this._markLaunched(code);
+      QDialog.close();
+      if (!silent) {
+        showToast?.('✓ Mission lancée — le client suit tout depuis le même lien', '#2e9a63', 4000);
+        if (typeof renderPortals === 'function') renderPortals();
+      }
+      this._acc = this._acc.filter(a => a.est.code !== code);
+      this._renderAcc();
+      return true;
+    } catch (e) {
+      console.warn('[quote] launch', e);
+      if (!silent) showToast?.('✗ ' + (e.message || 'Lancement impossible'), '#c0392b', 4000);
+      return false;
+    }
+  },
+  _syncPortalLocal(portal) {
+    const l = this.getPortals().filter(p => p.id !== portal.id);
+    l.unshift({ ...portal, url: location.origin + '/c/' + portal.id, publishedAt: Date.now() });
+    localStorage.setItem('hub_portals', JSON.stringify(l));
   },
 };
 
+/* ══════════════════════════════════════════════════════════════════════════
+   QDialog — micro-fenêtre intégrée du tableau de bord (remplace confirm/prompt).
+   Overlay + carte, Échap et clic extérieur ferment (sauf pendant l'envoi),
+   focus géré, onConfirm asynchrone avec état de chargement et erreur inline.
+══════════════════════════════════════════════════════════════════════════ */
+const QDialog = {
+  _el: null, _busy: false, _lastFocus: null,
+  open({ title, body, confirm, cancel, onConfirm }) {
+    this.close();
+    this._lastFocus = document.activeElement;
+    const ov = document.createElement('div');
+    ov.className = 'qd-ov';
+    ov.innerHTML = `<div class="qd" role="dialog" aria-modal="true">
+      <h2 class="qd-t">${title || ''}</h2>
+      <div class="qd-b">${body || ''}</div>
+      <div class="qd-err" style="display:none"></div>
+      <div class="qd-a">
+        <button type="button" class="btn btn-ghost qd-cancel">${cancel || 'Annuler'}</button>
+        <button type="button" class="btn btn-accent qd-ok">${confirm || 'Confirmer'}</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    this._el = ov;
+    const card = ov.querySelector('.qd');
+    const okB = ov.querySelector('.qd-ok'), err = ov.querySelector('.qd-err');
+    ov.querySelector('.qd-cancel').onclick = () => { if (!this._busy) this.close(); };
+    ov.onclick = e => { if (e.target === ov && !this._busy) this.close(); };
+    this._key = e => { if (e.key === 'Escape' && !this._busy) this.close(); };
+    document.addEventListener('keydown', this._key);
+    okB.onclick = async () => {
+      if (this._busy || !onConfirm) return;
+      this._busy = true; okB.disabled = true; const label = okB.textContent; okB.textContent = 'Envoi…';
+      err.style.display = 'none';
+      try {
+        const ok = await onConfirm(card);
+        // onConfirm ferme lui-même en cas de succès (ex. QDialog.close()).
+        if (ok === false) throw new Error('Action non aboutie');
+      } catch (e) {
+        this._busy = false; okB.disabled = false; okB.textContent = label;
+        err.textContent = e.message || 'Une erreur est survenue. Réessaie.';
+        err.style.display = 'block';
+        return;
+      }
+      this._busy = false;
+    };
+    const first = card.querySelector('input,select,textarea,button:not(.qd-cancel):not(.qd-ok)');
+    setTimeout(() => { (first || okB).focus(); }, 0);
+  },
+  close() {
+    if (this._key) document.removeEventListener('keydown', this._key);
+    if (this._el) this._el.remove();
+    this._el = null; this._busy = false;
+    if (this._lastFocus && this._lastFocus.focus) { try { this._lastFocus.focus(); } catch (e) {} }
+  },
+};
+
+window.QDialog = QDialog;
 window.QuoteUI = QuoteUI;
 window.Pricing = Pricing;
 window.QuoteEngine = QuoteEngine;

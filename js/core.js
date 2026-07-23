@@ -1715,9 +1715,13 @@ function generatePortal(p, cfg) {
   const solde   = total - acompte;
   const idx    = Number(p.stepIndex) || 0;
   const hasPrice = total > 0;
-  // « Acompte reçu » ne s'affiche JAMAIS sans montant (§26) : un acompte de 0 €
-  // « reçu » n'a aucun sens et donnait l'impression d'une commande déjà réglée.
-  const acompteRecu = hasPrice && idx >= 2;
+  const acStep = acPct > 0;
+  /* « Acompte reçu » ne s'affiche JAMAIS sans montant (§26), et JAMAIS tant
+     qu'on est ENCORE à l'étape Acompte (idx===2 = acompte ATTENDU, pas reçu).
+     Il faut avoir DÉPASSÉ cette étape — c'est le créateur qui l'avance quand le
+     paiement arrive. Sans acompte configuré, la notion ne s'applique pas. */
+  const acompteRecu = hasPrice && acStep && idx > 2;
+  const soldeDu = acStep ? (acompteRecu ? solde : total) : total;
   const money  = n => n.toLocaleString('fr-FR') + ' €';
   const STATUS = { brief:'Brief', devis:'Devis', production:'En production', livraison:'Livraison', termine:'Terminé', valide:'Validé' };
   const statusKey = p.status || (idx >= 5 ? 'termine' : idx >= 3 ? 'production' : idx >= 1 ? 'devis' : 'brief');
@@ -1734,8 +1738,10 @@ function generatePortal(p, cfg) {
     ? deliverables.map(d => `<a class="dl" href="${esc(d.url)}" target="_blank" rel="noopener"><span>📎 ${esc(d.label || 'Fichier')}</span><span class="dl-go">Ouvrir ↗</span></a>`).join('')
     : `<div class="muted" style="padding:6px 2px">Vos fichiers finaux apparaîtront ici à la livraison — accessibles pour toujours depuis ce lien.</div>`;
 
-  const payBtn = (solde > 0 && statusKey !== 'termine' && p.paymentLink)
-    ? `<a class="pay" href="${esc(p.paymentLink)}" target="_blank" rel="noopener">Payer le solde — ${money(solde)} →</a>` : '';
+  // Le bouton propose de régler le montant RÉELLEMENT dû (solde restant), pas
+  // un solde théorique déduit d'un acompte qui n'a peut-être pas été payé.
+  const payBtn = (soldeDu > 0 && statusKey !== 'termine' && p.paymentLink)
+    ? `<a class="pay" href="${esc(p.paymentLink)}" target="_blank" rel="noopener">Payer — ${money(soldeDu)} →</a>` : '';
 
   const body = `
 <div class="wrap">
@@ -1758,10 +1764,11 @@ function generatePortal(p, cfg) {
   </section>
 
   ${hasPrice ? `<section class="c">
-    <div class="c-h"><span class="c-t">💰 Suivi financier</span>${acompteRecu ? '<span class="ok">✓ Acompte reçu</span>' : ''}</div>
-    <div class="fin"><span>Total mission</span><b>${money(total)}</b></div>
-    <div class="fin"><span>Acompte (${acPct}%)</span><b style="color:${acc}">${money(acompte)}</b></div>
-    <div class="fin"><span>Solde à la livraison</span><b>${money(solde)}</b></div>
+    <div class="c-h"><span class="c-t">💰 Suivi financier</span>${acompteRecu ? '<span class="ok">✓ Acompte reçu</span>' : (acStep ? '<span class="muted sm">Acompte attendu</span>' : '')}</div>
+    <div class="fin"><span>Total de la mission</span><b>${money(total)}</b></div>
+    ${acStep ? `<div class="fin"><span>Acompte demandé (${acPct}%)</span><b style="color:${acc}">${money(acompte)}</b></div>
+    <div class="fin"><span>Acompte reçu</span><b>${money(acompteRecu ? acompte : 0)}</b></div>` : ''}
+    <div class="fin"><span>Solde restant</span><b>${money(soldeDu)}</b></div>
     ${payBtn}
   </section>` : `<section class="c">
     <div class="c-h"><span class="c-t">💰 Suivi financier</span><span class="muted sm">En attente de validation</span></div>
