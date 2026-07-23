@@ -1714,7 +1714,10 @@ function generatePortal(p, cfg) {
   const acompte = Math.round(total * acPct / 100);
   const solde   = total - acompte;
   const idx    = Number(p.stepIndex) || 0;
-  const acompteRecu = idx >= 2;
+  const hasPrice = total > 0;
+  // « Acompte reçu » ne s'affiche JAMAIS sans montant (§26) : un acompte de 0 €
+  // « reçu » n'a aucun sens et donnait l'impression d'une commande déjà réglée.
+  const acompteRecu = hasPrice && idx >= 2;
   const money  = n => n.toLocaleString('fr-FR') + ' €';
   const STATUS = { brief:'Brief', devis:'Devis', production:'En production', livraison:'Livraison', termine:'Terminé', valide:'Validé' };
   const statusKey = p.status || (idx >= 5 ? 'termine' : idx >= 3 ? 'production' : idx >= 1 ? 'devis' : 'brief');
@@ -1754,13 +1757,16 @@ function generatePortal(p, cfg) {
     ${p.note ? `<div class="muted sm" style="margin-top:14px">📝 ${esc(p.note)}</div>` : ''}
   </section>
 
-  <section class="c">
+  ${hasPrice ? `<section class="c">
     <div class="c-h"><span class="c-t">💰 Suivi financier</span>${acompteRecu ? '<span class="ok">✓ Acompte reçu</span>' : ''}</div>
     <div class="fin"><span>Total mission</span><b>${money(total)}</b></div>
     <div class="fin"><span>Acompte (${acPct}%)</span><b style="color:${acc}">${money(acompte)}</b></div>
     <div class="fin"><span>Solde à la livraison</span><b>${money(solde)}</b></div>
     ${payBtn}
-  </section>
+  </section>` : `<section class="c">
+    <div class="c-h"><span class="c-t">💰 Suivi financier</span><span class="muted sm">En attente de validation</span></div>
+    <div class="muted" style="padding:6px 2px">Le montant de la mission sera confirmé une fois le devis validé. Aucun paiement n'est demandé à ce stade.</div>
+  </section>`}
 
   <section class="c">
     <div class="c-h"><span class="c-t">📦 Livrables</span><span class="muted sm">${deliverables.length ? deliverables.length + ' fichier(s)' : 'En attente de livraison'}</span></div>

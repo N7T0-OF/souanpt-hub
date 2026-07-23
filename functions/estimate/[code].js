@@ -106,6 +106,8 @@ textarea.inp{resize:vertical;min-height:64px;font-size:12px;line-height:1.6}
 .calc{background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:14px;margin-top:14px}
 .calc .r{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--m)}
 .calc .r.big{font-size:16px;font-weight:800;color:var(--t);padding-top:8px;margin-top:6px;border-top:1px solid var(--b)}
+.chk{display:flex;align-items:flex-start;gap:9px;margin-top:14px;font-size:12px;line-height:1.5;color:var(--t);cursor:pointer}
+.chk input{margin-top:2px;flex-shrink:0}
 .err{color:var(--red);font-size:11px;margin-top:8px;min-height:14px;line-height:1.5}
 .ok{color:var(--green);font-size:12px;margin-top:10px;line-height:1.6}
 .mod .acts{margin-top:18px}
@@ -159,7 +161,25 @@ export async function onRequestGet({ params }) {
     }
   } catch (e) {}
 
-  const closed = expired || status === 'accepted' || status === 'refused';
+  // Le client a-t-il DÉJÀ accepté ? Son acceptation est un engagement, en
+  // attente de confirmation du créateur (le client n'a pas de compte, il ne
+  // peut donc pas changer le statut lui-même). Tant que c'est le cas, on
+  // masque Accepter/Négocier : sinon la page dit « accepté » ET propose encore
+  // d'accepter — l'incohérence signalée.
+  const clientAccepted = offers.some(o => o.author === 'client' && o.kind === 'acceptance');
+  const creatorName = esc(d.creatorName || 'Le créateur');
+  const closed  = expired || status === 'accepted' || status === 'refused';
+  const canAct  = !closed && !clientAccepted;
+
+  const stateBanner = expired
+      ? { t: 'Offre expirée', s: 'Cette offre a expiré. Reprends contact avec le créateur pour en obtenir une nouvelle.' }
+    : status === 'refused'
+      ? { t: 'Offre close', s: 'Cette offre a été close par le créateur.' }
+    : status === 'accepted'
+      ? { t: 'Offre acceptée ✓', s: 'C\'est confirmé — ta mission est lancée. ' + creatorName + ' va démarrer le travail.' }
+    : clientAccepted
+      ? { t: 'Tu as accepté cette offre ✓', s: creatorName + ' va confirmer et lancer ta mission. Tu suivras tout depuis ce même lien — inutile d\'en attendre un autre.' }
+      : null;
 
   const body = `<div class="wrap">
   <div class="brand">
@@ -168,7 +188,9 @@ export async function onRequestGet({ params }) {
   </div>
 
   <h1>${esc(d.title || 'Ton estimation')}</h1>
-  <p class="sub">${d.intro ? esc(d.intro) : 'Voici le détail de ta demande. Tu peux accepter, proposer un autre montant, ou poser une question.'}</p>
+  <p class="sub">${d.intro ? esc(d.intro)
+      : canAct ? 'Voici le détail de ta demande. Tu peux accepter, proposer un autre montant, ou poser une question.'
+      : 'Voici le détail de ta demande.'}</p>
 
   <div class="card">
     ${lines.map(l => `<div class="row"><span class="l">${esc(l.label)}${Number(l.qty) > 1 ? ' × ' + esc(l.qty) : ''}</span>
@@ -185,21 +207,28 @@ export async function onRequestGet({ params }) {
   </div>
 
   ${offers.length ? `<div class="card"><div class="lbl" style="margin-top:0">Historique</div><div class="hist">
-    ${offers.map(o => `<div class="off">
-      <span class="who ${o.author === 'client' ? 'c' : ''}">${o.author === 'client' ? 'Toi' : esc(d.creatorName || 'Créateur')}</span>
-      <span>${o.message ? `<span class="msg">${esc(o.message)}</span>` : ''}</span>
-      <span class="amt">${esc(o.amount)} ${cur}</span>
-    </div>`).join('')}
+    ${offers.map(o => {
+      const mine = o.author === 'client';
+      // « Vous » côté client (page publique), le nom du créateur sinon (§16).
+      const who = mine ? 'Vous' : creatorName;
+      const label = o.kind === 'acceptance'
+        ? (mine ? 'a accepté l\'offre' : 'a confirmé l\'offre')
+        : (o.message ? esc(o.message) : 'a proposé un montant');
+      return `<div class="off">
+        <span class="who ${mine ? 'c' : ''}">${who}</span>
+        <span><span class="msg">${label}</span></span>
+        <span class="amt">${esc(o.amount)} ${cur}</span>
+      </div>`;
+    }).join('')}
   </div></div>` : ''}
 
-  ${closed ? `<div class="card"><p class="sub" style="margin:0">${
-      expired ? 'Cette offre a expiré. Reprends contact avec le créateur pour en obtenir une nouvelle.'
-              : status === 'accepted' ? 'Cette offre a été acceptée. Merci !' : 'Cette offre a été close.'
-    }</p></div>`
-  : `<div class="acts">
+  ${stateBanner ? `<div class="card"><h2 style="font-size:15px;margin-bottom:6px">${stateBanner.t}</h2>
+      <p class="sub" style="margin:0">${stateBanner.s}</p></div>` : ''}
+
+  ${canAct ? `<div class="acts">
       <button class="btn p" id="acc">Accepter ${total} ${cur}</button>
       <button class="btn" id="neg">Négocier</button>
-    </div>`}
+    </div>` : ''}
 
   <p class="foot">Estimation non contractuelle tant qu'elle n'est pas acceptée par les deux parties.<br>
     <a href="/">Créé avec souanpt.hub</a></p>
@@ -243,6 +272,29 @@ export async function onRequestGet({ params }) {
     <div class="acts">
       <button type="button" class="btn" id="cancel">Annuler</button>
       <button type="button" class="btn p" id="send" disabled>Envoyer la proposition</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Fenêtre d'acceptation (remplace le confirm() natif — §3) ══ -->
+<div class="ovl" id="accOvl" role="dialog" aria-modal="true" aria-labelledby="at">
+  <div class="mod">
+    <h2 id="at">Accepter cette estimation ?</h2>
+    <div class="cur">${esc(d.projectName || d.title || 'Projet')} · <b>${total} ${cur}</b>${d.revisions !== undefined ? ' · ' + esc(d.revisions) + ' retour(s)' : ''}</div>
+    <p class="sub" style="margin:2px 0 4px;font-size:12px">En acceptant, tu confirmes le périmètre et le tarif. ${creatorName} recevra ta validation et lancera la mission — tu suivras tout depuis ce même lien.</p>
+
+    <div class="lbl">Ton nom</div>
+    <input class="inp" id="acName" type="text" autocomplete="name" placeholder="Prénom Nom">
+    <div class="lbl">Ton email</div>
+    <input class="inp" id="acMail" type="email" inputmode="email" autocomplete="email" placeholder="toi@exemple.fr">
+    <label class="chk"><input type="checkbox" id="acOk"> <span>J'accepte l'estimation et les conditions associées.</span></label>
+
+    <div class="err" id="acErr"></div>
+    <div class="ok" id="acOkMsg" style="display:none"></div>
+
+    <div class="acts">
+      <button type="button" class="btn" id="acCancel">Annuler</button>
+      <button type="button" class="btn p" id="acConfirm" disabled>Confirmer l'acceptation</button>
     </div>
   </div>
 </div>
@@ -350,6 +402,7 @@ export async function onRequestGet({ params }) {
     var fields = {
       author: { stringValue: 'client' },
       amount: { doubleValue: amount },
+      kind: { stringValue: 'counter' },
       status: { stringValue: 'pending' },
       createdAt: { integerValue: String(Date.now()) }
     };
@@ -376,24 +429,57 @@ export async function onRequestGet({ params }) {
   }
   send.addEventListener('click', submitOffer);
 
-  // Accepter = une offre au prix affiché, tracée comme les autres.
-  if (accBtn) accBtn.addEventListener('click', function(){
-    if (!confirm('Accepter cette offre à ' + money(TOTAL) + ' ?')) return;
-    accBtn.disabled = true; accBtn.textContent = 'Envoi…';
+  // ── Acceptation : fenêtre intégrée, jamais de confirm()/alert() natif ──
+  var accOvl = document.getElementById('accOvl'),
+      acName = document.getElementById('acName'), acMail = document.getElementById('acMail'),
+      acOk = document.getElementById('acOk'), acErr = document.getElementById('acErr'),
+      acOkMsg = document.getElementById('acOkMsg'),
+      acConfirm = document.getElementById('acConfirm'),
+      acCancel = document.getElementById('acCancel');
+  var accSending = false, accFocus = null;
+
+  function mailOk(v){ return /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(v); }
+  function accRefresh(){
+    acConfirm.disabled = accSending
+      || acName.value.trim().length < 2 || !mailOk(acMail.value.trim()) || !acOk.checked;
+  }
+  [acName, acMail].forEach(function(e){ e.addEventListener('input', function(){ acErr.textContent=''; accRefresh(); }); });
+  acOk.addEventListener('change', accRefresh);
+
+  function accOpen(){ accFocus = accBtn; accOvl.classList.add('on'); setTimeout(function(){ acName.focus(); }, 0); }
+  function accClose(){ accOvl.classList.remove('on'); if (accFocus && accFocus.focus) accFocus.focus(); }
+  if (accBtn) accBtn.addEventListener('click', accOpen);
+  acCancel.addEventListener('click', accClose);
+  accOvl.addEventListener('click', function(e){ if (e.target === accOvl && !accSending) accClose(); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && accOvl.classList.contains('on') && !accSending) accClose();
+  });
+
+  acConfirm.addEventListener('click', function(){
+    if (accSending) return;
+    if (acConfirm.disabled) return;
+    accSending = true; acConfirm.disabled = true; acConfirm.textContent = 'Envoi…'; acErr.textContent = '';
+    // kind:'acceptance' → la page saura, au rechargement, que le client s'est
+    // engagé, et masquera Accepter/Négocier. Le statut reste 'pending' : c'est
+    // au créateur de CONFIRMER (modèle à deux parties). L'estimation ne peut
+    // donc pas s'auto-accepter côté client.
     fetch(URL_, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ fields: {
         author: { stringValue: 'client' }, amount: { doubleValue: TOTAL },
-        status: { stringValue: 'pending' }, createdAt: { integerValue: String(Date.now()) },
-        message: { stringValue: "J'accepte cette offre." }
+        kind: { stringValue: 'acceptance' }, status: { stringValue: 'pending' },
+        createdAt: { integerValue: String(Date.now()) },
+        message: { stringValue: (acName.value.trim() + ' · ' + acMail.value.trim()).slice(0, 600) }
       }})
     }).then(function(r){
       if (!r.ok) throw new Error();
-      accBtn.textContent = 'Acceptée ✓';
-      setTimeout(function(){ location.reload(); }, 1400);
+      acOkMsg.style.display = 'block';
+      acOkMsg.textContent = 'Estimation acceptée ✓ ' + ${JSON.stringify(creatorName)} + ' va lancer ta mission.';
+      acConfirm.textContent = 'Acceptée ✓';
+      setTimeout(function(){ location.reload(); }, 1600);
     }).catch(function(){
-      accBtn.disabled = false; accBtn.textContent = 'Accepter ' + money(TOTAL);
-      alert("L'acceptation n'a pas pu être enregistrée. Réessaie dans un instant.");
+      accSending = false; acConfirm.disabled = false; acConfirm.textContent = "Confirmer l'acceptation";
+      acErr.textContent = "L'acceptation n'a pas pu être enregistrée. Vérifie ta connexion et réessaie.";
     });
   });
 })();

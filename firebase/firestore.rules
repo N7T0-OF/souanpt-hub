@@ -56,12 +56,19 @@ service cloud.firestore {
       // est imposé pour qu'une offre ne puisse pas s'auto-accepter.
       match /offers/{offerId} {
         allow read: if true;
+        // `kind` distingue une contre-offre ('counter') d'une acceptation
+        // ('acceptance'). Une acceptation reste status:'pending' : c'est un
+        // ENGAGEMENT DU CLIENT, que le créateur confirme ensuite côté tableau
+        // de bord (modèle à deux parties). Le client ne peut donc jamais
+        // marquer une estimation acceptée tout seul.
         allow create: if
-             request.resource.data.keys().hasOnly(['author','amount','discountPercent','message','status','createdAt'])
+             request.resource.data.keys().hasOnly(['author','amount','discountPercent','message','status','createdAt','kind'])
           && request.resource.data.status == 'pending'
           && request.resource.data.amount is number
           && request.resource.data.amount > 0
           && request.resource.data.amount < 1000000
+          && (!('kind' in request.resource.data)
+              || request.resource.data.kind in ['counter','acceptance'])
           && (!('message' in request.resource.data)
               || (request.resource.data.message is string && request.resource.data.message.size() <= 600))
           && (
