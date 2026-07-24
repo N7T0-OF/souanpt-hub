@@ -194,6 +194,8 @@ const Cloud = {
       total: Number(p.total) || 0, acomptePct: Number(p.acomptePct) || 0,
       stepIndex: Number(p.stepIndex) || 0, paymentLink: p.paymentLink || '',
       note: p.note || '', deliverables: p.deliverables || [],
+      // Pièces jointes = RÉFÉRENCES (id + url + méta), jamais le binaire.
+      attachments: Array.isArray(p.attachments) ? p.attachments : [],
       password: p.password || '', active: p.active !== false,
       siteName: p.siteName || '', accent: p.accent || '#C8FF00', theme: p.theme || '#060606',
       updatedAt: Date.now(),

@@ -361,6 +361,7 @@ const QuoteUI = {
 
   init() {
     this.renderPricing();
+    this._renderChips();
     const m = this._el('qf-mode'); if (m) m.value = SiteConfig.get().acceptanceMode || 'manual';
     this.loadAcceptances();   // repère les acceptations entrantes à confirmer
   },
@@ -419,10 +420,56 @@ const QuoteUI = {
   clear() {
     const i = this._el('qf-input'); if (i) i.value = '';
     this._a = this._e = null;
+    this._attachments = [];
+    this._renderChips();
     this._el('qf-result').style.display = 'none';
     this._el('qf-empty').style.display = 'block';
     this._el('qf-msg').textContent = '';
   },
+
+  /* ── Références jointes (fichiers PUBLICS du Stockage) ─────────────────── */
+  _attachments: [],
+  _renderChips() {
+    const box = this._el('qf-chips'); if (!box) return;
+    const n = (this._attachments || []).length;
+    box.innerHTML = n ? this._attachments.map((a, i) =>
+      `<span class="qf-chip">📎 ${this._esc(a.name)}<button onclick="QuoteUI.unattach(${i})" title="Retirer">✕</button></span>`).join('')
+      : '<span class="edw-hint">Aucune référence jointe. Elles suivront la mission automatiquement.</span>';
+  },
+  unattach(i) { this._attachments.splice(i, 1); this._renderChips(); },
+  attachDialog() {
+    if (typeof HubFiles === 'undefined') return showToast?.('Stockage indisponible', '#e4b24a', 3000);
+    // Seuls les fichiers PUBLICS sont proposés : le client (sans compte) ne
+    // pourra voir sur sa mission que ce qui a une URL publique.
+    const files = HubFiles.list().filter(f => f.status !== 'trash' && f.visibility === 'public');
+    const already = new Set((this._attachments || []).map(a => a.id));
+    const body = files.length
+      ? `<div class="edw-hint" style="margin-bottom:8px">Seuls tes fichiers <b>publics</b> apparaissent : le client les verra sur sa mission sans avoir à les renvoyer.</div>
+         <div style="max-height:46vh;overflow:auto">${files.map(f =>
+           `<label class="edw-tog" style="padding:6px 0"><input type="checkbox" data-fid="${this._esc(f.id)}"${already.has(f.id) ? ' checked' : ''}>
+             📎 ${this._esc(f.displayName || f.name)} <span class="edw-hint">${this._size(f.size)}</span></label>`).join('')}</div>`
+      : `<div class="edw-hint">Aucun fichier public dans ton Stockage. Rends une référence publique dans <b>Stockage</b>, puis reviens la joindre.</div>`;
+    QDialog.open({
+      title: '📎 Joindre des références', body, confirm: 'Joindre',
+      onConfirm: (dlg) => {
+        const picked = [...dlg.querySelectorAll('[data-fid]:checked')].map(c => c.dataset.fid);
+        const list = HubFiles.list();
+        this._attachments = picked.map(id => {
+          const f = list.find(x => x.id === id); if (!f) return null;
+          return {
+            id: f.id, name: f.displayName || f.name, type: f.mime || '', size: f.size || 0,
+            url: HubFiles.publicUrl(f), storagePath: f.path, hash: f.sha || '',
+            category: 'client_reference', visibility: 'client_visible',
+            uploadedBy: 'creator', createdAt: Date.now(),
+          };
+        }).filter(Boolean);
+        this._renderChips();
+        QDialog.close();
+        return true;
+      },
+    });
+  },
+  _size(b) { b = Number(b) || 0; if (b < 1024) return b + ' o'; if (b < 1048576) return (b / 1024).toFixed(0) + ' Ko'; return (b / 1048576).toFixed(1) + ' Mo'; },
   analyze() {
     const txt = (this._el('qf-input')?.value || '').trim();
     if (!txt) return showToast?.('Colle d\'abord le message du client', '#e4b24a', 2500);
@@ -547,6 +594,9 @@ const QuoteUI = {
       status: 'sent',
       createdAt: Date.now(),
       expiresAt: Date.now() + days * 86400000,
+      // Références jointes (fichiers PUBLICS uniquement — le client les verra
+      // sur la mission sans avoir à les renvoyer). Références, pas binaires.
+      attachments: (this._attachments || []).slice(),
     };
     try {
       await Cloud._db.collection('estimates').doc(code).set(doc);
@@ -595,9 +645,11 @@ const QuoteUI = {
 
   _acc: [],   // acceptations en attente, chargées depuis Firestore
 
-  /** Lit les estimations du créateur et repère les acceptations à confirmer. */
+  _neg: [],   // contre-offres en attente (notification interne)
+
+  /** Lit les estimations du créateur : acceptations à confirmer + contre-offres. */
   async loadAcceptances() {
-    this._acc = [];
+    this._acc = []; this._neg = [];
     if (!(window.Cloud && Cloud.enabled && Cloud.user())) { this._renderAcc(); return; }
     const uid = Cloud.user().uid;
     try {
@@ -607,12 +659,24 @@ const QuoteUI = {
       snap.forEach(d => estimates.push({ code: d.id, ...d.data() }));
       // Un portail déjà créé = mission lancée → on n'a plus à confirmer.
       const launched = new Set(this.getPortals().map(p => p.id));
+      // Contre-offres déjà « vues » (marquées localement) → on ne re-notifie pas.
+      const seen = this._seenNeg();
       for (const est of estimates) {
         if (est.status === 'confirmed' || launched.has(est.code)) continue;
         const offs = await Cloud._db.collection('estimates').doc(est.code).collection('offers').get();
-        let accept = null;
-        offs.forEach(o => { const v = o.data(); if (v.author === 'client' && v.kind === 'acceptance') accept = v; });
+        let accept = null, lastCounter = null;
+        offs.forEach(o => {
+          const v = o.data();
+          if (v.author !== 'client') return;
+          if (v.kind === 'acceptance') accept = v;
+          else if (v.kind === 'counter' && (!lastCounter || (v.createdAt || 0) > (lastCounter.createdAt || 0))) lastCounter = v;
+        });
+        // L'acceptation prime : si le client a fini par accepter, la contre-offre
+        // n'a plus à être signalée.
         if (accept) this._acc.push({ est, accept });
+        else if (lastCounter && !seen.has(est.code + ':' + (lastCounter.createdAt || 0))) {
+          this._neg.push({ est, offer: lastCounter });
+        }
       }
     } catch (e) { console.warn('[quote] loadAcceptances', e); }
     // Mode automatique : lancer sans intervention pour les prestations simples.
@@ -625,15 +689,25 @@ const QuoteUI = {
   },
   getPortals() { try { return JSON.parse(localStorage.getItem('hub_portals') || '[]'); } catch (e) { return []; } },
 
+  // Contre-offres déjà consultées → mémorisées localement pour ne pas re-notifier.
+  _seenNeg() { try { return new Set(JSON.parse(localStorage.getItem('hub_neg_seen') || '[]')); } catch (e) { return new Set(); } },
+  dismissNeg(key) {
+    const s = this._seenNeg(); s.add(key);
+    localStorage.setItem('hub_neg_seen', JSON.stringify([...s].slice(-200)));
+    this._neg = this._neg.filter(x => x.est.code + ':' + (x.offer.createdAt || 0) !== key);
+    this._renderAcc();
+  },
+
   _renderAcc() {
     const box = this._el('qf-acc'); if (!box) return;
-    const n = this._acc.length;
+    const nA = this._acc.length, nN = this._neg.length, n = nA + nN;
     const badge = this._el('devis-badge');
     if (badge) { badge.textContent = n || ''; badge.style.display = n ? '' : 'none'; }
     if (!n) { box.style.display = 'none'; box.innerHTML = ''; return; }
     box.style.display = 'block';
-    box.innerHTML = `<div class="an-card" style="border-color:rgba(200,255,0,.3)">
-      <div class="an-card-h"><span>✅ Acceptations à confirmer</span><span class="an-card-sub">${n} en attente</span></div>
+
+    const accCard = !nA ? '' : `<div class="an-card" style="border-color:rgba(200,255,0,.3)">
+      <div class="an-card-h"><span>✅ Acceptations à confirmer</span><span class="an-card-sub">${nA} en attente</span></div>
       ${this._acc.map(({ est, accept }) => {
         const parts = String(accept.message || '').split('·').map(s => s.trim());
         const name = this._esc(parts[0] || 'Client'), mail = this._esc(parts[1] || '');
@@ -650,6 +724,26 @@ const QuoteUI = {
         </div>`;
       }).join('')}
     </div>`;
+
+    // Notification interne : contre-offres reçues (pas de service tiers).
+    const negCard = !nN ? '' : `<div class="an-card" style="border-color:rgba(228,178,74,.3)">
+      <div class="an-card-h"><span>💬 Contre-offres reçues</span><span class="an-card-sub">${nN} à examiner</span></div>
+      ${this._neg.map(({ est, offer }) => {
+        const key = est.code + ':' + (offer.createdAt || 0);
+        return `<div class="qf-row" style="align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:700">${this._esc(est.projectName || est.title || 'Projet')}</div>
+            <div style="font-size:10px;color:var(--muted2)">Proposé : ${this._esc(offer.amount)} ${this._esc(est.currency || '€')} (au lieu de ${this._esc(est.total)}) · ${this._when(offer.createdAt)}${offer.message ? ' · « ' + this._esc(String(offer.message).slice(0, 60)) + ' »' : ''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-ghost" style="font-size:10px" onclick="window.open('/c/${this._esc(est.code)}','_blank')">Voir</button>
+            <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.dismissNeg('${this._esc(key)}')" title="Marquer comme lue">Vu</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+    box.innerHTML = accCard + negCard;
   },
   _when(ts) {
     const s = Math.round((Date.now() - Number(ts || 0)) / 1000);
@@ -737,6 +831,12 @@ const QuoteUI = {
         siteName, accent: cfg.accentColor || '#C8FF00', theme: cfg.theme || '#060606',
         active: true, sourceAcceptanceId: code,
         deliverables: [], createdAt: Date.now(),
+        // Reprise AUTOMATIQUE des pièces jointes de la demande / estimation :
+        // références, brief… Elles ne sont pas recopiées (ce sont des
+        // références de fichiers), juste rattachées, dédupliquées.
+        attachments: (typeof dedupeAttachments === 'function')
+          ? dedupeAttachments([...(est.attachments || []), ...(est.requestAttachments || [])])
+          : (est.attachments || []),
       };
       // Écriture atomique : le portail Firestore d'abord (source de vérité du
       // lien public), puis le miroir local, puis le statut de l'estimation.

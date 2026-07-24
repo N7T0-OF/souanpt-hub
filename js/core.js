@@ -1694,6 +1694,97 @@ async function deployPortfolio(onLog, onStep) {
 ══════════════════════════════════════════════════════ */
 const PORTAL_STEPS = ['Brief', 'Devis', 'Acompte', 'Production', 'Livraison', 'Terminé'];
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Pièces jointes unifiées — mêmes fichiers de la demande à la livraison.
+
+   ⚠ On ne COPIE JAMAIS le binaire. Une pièce jointe n'est qu'une RÉFÉRENCE :
+   l'id du fichier dans le Stockage (HubFiles) + son URL publique + des
+   métadonnées. Retirer une pièce jointe d'une mission n'efface donc jamais le
+   fichier du Stockage — seulement le lien.
+
+   Modèle : { id, name, type, size, url, category, visibility, uploadedBy, createdAt }
+══════════════════════════════════════════════════════════════════════════ */
+const ATTACH_CATEGORIES = ['client_reference', 'brief', 'document', 'source_asset', 'proposal', 'deliverable', 'internal'];
+const ATTACH_CAT_LABEL = {
+  client_reference: 'Références du client', brief: 'Brief et documents', document: 'Documents',
+  source_asset: 'Fichiers de travail', proposal: 'Propositions', deliverable: 'Livrables finaux', internal: 'Interne',
+};
+// Ordre d'affichage des sections côté client.
+const ATTACH_CAT_ORDER = ['client_reference', 'brief', 'document', 'proposal', 'deliverable'];
+const ATTACH_VISIBILITY = ['internal', 'client_visible', 'preview_only', 'downloadable', 'locked_until_payment'];
+
+/** Un fichier est-il montrable au CLIENT ? (jamais 'internal'.) */
+function attachClientVisible(a) {
+  return a && a.visibility && a.visibility !== 'internal';
+}
+/** Le client peut-il TÉLÉCHARGER ? (aperçu seul, ou verrou paiement, => non.) */
+function attachDownloadable(a, paid) {
+  if (!a) return false;
+  if (a.visibility === 'downloadable' || a.visibility === 'client_visible') return true;
+  if (a.visibility === 'locked_until_payment') return !!paid;
+  return false;   // preview_only, internal
+}
+
+/**
+ * Déduplique une liste de pièces jointes SANS jamais fusionner deux fichiers
+ * réellement différents : on compare d'abord l'id, puis l'URL (≈ storagePath),
+ * puis le hash, et seulement en dernier recours nom+taille.
+ */
+function dedupeAttachments(list) {
+  const out = [], seen = new Set();
+  for (const a of (list || [])) {
+    if (!a) continue;
+    const keys = [
+      a.id && 'id:' + a.id,
+      a.url && 'url:' + a.url,
+      a.storagePath && 'path:' + a.storagePath,
+      a.hash && 'hash:' + a.hash,
+      (a.name && a.size) ? 'ns:' + a.name + ':' + a.size : null,
+    ].filter(Boolean);
+    if (keys.some(k => seen.has(k))) continue;
+    keys.forEach(k => seen.add(k));
+    out.push(a);
+  }
+  return out;
+}
+
+/** Section « Fichiers du projet » du portail (ne montre que les catégories présentes). */
+function renderPortalFiles(p, opts) {
+  const paid = !!(opts && opts.paid);
+  const all = (p.attachments || []).filter(attachClientVisible);
+  if (!all.length) return '';
+  const icon = a => {
+    const t = (a.type || '') + ' ' + (a.name || '');
+    if (/image\//.test(a.type) || /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(a.name || '')) return '🖼';
+    if (/pdf/.test(t)) return '📄'; if (/zip|rar|archive/.test(t)) return '🗜';
+    if (/video/.test(t)) return '🎬'; if (/audio/.test(t)) return '🎵'; return '📎';
+  };
+  const groups = ATTACH_CAT_ORDER
+    .map(cat => ({ cat, items: all.filter(a => (a.category || 'document') === cat) }))
+    .filter(g => g.items.length);
+  // Catégories non prévues dans l'ordre → repli « Documents ».
+  const known = new Set(ATTACH_CAT_ORDER);
+  const rest = all.filter(a => !known.has(a.category || 'document'));
+  if (rest.length) groups.push({ cat: 'document', items: rest });
+
+  const rowFor = a => {
+    const dl = attachDownloadable(a, paid);
+    const locked = a.visibility === 'locked_until_payment' && !paid;
+    const action = locked ? '<span class="dl-go" style="opacity:.6">🔒 après paiement</span>'
+      : dl ? '<span class="dl-go">Ouvrir ↗</span>' : '<span class="dl-go" style="opacity:.6">Aperçu</span>';
+    const href = (dl && a.url) ? esc(a.url) : null;
+    const inner = `<span>${icon(a)} ${esc(a.name || 'Fichier')}</span>${action}`;
+    return href
+      ? `<a class="dl" href="${href}" target="_blank" rel="noopener">${inner}</a>`
+      : `<div class="dl" style="cursor:default">${inner}</div>`;
+  };
+  return `<section class="c">
+    <div class="c-h"><span class="c-t">📁 Fichiers du projet</span><span class="muted sm">${all.length} fichier(s)</span></div>
+    ${groups.map(g => `<div class="muted sm" style="margin:10px 0 4px">${esc(ATTACH_CAT_LABEL[g.cat] || 'Documents')}</div>
+      ${g.items.map(rowFor).join('')}`).join('')}
+  </section>`;
+}
+
 function randomId(len = 16) {
   const a = new Uint8Array(len);
   (crypto || window.crypto).getRandomValues(a);
@@ -1774,6 +1865,8 @@ function generatePortal(p, cfg) {
     <div class="c-h"><span class="c-t">💰 Suivi financier</span><span class="muted sm">En attente de validation</span></div>
     <div class="muted" style="padding:6px 2px">Le montant de la mission sera confirmé une fois le devis validé. Aucun paiement n'est demandé à ce stade.</div>
   </section>`}
+
+  ${renderPortalFiles(p, { paid: acompteRecu || idx >= 5 })}
 
   <section class="c">
     <div class="c-h"><span class="c-t">📦 Livrables</span><span class="muted sm">${deliverables.length ? deliverables.length + ' fichier(s)' : 'En attente de livraison'}</span></div>

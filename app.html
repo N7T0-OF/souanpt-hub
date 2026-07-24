@@ -730,6 +730,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .qd-a .btn{flex:1;justify-content:center}
 .ql-r{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border)}
 .ql-r span{color:var(--muted)}
+.qf-chip{display:inline-flex;align-items:center;gap:6px;font-size:10px;padding:4px 8px;border-radius:999px;
+  background:var(--s2);border:1px solid var(--border);color:var(--text)}
+.qf-chip button{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:10px;padding:0;line-height:1}
+.qf-chip button:hover{color:var(--red,#c0392b)}
 @media(max-width:520px){.qd-ov{align-items:flex-end;padding:0}.qd{max-width:none;border-radius:16px 16px 0 0}}
 .edwin.wide{width:322px}
 /* ✎ Contact — une ligne par moyen */
@@ -1300,8 +1304,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copySummary()">📋 Envoyer l'estimation</button>
             <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.copySummary(true)">📋 Envoyer le prix ferme</button>
             <input class="prop-input" id="qf-project" placeholder="Nom du projet (facultatif)" style="width:180px;font-size:10px">
+            <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.attachDialog()">📎 Joindre des références</button>
             <button class="btn btn-accent" style="font-size:10px" onclick="QuoteUI.publish()">🔗 Créer un lien client</button>
           </div>
+          <div id="qf-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
           <pre id="qf-msg" class="qf-msg"></pre>
         </div>
       </div>
