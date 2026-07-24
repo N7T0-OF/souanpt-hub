@@ -88,16 +88,17 @@ const QUESTIONS_DEFAULT = [
   { k: 'assets', label: 'As-tu déjà des éléments à fournir ?', type: 'bool' },
 ];
 
-function shell(title, body) {
+function shell(title, body, status) {
   return new Response(`<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>${esc(title)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>${CSS}</style></head><body>${body}</body></html>`,
-    { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
+    { status: status || 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
 }
 function notFound(msg) {
-  return shell('Lien introuvable', `<div class="wrap"><h1>Lien introuvable</h1><p class="sub">${esc(msg)}</p></div>`);
+  // Statut 404 réel : une demande absente ne doit pas être indexée comme une page valide.
+  return shell('Lien introuvable', `<div class="wrap"><h1>Lien introuvable</h1><p class="sub">${esc(msg)}</p></div>`, 404);
 }
 
 const CSS = `
