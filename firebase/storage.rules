@@ -14,5 +14,20 @@ service firebase.storage {
                    && request.resource.size < 5 * 1024 * 1024          // 5 Mo max
                    && request.resource.contentType.matches('image/.*'); // images uniquement
     }
+
+    // ── Références déposées par un CLIENT SANS COMPTE via le formulaire ──
+    // Chemin isolé requests/<token>/<fileId>/<nom>. Écriture anonyme autorisée
+    // mais fortement bornée : 20 Mo, et JAMAIS de contenu exécutable (le type
+    // MIME de ces formats est refusé). Lecture publique pour que le créateur et
+    // le client revoient la référence via son URL de téléchargement.
+    match /requests/{token}/{fileId}/{fileName} {
+      allow read: if true;
+      allow write: if request.resource.size < 20 * 1024 * 1024
+                   && !request.resource.contentType.matches('application/x-msdownload')
+                   && !request.resource.contentType.matches('application/x-executable')
+                   && !request.resource.contentType.matches('application/vnd.android.package-archive')
+                   && !request.resource.contentType.matches('application/x-sh')
+                   && !request.resource.contentType.matches('text/javascript');
+    }
   }
 }

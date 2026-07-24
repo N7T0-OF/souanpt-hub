@@ -83,6 +83,28 @@ service cloud.firestore {
       }
     }
 
+    // ── Formulaires de demande, remplis par le client SANS compte ──
+    // Le créateur crée le document (vide, status:'open'). Le client public ne
+    // peut QUE compléter SA demande tant qu'elle est ouverte, et rien d'autre :
+    // il ne peut ni changer le propriétaire, ni rouvrir une demande traitée,
+    // ni écrire un prix ou un statut interne (ces champs vivent ailleurs).
+    match /requests/{token} {
+      allow read: if true;
+      allow create: if creatingSelf();
+      allow delete: if isOwner();
+      // Le créateur (connecté, propriétaire) : tout.
+      // Le client (anonyme) : seulement passer 'open' → 'submitted' et remplir
+      // les champs autorisés, jamais toucher owner/creatorName/status déjà figé.
+      allow update: if isOwner()
+        || (
+             resource.data.status == 'open'
+          && request.resource.data.owner == resource.data.owner
+          && request.resource.data.status == 'submitted'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status','submittedAt','contact','service','answers','description','budget','deadline','links','attachments'])
+        );
+    }
+
     // Collections privées scopées par owner
     match /{col}/{id} {
       allow read:   if isOwner();

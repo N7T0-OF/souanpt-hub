@@ -421,6 +421,7 @@ const QuoteUI = {
     const i = this._el('qf-input'); if (i) i.value = '';
     this._a = this._e = null;
     this._attachments = [];
+    this._fromRequest = null;
     this._renderChips();
     this._el('qf-result').style.display = 'none';
     this._el('qf-empty').style.display = 'block';
@@ -576,7 +577,9 @@ const QuoteUI = {
       showToast?.('Brief incomplet : le client verra une fourchette, pas un prix ferme.', '#e4b24a', 3500);
 
     const e = this._e, a = this._a;
-    const code = (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
+    // Si l'estimation vient d'une DEMANDE, on réutilise SON token → le client
+    // garde le même /c/ (demande → estimation → mission), aucun nouveau lien.
+    const code = this._fromRequest || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
     const days = 7;
     // Objet volontairement plat et minimal — relire cette liste avant d'y ajouter
     // quoi que ce soit : tout champ ajouté devient public.
@@ -612,7 +615,8 @@ const QuoteUI = {
       const box = this._el('qf-msg');
       if (box) box.textContent = `Lien client créé :\n${url}\n\nValable ${days} jours. Il s'ouvre sans compte, et restera le même quand le projet passera en production.`;
       navigator.clipboard?.writeText(url).catch(() => {});
-      showToast?.('Lien créé et copié ✓', '#2e9a63', 3500);
+      showToast?.(this._fromRequest ? 'Estimation créée sur le même lien ✓' : 'Lien créé et copié ✓', '#2e9a63', 3500);
+      this._fromRequest = null;   // consommé
     } catch (err) {
       showToast?.('✗ ' + (err.message || 'Publication impossible'), '#c0392b', 4000);
     }
@@ -646,17 +650,46 @@ const QuoteUI = {
   _acc: [],   // acceptations en attente, chargées depuis Firestore
 
   _neg: [],   // contre-offres en attente (notification interne)
+  _reqs: [],  // demandes reçues (formulaire public) à traiter
 
-  /** Lit les estimations du créateur : acceptations à confirmer + contre-offres. */
+  /** Crée un lien de demande vide et le copie. Le client remplira le formulaire. */
+  async newRequestLink() {
+    if (!(window.Cloud && Cloud.enabled && Cloud.user()))
+      return showToast?.('Connecte-toi pour créer un lien de demande', '#e4b24a', 4000);
+    const token = (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
+    try {
+      await Cloud._db.collection('requests').doc(token).set({
+        owner: Cloud.user().uid,
+        creatorName: localStorage.getItem('souanpt_pseudo') || Cloud.user().displayName || 'Créateur',
+        status: 'open', createdAt: Date.now(),
+      });
+      const url = location.origin + '/c/' + token;
+      const box = this._el('qf-msg');
+      if (box) box.textContent = `Lien de demande créé :\n${url}\n\nEnvoie-le à ton client : il décrira son besoin et déposera ses références. Ce même lien deviendra ensuite l'estimation, puis la mission.`;
+      navigator.clipboard?.writeText(url).catch(() => {});
+      showToast?.('Lien de demande créé et copié ✓', '#2e9a63', 3500);
+    } catch (e) { showToast?.('✗ ' + (e.message || 'Création impossible'), '#c0392b', 4000); }
+  },
+
+  /** Lit les estimations du créateur : acceptations, contre-offres, demandes reçues. */
   async loadAcceptances() {
-    this._acc = []; this._neg = [];
+    this._acc = []; this._neg = []; this._reqs = [];
     if (!(window.Cloud && Cloud.enabled && Cloud.user())) { this._renderAcc(); return; }
     const uid = Cloud.user().uid;
     try {
-      // Requête par propriétaire (filtre à champ unique, pas d'index composite).
-      const snap = await Cloud._db.collection('estimates').where('owner', '==', uid).limit(60).get();
+      // Demandes soumises (formulaire public) non encore transformées en estimation.
+      const rq = await Cloud._db.collection('requests').where('owner', '==', uid).limit(40).get();
+      const estCodes = new Set();
+      const ests0 = await Cloud._db.collection('estimates').where('owner', '==', uid).limit(60).get();
+      ests0.forEach(d => estCodes.add(d.id));
+      rq.forEach(d => {
+        const v = d.data();
+        // Une demande dont l'estimation existe déjà (même token) est traitée.
+        if (v.status === 'submitted' && !estCodes.has(d.id)) this._reqs.push({ token: d.id, ...v });
+      });
+      // Réutilise la lecture des estimations déjà faite ci-dessus (ests0).
       const estimates = [];
-      snap.forEach(d => estimates.push({ code: d.id, ...d.data() }));
+      ests0.forEach(d => estimates.push({ code: d.id, ...d.data() }));
       // Un portail déjà créé = mission lancée → on n'a plus à confirmer.
       const launched = new Set(this.getPortals().map(p => p.id));
       // Contre-offres déjà « vues » (marquées localement) → on ne re-notifie pas.
@@ -700,11 +733,31 @@ const QuoteUI = {
 
   _renderAcc() {
     const box = this._el('qf-acc'); if (!box) return;
-    const nA = this._acc.length, nN = this._neg.length, n = nA + nN;
+    const nA = this._acc.length, nN = this._neg.length, nR = this._reqs.length, n = nA + nN + nR;
     const badge = this._el('devis-badge');
     if (badge) { badge.textContent = n || ''; badge.style.display = n ? '' : 'none'; }
     if (!n) { box.style.display = 'none'; box.innerHTML = ''; return; }
     box.style.display = 'block';
+
+    // Demandes reçues via le formulaire public.
+    const reqCard = !nR ? '' : `<div class="an-card" style="border-color:rgba(90,140,255,.35)">
+      <div class="an-card-h"><span>📥 Nouvelles demandes</span><span class="an-card-sub">${nR} reçue(s)</span></div>
+      ${this._reqs.map(r => {
+        const svc = (QUOTE_SERVICES[r.service] || {}).label || r.service || 'Demande';
+        const nbRef = ((r.attachments || []).length) + ((r.links || []).length);
+        const c = r.contact || {};
+        return `<div class="qf-row" style="align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:700">${this._esc(svc)}</div>
+            <div style="font-size:10px;color:var(--muted2)">${this._esc(c.name || 'Client')}${c.email ? ' · ' + this._esc(c.email) : ''} · ${nbRef} référence(s)${r.deadline ? ' · ' + this._esc(r.deadline) : ''} · ${this._when(r.submittedAt)}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-ghost" style="font-size:10px" onclick="window.open('/c/${this._esc(r.token)}','_blank')">Voir</button>
+            <button class="btn btn-accent" style="font-size:10px" onclick="QuoteUI.useRequest('${this._esc(r.token)}')">⚡ Créer l'estimation</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
 
     const accCard = !nA ? '' : `<div class="an-card" style="border-color:rgba(200,255,0,.3)">
       <div class="an-card-h"><span>✅ Acceptations à confirmer</span><span class="an-card-sub">${nA} en attente</span></div>
@@ -743,7 +796,53 @@ const QuoteUI = {
       }).join('')}
     </div>`;
 
-    box.innerHTML = accCard + negCard;
+    box.innerHTML = reqCard + accCard + negCard;
+  },
+
+  /**
+   * « Créer l'estimation » depuis une demande : compose un texte pour le moteur
+   * d'analyse (description libre + réponses au questionnaire), reprend le nom
+   * de projet et IMPORTE les références (fichiers + liens) → elles suivront la
+   * mission. L'estimation gardera le MÊME token que la demande.
+   */
+  async useRequest(token) {
+    const req = this._reqs.find(r => r.token === token)
+      || (await (async () => { try { const d = await Cloud._db.collection('requests').doc(token).get(); return d.exists ? { token, ...d.data() } : null; } catch (e) { return null; } })());
+    if (!req) return showToast?.('Demande introuvable', '#c0392b', 3000);
+    showPage('devis');
+    // Compose le message analysé : réponses structurées + description libre.
+    const svc = (QUOTE_SERVICES[req.service] || {}).label || req.service || '';
+    const ans = req.answers || {};
+    const lines = [];
+    // Quantité EN TÊTE du libellé (« 3 Miniature YouTube ») : le moteur
+    // d'analyse la lit ainsi, ce qui pré-remplit la bonne quantité.
+    if (svc) lines.push('Prestation : ' + (ans.nb ? ans.nb + ' ' : '') + svc);
+    Object.keys(ans).forEach(k => { if (k !== 'nb' && ans[k] !== '' && ans[k] != null) lines.push(k + ' : ' + (ans[k] === true ? 'oui' : ans[k] === false ? 'non' : ans[k])); });
+    if (req.budget) lines.push('Budget : ' + req.budget);
+    if (req.deadline) lines.push('Délai : ' + req.deadline);
+    const text = (req.description || '') + (lines.length ? '\n\n' + lines.join('\n') : '');
+    const inp = this._el('qf-input'); if (inp) inp.value = text.trim();
+    const proj = this._el('qf-project'); if (proj) proj.value = svc || '';
+    // Reprend les références de la demande → this._attachments (client_reference).
+    this._attachments = [
+      ...((req.attachments || []).map(a => ({ id: a.id, name: a.name, type: a.mimeType || a.type || '', size: a.size || 0,
+        url: a.downloadUrl || a.url || '', storagePath: a.storagePath || '', category: 'client_reference', visibility: 'client_visible', uploadedBy: 'client', createdAt: a.createdAt }))),
+      ...((req.links || []).map(l => ({ id: 'ext_' + Math.random().toString(36).slice(2, 8), name: l.label || l.url, type: 'external_link',
+        url: l.url, category: 'client_reference', visibility: 'client_visible', uploadedBy: 'client', createdAt: Date.now() }))),
+    ];
+    // Mémorise le token de la demande : publish() réutilisera CE token pour
+    // garder le même /c/ tout au long du parcours.
+    this._fromRequest = token;
+    this._renderChips();
+    this.analyze();
+    // La quantité vient du FORMULAIRE (fiable), pas d'une déduction sur le texte
+    // libre : on l'applique à la prestation détectée, puis on recalcule.
+    if (this._a && this._a.services.length && Number(ans.nb) > 0) {
+      this._a.services[0].qty = Number(ans.nb);
+      this._a.services[0].qtyFound = true;
+      this.recompute();
+    }
+    showToast?.('Demande importée — vérifie l\'analyse puis crée le lien', '#2e9a63', 3500);
   },
   _when(ts) {
     const s = Math.round((Date.now() - Number(ts || 0)) / 1000);

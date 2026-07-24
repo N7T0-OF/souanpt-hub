@@ -16,6 +16,7 @@
  */
 
 import { onRequestGet as renderEstimate } from '../estimate/[code].js';
+import { onRequestGet as renderRequest } from '../request/[token].js';
 
 const PROJECT = 'souanpt-hub';
 const API_KEY = 'AIzaSyCBe6IUWsTBJ0H29KNxw5qU3YiC32Nenvk';   // clé Web publique par conception
@@ -60,6 +61,13 @@ export async function onRequestGet(ctx) {
   // 2. Étape commerciale — rendue ICI pour que l'adresse reste /c/<token>.
   if (await exists('estimates', token)) {
     return renderEstimate({ ...ctx, params: { code: token } });
+  }
+
+  // 3. Étape AMONT : formulaire de demande. Le créateur a partagé un lien de
+  //    demande (requests/<token>) → le client décrit son besoin et dépose ses
+  //    références sur ce MÊME /c/, avant même qu'une estimation existe.
+  if (await exists('requests', token)) {
+    return renderRequest({ ...ctx, params: { token } });
   }
 
   return notFound('Ce dossier n’existe pas, ou il a été retiré par son auteur.');
