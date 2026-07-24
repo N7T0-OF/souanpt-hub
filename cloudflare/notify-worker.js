@@ -332,10 +332,20 @@ export default {
       body = JSON.parse(txt);
     } catch (e) { return json(env, { ok: false, error: 'json' }, 400); }
 
+    // Sans le compte de service, RIEN ne peut être écrit. On le dit
+    // proprement (200) plutôt que de laisser le Worker planter en 500 :
+    // l'appelant métier ne doit jamais voir d'erreur dure.
+    if (!env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) {
+      return json(env, { ok: false, error: 'stockage non configuré (FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY manquants)',
+        results: {}, errors: {} }, 200);
+    }
+
     // Relance manuelle d'un job depuis « État des envois ».
     if (body.action === 'retry' && body.jobId) {
       const id = String(body.jobId).replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 120);
-      const job = await fsGet(env, 'notification_jobs/' + encodeURIComponent(id));
+      let job = null;
+      try { job = await fsGet(env, 'notification_jobs/' + encodeURIComponent(id)); }
+      catch (e) { return json(env, { ok: false, error: 'stockage indisponible : ' + safeError(e.message) }, 200); }
       if (!job) return json(env, { ok: false, error: 'job introuvable' }, 404);
       // Un canal abandonné redevient « à tenter » sur demande explicite.
       const st = { ...(job.channelStatus || {}) };
@@ -357,7 +367,9 @@ export default {
       .filter(c => ['internal', 'discord', 'email'].includes(c));
 
     // Déjà traité ? On renvoie le résultat existant sans rien renvoyer.
-    const existing = await fsGet(env, 'notification_jobs/' + encodeURIComponent(idempotencyKey));
+    let existing = null;
+    try { existing = await fsGet(env, 'notification_jobs/' + encodeURIComponent(idempotencyKey)); }
+    catch (e) { return json(env, { ok: false, error: 'stockage indisponible : ' + safeError(e.message) }, 200); }
     if (existing && !body.test) {
       return json(env, { ok: true, deduped: true, results: existing.channelStatus || {}, idempotencyKey });
     }
@@ -372,7 +384,9 @@ export default {
     try { await fsSet(env, 'notification_jobs/' + encodeURIComponent(idempotencyKey), job); }
     catch (e) { return json(env, { ok: false, error: 'file indisponible : ' + safeError(e.message) }, 200); }
 
-    const out = await runJob(env, job);
+    let out;
+    try { out = await runJob(env, job); }
+    catch (e) { return json(env, { ok: false, error: 'envoi indisponible : ' + safeError(e.message) }, 200); }
     // TOUJOURS 200 : une notification ne doit jamais faire échouer le métier.
     return json(env, { ok: true, results: out.status, errors: out.lastError, idempotencyKey });
   },
