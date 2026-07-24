@@ -1433,7 +1433,10 @@ const Notify = {
     if (!(window.Cloud && Cloud.enabled && Cloud.user())) { box.innerHTML = '<div class="an-empty-mini">Connecte-toi pour voir la file.</div>'; return; }
     box.innerHTML = '<div class="an-empty-mini">Chargement…</div>';
     try {
-      const snap = await Cloud._db.collection('notification_jobs').limit(40).get();
+      // Filtre par propriétaire OBLIGATOIRE : les règles n'autorisent la
+      // lecture que de ses propres jobs, une requête non filtrée est rejetée.
+      const snap = await Cloud._db.collection('notification_jobs')
+        .where('ownerId', '==', Cloud.user().uid).limit(40).get();
       const jobs = []; snap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
       jobs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       const lbl = s => s === 'sent' ? '<span style="color:var(--accent)">Envoyé</span>'

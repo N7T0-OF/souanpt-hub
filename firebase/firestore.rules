@@ -137,10 +137,10 @@ service cloud.firestore {
       allow update: if signedIn() && resource.data.ownerId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt','archivedAt']);
     }
-    // File technique : lecture par le propriétaire (écran « État des envois »),
-    // écriture réservée au Worker.
+    // File technique : lecture par le SEUL propriétaire (écran « État des
+    // envois »), écriture réservée au Worker (compte de service).
     match /notification_jobs/{id} {
-      allow read: if signedIn();
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
       allow write: if false;
     }
 

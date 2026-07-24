@@ -258,10 +258,10 @@ async function loadContext(env, workspaceId) {
 }
 
 /** Envoie les canaux encore à traiter et met le job à jour. */
-async function runJob(env, job) {
+async function runJob(env, job, preCtx) {
   const provider = new NotificationProvider(env);
-  const ctx = job.test ? { ownerId: 'test', details: { Test: 'Notification de test' }, emailTo: '' }
-                       : await loadContext(env, job.workspaceId);
+  const ctx = preCtx || (job.test ? { ownerId: job.ownerId || 'test', details: { Test: 'Notification de test' }, emailTo: '' }
+                                  : await loadContext(env, job.workspaceId));
   const meta = EVENTS[job.event] || { icon: '🔔', title: job.event, cat: 'requests' };
   const ev = {
     event: job.event, icon: meta.icon, title: meta.title, category: meta.cat,
@@ -374,8 +374,16 @@ export default {
       return json(env, { ok: true, deduped: true, results: existing.channelStatus || {}, idempotencyKey });
     }
 
+    // On résout le contexte AVANT de créer le job pour y inscrire l'ownerId :
+    // sans lui, l'écran « État des envois » ne pourrait pas être limité au
+    // propriétaire, et n'importe quel créateur connecté verrait la file des
+    // autres. On réutilise ensuite ce contexte pour l'envoi (pas de relecture).
+    const ctx = body.test ? { ownerId: 'test', details: { Test: 'Notification de test' }, emailTo: '' }
+                          : await loadContext(env, workspaceId).catch(() => ({ ownerId: '', details: {}, emailTo: '' }));
+
     const job = {
       id: idempotencyKey, event, workspaceId, entityId, idempotencyKey, channels,
+      ownerId: ctx.ownerId || '',
       audience: body.audience === 'client' ? 'client' : 'creator',
       channelStatus: Object.fromEntries(channels.map(c => [c, 'pending'])),
       attempts: {}, lastError: {}, nextRetryAt: 0, done: false, test: !!body.test,
@@ -385,7 +393,7 @@ export default {
     catch (e) { return json(env, { ok: false, error: 'file indisponible : ' + safeError(e.message) }, 200); }
 
     let out;
-    try { out = await runJob(env, job); }
+    try { out = await runJob(env, job, ctx); }
     catch (e) { return json(env, { ok: false, error: 'envoi indisponible : ' + safeError(e.message) }, 200); }
     // TOUJOURS 200 : une notification ne doit jamais faire échouer le métier.
     return json(env, { ok: true, results: out.status, errors: out.lastError, idempotencyKey });
