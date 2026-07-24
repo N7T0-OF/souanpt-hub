@@ -734,6 +734,26 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   background:var(--s2);border:1px solid var(--border);color:var(--text)}
 .qf-chip button{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:10px;padding:0;line-height:1}
 .qf-chip button:hover{color:var(--red,#c0392b)}
+/* ── Centre de notifications ── */
+.nt-wrap{position:relative}
+.nt-bell{position:relative;font-size:13px;padding:5px 10px}
+.nt-bell .nbadge{position:absolute;top:-4px;right:-4px}
+.nt-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:1100;width:min(380px,92vw);
+  background:var(--s1);border:1px solid var(--border2);border-radius:14px;
+  box-shadow:0 18px 50px rgba(0,0,0,.6);overflow:hidden}
+.nt-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 13px;
+  border-bottom:1px solid var(--border);font-size:12px}
+.nt-filters{display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.nt-filters button{background:var(--s2);border:1px solid var(--border);border-radius:999px;
+  color:var(--muted);font-family:inherit;font-size:9px;padding:3px 9px;cursor:pointer}
+.nt-filters button:hover{color:var(--accent);border-color:var(--accent)}
+#nt-list{max-height:52vh;overflow-y:auto}
+.nt-item{display:flex;gap:10px;align-items:flex-start;padding:10px 13px;border-bottom:1px solid var(--border)}
+.nt-item:last-child{border-bottom:none}
+.nt-item.unread{background:rgba(200,255,0,.05)}
+.nt-t{font-size:12px;font-weight:700;color:var(--text)}
+.nt-m{font-size:10px;color:var(--muted);line-height:1.5;margin-top:2px}
+.nt-d{font-size:9px;color:var(--muted2);margin-top:3px}
 @media(max-width:520px){.qd-ov{align-items:flex-end;padding:0}.qd{max-width:none;border-radius:16px 16px 0 0}}
 .edwin.wide{width:322px}
 /* ✎ Contact — une ligne par moyen */
@@ -1121,6 +1141,25 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <div class="main">
   <div class="topbar">
     <div id="topbar-title" style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;flex:1">Vue d'ensemble</div>
+    <!-- Centre de notifications : persistant, avec compteur non lu -->
+    <div class="nt-wrap">
+      <button class="btn btn-ghost nt-bell" onclick="Notify.toggleInbox()" title="Notifications">🔔<span class="nbadge" id="nt-bell-count" style="display:none"></span></button>
+      <div class="nt-panel" id="nt-panel" style="display:none">
+        <div class="nt-head">
+          <b>Notifications</b>
+          <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="Notify.markAllRead()">Tout marquer comme lu</button>
+        </div>
+        <div class="nt-filters">
+          <button onclick="Notify.setFilter('all')">Toutes</button>
+          <button onclick="Notify.setFilter('unread')">Non lues</button>
+          <button onclick="Notify.setFilter('requests')">Demandes</button>
+          <button onclick="Notify.setFilter('estimates')">Estimations</button>
+          <button onclick="Notify.setFilter('missions')">Missions</button>
+          <button onclick="Notify.setFilter('payments')">Paiements</button>
+        </div>
+        <div id="nt-list"></div>
+      </div>
+    </div>
     <button class="btn btn-ghost" onclick="syncBehance()">↻ Sync Behance</button>
     <button class="btn btn-accent" onclick="edDeploy()">🚀 Publier</button>
   </div>
@@ -1709,8 +1748,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
               <div id="nt-events" style="margin-top:14px"></div>
               <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
                 <button class="btn btn-accent" style="font-size:10px" onclick="notifsSave()">Enregistrer</button>
-                <button class="btn btn-ghost" style="font-size:10px" onclick="Notify.test()">📨 Envoyer un test</button>
+                <button class="btn btn-ghost" style="font-size:10px" onclick="Notify.test()">📨 Tester les canaux</button>
               </div>
+              <div id="nt-test-out" style="margin-top:10px"></div>
+            </div>
+            <div class="setting-group">
+              <div class="setting-group-title">📡 État des envois</div>
+              <div class="hintbox" style="margin-bottom:10px">Chaque canal a son propre statut. Un échec temporaire est <strong style="color:var(--text)">rejoué automatiquement</strong> (5 min, 15 min, 1 h, 6 h) ; un refus définitif ne l'est pas. Les erreurs affichées sont nettoyées de tout secret.</div>
+              <div id="nt-jobs"><div class="an-empty-mini">—</div></div>
+              <button class="btn btn-ghost" style="font-size:10px;margin-top:10px" onclick="Notify.loadJobs()">↻ Actualiser</button>
             </div>
           </div>
           <div id="set-tab-soutien" class="set-tab" style="display:none">
@@ -1906,7 +1952,7 @@ function settingsTab(name, el) {
   if (tab) tab.style.display = '';
   if (el) el.classList.add('active');
   if (name === 'compte') renderCompte();
-  if (name === 'notifs') renderNotifs();
+  if (name === 'notifs') { renderNotifs(); Notify.loadJobs(); }
   if (name === 'integrations') {
     renderIntegrations(); renderBehancePage?.(); renderLoginLog?.();
     setTimeout(() => GHPage.init(), 50);
@@ -1939,6 +1985,14 @@ function notifsSave() {
   Notify.set({ url: (document.getElementById('nt-url').value || '').trim(), events });
   showToast('Préférences de notification enregistrées ✓', '#2e9a63', 2500);
 }
+
+/* Ferme le panneau de notifications au clic extérieur (même logique que les
+   micro-fenêtres de l'éditeur : rien ne doit rester ouvert par inadvertance). */
+document.addEventListener('click', e => {
+  const p = document.getElementById('nt-panel');
+  if (!p || p.style.display === 'none') return;
+  if (!e.target.closest('.nt-wrap')) p.style.display = 'none';
+});
 
 /* ═══ COMPTE — bannière profil + connexions ═══ */
 function renderCompte() {

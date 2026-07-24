@@ -1331,39 +1331,174 @@ const Notify = {
     const { url } = this.cfg();
     const ch = this.channels(event);
     const key = `${workspaceId}_${event}_${opts.entityId || '0'}_${opts.version || 1}`;
-    if (!opts.test && this._sent().has(key)) return false;   // anti-doublon
-    if (!url) { if (!opts.test) this._markSent(key); return false; }   // canal externe non configuré
+    if (!opts.test && this._sent().has(key)) return false;   // anti-doublon local
+    if (!url) return false;   // pas de Worker → rien à relayer, et RIEN n'est marqué
     try {
       const r = await fetch(url, {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ event, workspaceId, entityId: opts.entityId || '', version: opts.version || 1,
-                               channels: ch, test: !!opts.test }),
+                               channels: ch, audience: opts.audience || 'creator', test: !!opts.test }),
       });
-      if (!opts.test) this._markSent(key);
+      /* On ne marque l'événement « relayé » QU'APRÈS confirmation du Worker.
+         Un échec réseau le laisse détectable : il repartira au prochain
+         chargement, et l'idempotence SERVEUR (clé = id du job) empêche le
+         doublon. */
+      if (r.ok && !opts.test) this._markSent(key);
       return r.ok;
     } catch (e) {
-      // Panne du Worker → on n'empêche rien. L'action métier a déjà réussi.
-      console.warn('[notify] échec (sans conséquence)', e);
+      // Panne du Worker → on n'empêche rien, et on ne marque rien.
+      console.warn('[notify] échec (sans conséquence, sera retenté)', e);
       return false;
     }
   },
-  /** Bouton « Envoyer une notification de test » des Paramètres. */
-  async test() {
-    const { url } = this.cfg();
-    if (!url) return showToast?.('Renseigne d\'abord l\'URL du Worker de notifications.', '#e4b24a', 4000);
-    showToast?.('Envoi du test…', '#666', 1500);
+
+  /* ── Boîte de réception interne ─────────────────────────────────────── */
+  _inbox: [], _unread: 0,
+  async loadInbox() {
+    if (!(window.Cloud && Cloud.enabled && Cloud.user())) return;
     try {
-      const r = await fetch(url, {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ event: 'request.created', workspaceId: 'TESTTEST',
-                               channels: ['internal', 'discord', 'email'], test: true }),
-      });
+      const snap = await Cloud._db.collection('notifications')
+        .where('ownerId', '==', Cloud.user().uid).limit(60).get();
+      this._inbox = [];
+      snap.forEach(d => this._inbox.push({ id: d.id, ...d.data() }));
+      this._inbox = this._inbox.filter(n => !n.archivedAt).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      this._unread = this._inbox.filter(n => !n.readAt).length;
+      this.renderBell();
+    } catch (e) { console.warn('[notify] boîte de réception', e); }
+  },
+  renderBell() {
+    const b = document.getElementById('nt-bell-count'); if (!b) return;
+    b.textContent = this._unread || '';
+    b.style.display = this._unread ? '' : 'none';
+  },
+  async markRead(id) {
+    const n = this._inbox.find(x => x.id === id); if (!n || n.readAt) return;
+    n.readAt = Date.now(); this._unread = Math.max(0, this._unread - 1); this.renderBell(); this.renderInbox();
+    try { await Cloud._db.collection('notifications').doc(id).set({ readAt: n.readAt }, { merge: true }); } catch (e) {}
+  },
+  async markAllRead() {
+    const todo = this._inbox.filter(n => !n.readAt);
+    todo.forEach(n => { n.readAt = Date.now(); });
+    this._unread = 0; this.renderBell(); this.renderInbox();
+    for (const n of todo) {
+      try { await Cloud._db.collection('notifications').doc(n.id).set({ readAt: n.readAt }, { merge: true }); } catch (e) {}
+    }
+    showToast?.('Tout marqué comme lu ✓', '#666', 2000);
+  },
+  async archive(id) {
+    const n = this._inbox.find(x => x.id === id); if (!n) return;
+    if (!n.readAt) this._unread = Math.max(0, this._unread - 1);
+    this._inbox = this._inbox.filter(x => x.id !== id);
+    this.renderBell(); this.renderInbox();
+    // Archivage LOGIQUE : le document reste, il sort simplement de la liste.
+    try { await Cloud._db.collection('notifications').doc(id).set({ archivedAt: Date.now() }, { merge: true }); } catch (e) {}
+  },
+  _filter: 'all',
+  setFilter(f) { this._filter = f; this.renderInbox(); },
+  toggleInbox() {
+    const p = document.getElementById('nt-panel'); if (!p) return;
+    const open = p.style.display !== 'none';
+    p.style.display = open ? 'none' : 'block';
+    if (!open) { this.loadInbox().then(() => this.renderInbox()); this.renderInbox(); }
+  },
+  renderInbox() {
+    const box = document.getElementById('nt-list'); if (!box) return;
+    const f = this._filter;
+    const list = this._inbox.filter(n =>
+      f === 'all' ? true : f === 'unread' ? !n.readAt : (n.category || 'requests') === f);
+    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    box.innerHTML = list.length ? list.map(n => `
+      <div class="nt-item${n.readAt ? '' : ' unread'}">
+        <div style="flex:1;min-width:0">
+          <div class="nt-t">${esc(n.title || n.event)}</div>
+          <div class="nt-m">${esc(n.message || '')}</div>
+          <div class="nt-d">${QuoteUI._when(n.createdAt)}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          ${n.workspaceId ? `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.open('${esc(n.id)}','${esc(n.workspaceId)}')">Ouvrir</button>` : ''}
+          ${n.readAt ? '' : `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.markRead('${esc(n.id)}')" title="Marquer comme lu">✓</button>`}
+          <button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.archive('${esc(n.id)}')" title="Archiver">✕</button>
+        </div>
+      </div>`).join('')
+      : '<div class="an-empty-mini" style="padding:14px">Aucune notification.</div>';
+  },
+  open(id, workspaceId) {
+    this.markRead(id);
+    window.open('/c/' + workspaceId, '_blank');
+  },
+
+  /* ── État des envois (file technique) ── */
+  async loadJobs() {
+    const box = document.getElementById('nt-jobs'); if (!box) return;
+    if (!(window.Cloud && Cloud.enabled && Cloud.user())) { box.innerHTML = '<div class="an-empty-mini">Connecte-toi pour voir la file.</div>'; return; }
+    box.innerHTML = '<div class="an-empty-mini">Chargement…</div>';
+    try {
+      const snap = await Cloud._db.collection('notification_jobs').limit(40).get();
+      const jobs = []; snap.forEach(d => jobs.push({ id: d.id, ...d.data() }));
+      jobs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const lbl = s => s === 'sent' ? '<span style="color:var(--accent)">Envoyé</span>'
+        : s === 'skipped' ? '<span style="color:var(--muted2)">Ignoré</span>'
+        : s === 'failed' ? '<span style="color:#e4b24a">En attente</span>'
+        : s === 'abandoned' ? '<span style="color:#c0392b">Échec</span>'
+        : '<span style="color:var(--muted2)">—</span>';
+      const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      box.innerHTML = jobs.length ? jobs.map(j => {
+        const st = j.channelStatus || {};
+        const errs = Object.entries(j.lastError || {}).map(([k, v]) => k + ' : ' + esc(v)).join(' · ');
+        const retryable = Object.values(st).some(s => s === 'failed' || s === 'abandoned');
+        return `<div class="qf-row" style="align-items:flex-start;flex-wrap:wrap">
+          <div style="flex:1;min-width:140px">
+            <div style="font-size:11px;font-weight:700">${esc((NOTIFY_EVENTS.find(e => e[0] === j.event) || [null, j.event])[1])}</div>
+            <div style="font-size:9px;color:var(--muted2)">${esc(j.workspaceId || '')} · ${QuoteUI._when(j.createdAt)}${errs ? ' · ' + errs : ''}</div>
+          </div>
+          <div style="font-size:9px;display:flex;gap:10px">
+            <span>Interne ${lbl(st.internal)}</span><span>Discord ${lbl(st.discord)}</span><span>Email ${lbl(st.email)}</span>
+          </div>
+          ${retryable ? `<button class="btn btn-ghost" style="font-size:9px;padding:2px 7px" onclick="Notify.retry('${esc(j.id)}')">Réessayer</button>` : ''}
+        </div>`;
+      }).join('') : '<div class="an-empty-mini">Aucun envoi pour l\'instant.</div>';
+    } catch (e) { box.innerHTML = '<div class="an-empty-mini">File illisible (règles Firestore à publier ?)</div>'; }
+  },
+  async retry(jobId) {
+    const { url } = this.cfg(); if (!url) return showToast?.('URL du Worker manquante', '#e4b24a', 3000);
+    showToast?.('Relance…', '#666', 1500);
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'retry', jobId }) });
       const j = await r.json().catch(() => ({}));
-      const res = j.results || {};
-      const line = Object.entries(res).map(([k, v]) => `${k} : ${v}`).join(' · ') || 'aucune réponse';
-      showToast?.(r.ok ? '✓ ' + line : '✗ ' + (j.error || 'échec'), r.ok ? '#2e9a63' : '#c0392b', 7000);
-    } catch (e) {
-      showToast?.('✗ Worker injoignable — vérifie l\'URL', '#c0392b', 5000);
+      showToast?.(r.ok ? '✓ ' + Object.entries(j.results || {}).map(([k, v]) => k + ':' + v).join(' · ') : '✗ ' + (j.error || 'échec'),
+        r.ok ? '#2e9a63' : '#c0392b', 5000);
+      this.loadJobs();
+    } catch (e) { showToast?.('✗ Worker injoignable', '#c0392b', 3500); }
+  },
+  /** Teste CHAQUE canal séparément et distingue les causes d'échec. */
+  async test() {
+    const out = document.getElementById('nt-test-out');
+    const say = h => { if (out) out.innerHTML = h; };
+    const { url } = this.cfg();
+    if (!url) return say('<div style="color:#e4b24a">Renseigne d\'abord l\'URL du Worker, puis enregistre.</div>');
+    say('<div style="color:var(--muted2)">Test en cours…</div>');
+    const rows = [];
+    for (const ch of ['internal', 'discord', 'email']) {
+      let line;
+      try {
+        const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ event: 'request.created', workspaceId: 'TESTTEST' + ch.toUpperCase(),
+                                 channels: [ch], test: true }) });
+        const j = await r.json().catch(() => ({}));
+        const st = (j.results || {})[ch] || '—';
+        const err = (j.errors || {})[ch] || '';
+        if (!r.ok)            line = ['✕', '#c0392b', j.error || 'Worker en erreur'];
+        else if (st === 'sent')      line = ['✓', '#2e9a63', ch === 'internal' ? 'Fonctionnel' : 'Message envoyé'];
+        else if (st === 'skipped')   line = ['—', 'var(--muted2)', err || 'Non configuré'];
+        else if (st === 'failed')    line = ['✕', '#e4b24a', (err || 'Erreur fournisseur') + ' — sera retenté'];
+        else if (st === 'abandoned') line = ['✕', '#c0392b', err || 'Refus définitif'];
+        else                          line = ['?', 'var(--muted2)', 'Aucune réponse'];
+      } catch (e) { line = ['✕', '#c0392b', 'Worker injoignable — vérifie l\'URL']; }
+      rows.push(`<div style="display:flex;gap:8px;padding:3px 0;font-size:11px">
+        <b style="width:62px">${ch === 'internal' ? 'Interne' : ch === 'discord' ? 'Discord' : 'Email'}</b>
+        <span style="color:${line[1]}">${line[0]} ${line[2]}</span></div>`);
+      say(rows.join(''));
     }
   },
 };

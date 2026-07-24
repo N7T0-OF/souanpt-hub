@@ -2,7 +2,14 @@
 #   cd cloudflare
 #   wrangler deploy -c wrangler.notify.toml
 #
-# Secrets — À SAISIR TOI-MÊME, jamais dans le code ni dans ce fichier :
+# Secrets — À SAISIR TOI-MÊME, jamais dans le code ni dans ce fichier.
+#
+# OBLIGATOIRES (écritures Firestore avec le compte de service — ce sont les
+# MÊMES valeurs que le Worker analytics) :
+#   wrangler secret put FIREBASE_CLIENT_EMAIL -c wrangler.notify.toml
+#   wrangler secret put FIREBASE_PRIVATE_KEY  -c wrangler.notify.toml
+#
+# FACULTATIFS (sans eux, le canal est « non configuré », jamais « en échec ») :
 #   wrangler secret put DISCORD_WEBHOOK_URL -c wrangler.notify.toml
 #   wrangler secret put EMAIL_PROVIDER      -c wrangler.notify.toml   # resend | brevo | none
 #   wrangler secret put EMAIL_API_KEY       -c wrangler.notify.toml
@@ -10,10 +17,11 @@
 #   wrangler secret put EMAIL_TO            -c wrangler.notify.toml
 #   wrangler secret put APP_URL             -c wrangler.notify.toml
 #   wrangler secret put ALLOWED_ORIGIN      -c wrangler.notify.toml
-#
-# Tous sont FACULTATIFS : sans secret, le canal correspondant est simplement
-# ignoré (« non configuré ») et le parcours métier continue normalement.
 
 name = "souanpt-notify"
 main = "notify-worker.js"
 compatibility_date = "2026-07-01"
+
+# Reprise automatique des canaux en échec (backoff 5 min → 15 min → 1 h → 6 h).
+[triggers]
+crons = ["*/5 * * * *"]

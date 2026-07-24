@@ -127,6 +127,23 @@ service cloud.firestore {
       }
     }
 
+    // ── Notifications & file d'envoi ──
+    // ÉCRITES UNIQUEMENT par le Worker (compte de service, qui contourne ces
+    // règles). Aucun client ne peut donc fabriquer une fausse notification.
+    // Le créateur LIT les siennes, et ne peut que les marquer lues/archivées.
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create, delete: if false;
+      allow update: if signedIn() && resource.data.ownerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt','archivedAt']);
+    }
+    // File technique : lecture par le propriétaire (écran « État des envois »),
+    // écriture réservée au Worker.
+    match /notification_jobs/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
     // Collections privées scopées par owner
     match /{col}/{id} {
       allow read:   if isOwner();
