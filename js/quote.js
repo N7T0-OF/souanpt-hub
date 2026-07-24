@@ -682,11 +682,22 @@ const QuoteUI = {
       const estCodes = new Set();
       const ests0 = await Cloud._db.collection('estimates').where('owner', '==', uid).limit(60).get();
       ests0.forEach(d => estCodes.add(d.id));
+      const openReqs = [];
       rq.forEach(d => {
         const v = d.data();
         // Une demande dont l'estimation existe déjà (même token) est traitée.
-        if (v.status === 'submitted' && !estCodes.has(d.id)) this._reqs.push({ token: d.id, ...v });
+        if (v.status === 'submitted' && !estCodes.has(d.id)) openReqs.push({ token: d.id, ...v });
       });
+      // Questions complémentaires de chaque demande (en attente / répondues).
+      for (const r of openReqs) {
+        r.questions = [];
+        try {
+          const qs = await Cloud._db.collection('requests').doc(r.token).collection('questions').get();
+          qs.forEach(q => r.questions.push({ id: q.id, ...q.data() }));
+          r.questions.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        } catch (e) {}
+        this._reqs.push(r);
+      }
       // Réutilise la lecture des estimations déjà faite ci-dessus (ests0).
       const estimates = [];
       ests0.forEach(d => estimates.push({ code: d.id, ...d.data() }));
@@ -746,15 +757,36 @@ const QuoteUI = {
         const svc = (QUOTE_SERVICES[r.service] || {}).label || r.service || 'Demande';
         const nbRef = ((r.attachments || []).length) + ((r.links || []).length);
         const c = r.contact || {};
-        return `<div class="qf-row" style="align-items:flex-start">
+        const qs = (r.questions || []).filter(q => q.status !== 'cancelled');
+        const pending = qs.filter(q => q.status === 'pending');
+        const answered = qs.filter(q => q.status === 'answered');
+        // Une question obligatoire encore en attente = brief incomplet.
+        const blocking = pending.filter(q => q.required).length;
+        const qHtml = !qs.length ? '' : `<div style="flex-basis:100%;margin-top:8px;padding-left:2px">
+          ${qs.map(q => {
+            const exp = q.expiresAt && Date.now() > Number(q.expiresAt) && q.status === 'pending';
+            const state = q.status === 'answered' ? '✓ répondu' : exp ? '⏳ expirée' : q.seenAt ? '👁 vue' : '· envoyée';
+            const ans = q.status === 'answered'
+              ? ` → <b style="color:var(--accent)">${this._esc(String(q.answer))}</b>` : '';
+            return `<div style="font-size:10px;color:var(--muted2);padding:3px 0;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap">
+              <span style="flex:1;min-width:120px">${q.internal ? '🔒 ' : ''}${this._esc(q.question)}${ans}</span>
+              <span>${state}</span>
+              ${q.status === 'pending' ? `<button class="btn btn-ghost" style="font-size:9px;padding:2px 6px" onclick="QuoteUI.remind('${this._esc(r.token)}','${this._esc(q.id)}')">Relancer</button>
+              <button class="btn btn-ghost" style="font-size:9px;padding:2px 6px" onclick="QuoteUI.cancelQuestion('${this._esc(r.token)}','${this._esc(q.id)}')">Retirer</button>` : ''}
+            </div>`;
+          }).join('')}
+        </div>`;
+        return `<div class="qf-row" style="align-items:flex-start;flex-wrap:wrap">
           <div style="flex:1;min-width:0">
             <div style="font-size:12px;font-weight:700">${this._esc(svc)}</div>
-            <div style="font-size:10px;color:var(--muted2)">${this._esc(c.name || 'Client')}${c.email ? ' · ' + this._esc(c.email) : ''} · ${nbRef} référence(s)${r.deadline ? ' · ' + this._esc(r.deadline) : ''} · ${this._when(r.submittedAt)}</div>
+            <div style="font-size:10px;color:var(--muted2)">${this._esc(c.name || 'Client')}${c.email ? ' · ' + this._esc(c.email) : ''} · ${nbRef} référence(s)${r.deadline ? ' · ' + this._esc(r.deadline) : ''} · ${this._when(r.submittedAt)}${answered.length ? ' · ' + answered.length + ' réponse(s)' : ''}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-ghost" style="font-size:10px" onclick="window.open('/c/${this._esc(r.token)}','_blank')">Voir</button>
-            <button class="btn btn-accent" style="font-size:10px" onclick="QuoteUI.useRequest('${this._esc(r.token)}')">⚡ Créer l'estimation</button>
+            <button class="btn btn-ghost" style="font-size:10px" onclick="QuoteUI.askDialog('${this._esc(r.token)}')">❓ Précision</button>
+            <button class="btn btn-accent" style="font-size:10px" onclick="QuoteUI.useRequest('${this._esc(r.token)}')"${blocking ? ' title="Une question obligatoire attend encore une réponse"' : ''}>⚡ Créer l'estimation${blocking ? ' (' + blocking + ' en attente)' : ''}</button>
           </div>
+          ${qHtml}
         </div>`;
       }).join('')}
     </div>`;
@@ -812,7 +844,20 @@ const QuoteUI = {
     showPage('devis');
     // Compose le message analysé : réponses structurées + description libre.
     const svc = (QUOTE_SERVICES[req.service] || {}).label || req.service || '';
-    const ans = req.answers || {};
+    const ans = { ...(req.answers || {}) };
+    /* Les RÉPONSES aux questions complémentaires écrasent le formulaire : ce
+       sont les informations les plus récentes et les plus sûres. Celles qui
+       portent un `mapsTo` alimentent directement la donnée structurée
+       (quantité, délai, sources…) — jamais déduites du texte libre. */
+    const qAnswered = (req.questions || []).filter(q => q.status === 'answered' && !q.internal);
+    qAnswered.forEach(q => {
+      const v = q.responseType === 'number' ? Number(q.answer)
+              : q.responseType === 'bool' ? (q.answer === true || q.answer === 'true' || q.answer === 'oui')
+              : q.answer;
+      if (q.mapsTo === 'deadline') req.deadline = String(q.answer);
+      else if (q.mapsTo === 'budget') req.budget = String(q.answer);
+      else if (q.mapsTo) ans[q.mapsTo] = v;
+    });
     const lines = [];
     // Quantité EN TÊTE du libellé (« 3 Miniature YouTube ») : le moteur
     // d'analyse la lit ainsi, ce qui pré-remplit la bonne quantité.
@@ -820,6 +865,8 @@ const QuoteUI = {
     Object.keys(ans).forEach(k => { if (k !== 'nb' && ans[k] !== '' && ans[k] != null) lines.push(k + ' : ' + (ans[k] === true ? 'oui' : ans[k] === false ? 'non' : ans[k])); });
     if (req.budget) lines.push('Budget : ' + req.budget);
     if (req.deadline) lines.push('Délai : ' + req.deadline);
+    // Les précisions sans `mapsTo` restent utiles en texte pour le créateur.
+    qAnswered.filter(q => !q.mapsTo).forEach(q => lines.push(q.question + ' → ' + q.answer));
     const text = (req.description || '') + (lines.length ? '\n\n' + lines.join('\n') : '');
     const inp = this._el('qf-input'); if (inp) inp.value = text.trim();
     const proj = this._el('qf-project'); if (proj) proj.value = svc || '';
@@ -844,6 +891,112 @@ const QuoteUI = {
     }
     showToast?.('Demande importée — vérifie l\'analyse puis crée le lien', '#2e9a63', 3500);
   },
+  /* ══════════════════════════════════════════════════════════════════════
+     QUESTIONS COMPLÉMENTAIRES — poser une précision sans quitter le hub.
+     La question apparaît dans le MÊME /c/<token> ; la réponse revient dans le
+     même dossier. `mapsTo` relie la réponse à une donnée structurée (quantité,
+     délai…) pour qu'elle ne dépende PAS de l'analyse du texte libre.
+  ══════════════════════════════════════════════════════════════════════ */
+  QTYPES: [['text', 'Texte court'], ['long', 'Texte long'], ['number', 'Nombre'],
+           ['bool', 'Oui / Non'], ['choice', 'Choix unique'], ['date', 'Date'], ['link', 'Lien']],
+  QTPL: [
+    { q: 'Combien de propositions souhaitez-vous ?', t: 'number', m: 'nb' },
+    { q: 'Quelle est la date limite exacte ?',       t: 'date',   m: 'deadline' },
+    { q: 'Avez-vous besoin des fichiers sources ?',  t: 'bool',   m: 'sources' },
+    { q: 'Quel est votre budget approximatif ?',     t: 'text',   m: 'budget' },
+    { q: 'Pouvez-vous envoyer les éléments manquants ?', t: 'link', m: '' },
+  ],
+
+  askDialog(token) {
+    const tplOpts = this.QTPL.map((t, i) => `<option value="${i}">${this._esc(t.q)}</option>`).join('');
+    const typeOpts = this.QTYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    QDialog.open({
+      title: '❓ Demander une précision',
+      confirm: 'Envoyer la question',
+      body: `<div class="edw-l">Modèle rapide</div>
+        <select class="prop-input" id="aq-tpl"><option value="">— Écrire ma propre question —</option>${tplOpts}</select>
+        <div class="edw-l">Question</div>
+        <textarea class="prop-input" id="aq-q" rows="2" placeholder="Ex. : Combien de propositions souhaitez-vous ?"></textarea>
+        <div class="edw-l">Type de réponse</div>
+        <select class="prop-input" id="aq-type">${typeOpts}</select>
+        <div id="aq-optwrap" style="display:none">
+          <div class="edw-l">Choix possibles (séparés par des virgules)</div>
+          <input class="prop-input" id="aq-opts" placeholder="Option A, Option B, Option C">
+        </div>
+        <div class="edw-l">Expiration</div>
+        <select class="prop-input" id="aq-exp">
+          <option value="0">Sans expiration</option><option value="3">3 jours</option>
+          <option value="7" selected>7 jours</option><option value="14">14 jours</option>
+        </select>
+        <label class="edw-tog" style="margin-top:10px"><input type="checkbox" id="aq-req" checked> Réponse obligatoire</label>
+        <label class="edw-tog"><input type="checkbox" id="aq-priv"> Note interne (non visible du client)</label>`,
+      onConfirm: async (dlg) => {
+        const tplSel = dlg.querySelector('#aq-tpl');
+        const q = dlg.querySelector('#aq-q').value.trim();
+        if (q.length < 5) throw new Error('Écris une question un peu plus explicite.');
+        const days = Number(dlg.querySelector('#aq-exp').value) || 0;
+        return this.sendQuestion(token, {
+          question: q,
+          responseType: dlg.querySelector('#aq-type').value,
+          options: dlg.querySelector('#aq-opts').value.split(',').map(s => s.trim()).filter(Boolean),
+          required: dlg.querySelector('#aq-req').checked,
+          internal: dlg.querySelector('#aq-priv').checked,
+          mapsTo: (this.QTPL[Number(tplSel.value)] || {}).m || '',
+          expiresAt: days ? Date.now() + days * 86400000 : 0,
+        });
+      },
+    });
+    // Remplissage depuis un modèle + affichage conditionnel des choix.
+    setTimeout(() => {
+      const dlg = document.querySelector('.qd'); if (!dlg) return;
+      const tpl = dlg.querySelector('#aq-tpl'), qi = dlg.querySelector('#aq-q'),
+            ty = dlg.querySelector('#aq-type'), ow = dlg.querySelector('#aq-optwrap');
+      const syncOpts = () => { ow.style.display = ty.value === 'choice' ? '' : 'none'; };
+      tpl.onchange = () => {
+        const t = this.QTPL[Number(tpl.value)]; if (!t) return;
+        qi.value = t.q; ty.value = t.t; syncOpts();
+      };
+      ty.onchange = syncOpts; syncOpts();
+    }, 0);
+  },
+
+  async sendQuestion(token, data) {
+    if (!(window.Cloud && Cloud.enabled && Cloud.user())) throw new Error('Connecte-toi d\'abord.');
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    await Cloud._db.collection('requests').doc(token).collection('questions').doc(id).set({
+      ...data, status: 'pending', answer: null, answeredAt: 0, seenAt: 0,
+      reminders: [], locked: false, createdAt: Date.now(),
+    });
+    QDialog.close();
+    showToast?.(data.internal ? 'Note interne enregistrée' : 'Question envoyée — le client la verra sur son lien', '#2e9a63', 3800);
+    this.loadAcceptances();
+    return true;
+  },
+
+  /** Relance : trace la date, sans renvoyer de lien ni spammer. */
+  async remind(token, qid) {
+    try {
+      const ref = Cloud._db.collection('requests').doc(token).collection('questions').doc(qid);
+      const d = await ref.get(); if (!d.exists) return;
+      const r = d.data().reminders || [];
+      // Anti-spam : une relance par 24 h maximum.
+      if (r.length && Date.now() - Number(r[r.length - 1]) < 86400000)
+        return showToast?.('Déjà relancé il y a moins de 24 h.', '#e4b24a', 3000);
+      await ref.set({ reminders: [...r, Date.now()] }, { merge: true });
+      showToast?.('Relance enregistrée ✓ — pense à prévenir le client', '#2e9a63', 3000);
+      this.loadAcceptances();
+    } catch (e) { showToast?.('✗ ' + (e.message || 'Relance impossible'), '#c0392b', 3000); }
+  },
+
+  async cancelQuestion(token, qid) {
+    try {
+      await Cloud._db.collection('requests').doc(token).collection('questions').doc(qid)
+        .set({ status: 'cancelled' }, { merge: true });
+      showToast?.('Question retirée', '#666', 2200);
+      this.loadAcceptances();
+    } catch (e) { showToast?.('✗ ' + (e.message || 'Impossible'), '#c0392b', 3000); }
+  },
+
   _when(ts) {
     const s = Math.round((Date.now() - Number(ts || 0)) / 1000);
     if (s < 60) return 'à l\'instant';

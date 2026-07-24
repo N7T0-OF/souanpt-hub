@@ -103,6 +103,28 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['status','submittedAt','contact','service','answers','description','budget','deadline','links','attachments'])
         );
+
+      // ── Questions complémentaires posées par le créateur ──
+      // Le client (anonyme) ne peut QUE répondre à une question 'pending' de
+      // SON token, et seulement les champs de réponse. Il ne peut ni modifier
+      // la question, ni son type, ni la rouvrir, ni toucher un autre dossier.
+      match /questions/{qid} {
+        allow read: if true;
+        allow create, delete: if signedIn()
+          && get(/databases/$(database)/documents/requests/$(token)).data.owner == request.auth.uid;
+        allow update: if
+             // Le créateur : tout (relance, annulation, verrouillage…).
+             (signedIn() && get(/databases/$(database)/documents/requests/$(token)).data.owner == request.auth.uid)
+             // Le client : répondre à une question en attente et non verrouillée.
+          || (
+               resource.data.status == 'pending'
+            && resource.data.locked != true
+            && request.resource.data.status == 'answered'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answer','answeredAt','status'])
+             )
+             // Le client : signaler qu'il a vu la question (accusé de lecture).
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenAt']));
+      }
     }
 
     // Collections privées scopées par owner

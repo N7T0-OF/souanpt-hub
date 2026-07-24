@@ -161,6 +161,97 @@ select.inp{cursor:pointer}
 @media(max-width:520px){.ovl{align-items:flex-end;padding:0}.mod{max-width:none;border-radius:18px 18px 0 0}}
 `;
 
+/** Carte « Action requise » + chronologie des précisions déjà données. */
+function renderQuestions(pending, done, creator) {
+  if (!pending.length && !done.length) return '';
+  const field = q => {
+    const id = 'ans-' + esc(q.id);
+    if (q.responseType === 'long')   return `<textarea class="inp" id="${id}" rows="3"></textarea>`;
+    if (q.responseType === 'number') return `<input class="inp" id="${id}" type="text" inputmode="decimal" placeholder="ex. 3">`;
+    if (q.responseType === 'date')   return `<input class="inp" id="${id}" type="date">`;
+    if (q.responseType === 'link')   return `<input class="inp" id="${id}" type="url" placeholder="https://…">`;
+    if (q.responseType === 'bool')   return `<select class="inp" id="${id}"><option value="">—</option><option value="oui">Oui</option><option value="non">Non</option></select>`;
+    if (q.responseType === 'choice') return `<select class="inp" id="${id}"><option value="">—</option>${
+      (q.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`;
+    return `<input class="inp" id="${id}" type="text">`;
+  };
+  const ask = !pending.length ? '' : `<div class="card" style="border-color:rgba(200,255,0,.35)">
+    <div class="sec-t">Action requise</div>
+    <p class="sub" style="margin:0 0 12px">${creator} a besoin d'${pending.length > 1 ? 'précisions' : 'une précision'} pour préparer votre estimation.</p>
+    ${pending.map(q => `<div data-q="${esc(q.id)}" style="margin-bottom:14px">
+      <div class="lbl">${esc(q.question)}${q.required ? ' *' : ''}</div>
+      ${field(q)}
+      <div class="err" data-qerr="${esc(q.id)}"></div>
+      <button type="button" class="btn p small" data-send="${esc(q.id)}" data-type="${esc(q.responseType || 'text')}" data-req="${q.required ? '1' : ''}">Envoyer la réponse</button>
+    </div>`).join('')}
+  </div>`;
+  const hist = !done.length ? '' : `<div class="card">
+    <div class="sec-t">Précisions déjà données</div>
+    ${done.map(q => `<div style="padding:7px 0;border-bottom:1px solid var(--b)">
+      <div style="font-size:12px;color:var(--m)">${esc(q.question)}</div>
+      <div style="font-size:13px;font-weight:700">${esc(String(q.answer))}</div></div>`).join('')}
+  </div>`;
+  return ask + hist;
+}
+
+/**
+ * Envoi des réponses aux questions. Écriture Firestore ciblée : seuls
+ * `answer`, `answeredAt` et `status` partent — les règles refusent le reste.
+ * Marque aussi la question comme VUE (accusé de lecture pour le créateur).
+ */
+function answerScript(token, pending) {
+  if (!pending.length) return '';
+  return `<script>
+(function(){
+  var TOKEN=${JSON.stringify(token)}, KEY=${JSON.stringify(API_KEY)};
+  var BASE=${JSON.stringify(DOCS)}+'/requests/'+encodeURIComponent(TOKEN)+'/questions/';
+  var IDS=${JSON.stringify(pending.map(q => q.id))};
+
+  // Accusé de lecture : le créateur saura que la question a été vue.
+  IDS.forEach(function(id){
+    fetch(BASE+encodeURIComponent(id)+'?key='+KEY+'&updateMask.fieldPaths=seenAt',
+      {method:'PATCH',headers:{'content-type':'application/json'},
+       body:JSON.stringify({fields:{seenAt:{integerValue:String(Date.now())}}})}).catch(function(){});
+  });
+
+  document.querySelectorAll('[data-send]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id=btn.dataset.send, type=btn.dataset.type, req=btn.dataset.req==='1';
+      var inp=document.getElementById('ans-'+id);
+      var err=document.querySelector('[data-qerr="'+id+'"]');
+      var raw=(inp.value||'').trim();
+      err.textContent='';
+      if(!raw){ if(req){ err.textContent='Cette réponse est nécessaire.'; return; } err.textContent='Écris une réponse.'; return; }
+      var value=raw;
+      if(type==='number'){
+        var n=Number(raw.replace(',','.'));
+        if(!isFinite(n)||n<0){ err.textContent='Indique un nombre valide.'; return; }
+        value=n;
+      }
+      if(type==='link'){
+        var v=raw; if(!/^https?:\\/\\//i.test(v)) v='https://'+v;
+        var u; try{u=new URL(v);}catch(e){u=null;}
+        if(!u||!/\\./.test(u.hostname)){ err.textContent='Lien invalide.'; return; }
+        value=v;
+      }
+      if(type==='bool') value = (raw==='oui');
+      btn.disabled=true; btn.textContent='Envoi…';
+      var fv = typeof value==='number' ? (Number.isInteger(value)?{integerValue:String(value)}:{doubleValue:value})
+             : typeof value==='boolean' ? {booleanValue:value} : {stringValue:String(value).slice(0,2000)};
+      fetch(BASE+encodeURIComponent(id)+'?key='+KEY
+            +'&updateMask.fieldPaths=answer&updateMask.fieldPaths=answeredAt&updateMask.fieldPaths=status',
+        {method:'PATCH',headers:{'content-type':'application/json'},
+         body:JSON.stringify({fields:{answer:fv,answeredAt:{integerValue:String(Date.now())},status:{stringValue:'answered'}}})})
+        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+        .then(function(){ btn.textContent='Réponse envoyée ✓'; setTimeout(function(){location.reload();},1200); })
+        .catch(function(){ btn.disabled=false; btn.textContent='Envoyer la réponse';
+          err.textContent='Envoi impossible. Vérifie ta connexion et réessaie.'; });
+    });
+  });
+})();
+</script>`;
+}
+
 export async function onRequestGet(ctx) {
   const token = String(ctx.params.token || '').trim();
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(token)) return notFound('Ce lien n’est pas valide.');
@@ -175,6 +266,25 @@ export async function onRequestGet(ctx) {
   const d = {}; for (const k in f) d[k] = val(f[k]);
   const creator = esc(d.creatorName || 'Le créateur');
   const initial = esc(String(d.creatorName || 'S').trim().charAt(0).toUpperCase() || 'S');
+
+  // ── Questions complémentaires (jamais les notes internes du créateur) ──
+  let questions = [];
+  try {
+    const qr = await fetch(`${DOCS}/requests/${encodeURIComponent(token)}/questions?key=${API_KEY}&pageSize=40`);
+    if (qr.ok) {
+      const j = await qr.json();
+      questions = (j.documents || []).map(doc => {
+        const o = { id: String(doc.name || '').split('/').pop() };
+        for (const k in (doc.fields || {})) o[k] = val(doc.fields[k]);
+        return o;
+      }).filter(q => !q.internal && q.status !== 'cancelled')
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    }
+  } catch (e) {}
+  const nowTs = Date.now();
+  const pendingQ = questions.filter(q => q.status === 'pending' && !(q.expiresAt && nowTs > Number(q.expiresAt)));
+  const doneQ = questions.filter(q => q.status === 'answered');
+  const questionsHtml = renderQuestions(pendingQ, doneQ, creator);
   const submitted = d.status === 'submitted' || d.status === 'closed';
   const closed = d.status === 'closed';
 
@@ -189,6 +299,7 @@ export async function onRequestGet(ctx) {
     const body = `<div class="wrap">${brand}
       <h1>Demande envoyée ✓</h1>
       <p class="sub">${creator} va examiner ta demande et préparer une estimation. Tu pourras revenir sur cette page avec le même lien — elle deviendra ton estimation, puis ton espace mission.</p>
+      ${questionsHtml}
       <div class="card">
         <div class="sec-t">Récapitulatif</div>
         <div class="lbl">Type de projet</div><div>${esc(svc)}</div>
@@ -198,8 +309,8 @@ export async function onRequestGet(ctx) {
       </div>
       ${closed ? '' : `<div class="card"><div class="sec-t">Compléter</div>
         <p class="hint" style="margin:0 0 10px">Tu peux encore ajouter une précision ou une référence tant que l'estimation n'est pas préparée.</p>
-        <button class="btn small" onclick="location.href='?edit=1'">Ajouter une précision</button></div>`}
-      <p class="foot"><a href="/">Créé avec souanpt.hub</a></p></div>`;
+        <button class="btn small" onclick="location.href='?edit=1'">Ajouter une référence</button></div>`}
+      <p class="foot"><a href="/">Créé avec souanpt.hub</a></p></div>${answerScript(token, pendingQ)}`;
     // ?edit=1 rebascule sur le formulaire pré-rempli.
     const url = new URL(ctx.request.url);
     if (url.searchParams.get('edit') !== '1' || closed) return shell('Demande envoyée — souanpt.hub', body);
@@ -212,6 +323,8 @@ export async function onRequestGet(ctx) {
   const body = `<div class="wrap">${brand}
   <h1>Votre projet</h1>
   <p class="sub">Parlez-nous de votre besoin. Ces informations permettront de préparer une estimation plus juste — et resteront sur ce même lien tout au long du projet.</p>
+
+  ${questionsHtml}
 
   <div class="card">
     <div class="sec-t">Vos informations</div>
@@ -442,5 +555,5 @@ export async function onRequestGet(ctx) {
 })();
 </script>`;
 
-  return shell('Votre projet — souanpt.hub', body);
+  return shell('Votre projet — souanpt.hub', body + answerScript(token, pendingQ));
 }
