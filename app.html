@@ -1620,6 +1620,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div class="settings-nav-item active" onclick="settingsTab('compte',this)">👤 Compte</div>
           <div class="settings-nav-item" onclick="settingsTab('general',this)">Général</div>
           <div class="settings-nav-item" onclick="settingsTab('integrations',this)">🔗 Intégrations</div>
+          <div class="settings-nav-item" onclick="settingsTab('notifs',this)">🔔 Notifications</div>
           <div class="settings-nav-item" onclick="settingsTab('soutien',this)">❤️ Soutenir</div>
           <div class="settings-nav-item" onclick="settingsTab('domain',this)">Domaine</div>
           <div class="settings-nav-item" onclick="settingsTab('privacy',this)">Confidentialité</div>
@@ -1696,6 +1697,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                 </select>
               </div>
               <div class="hintbox">S'applique aux prochaines couvertures importées. Pour recompresser celles déjà en place avec ce réglage : <strong style="color:var(--accent);cursor:pointer" onclick="showPage('storage')">Stockage → Optimiser les images →</strong></div>
+            </div>
+          </div>
+          <div id="set-tab-notifs" class="set-tab" style="display:none">
+            <div class="setting-group">
+              <div class="setting-group-title">🔔 Notifications</div>
+              <div class="hintbox" style="margin-bottom:12px">Les notifications <strong style="color:var(--text)">internes</strong> sont gratuites et fonctionnent sans rien configurer. Discord et email passent par un <strong style="color:var(--text)">Worker</strong> : le webhook et la clé email y restent secrets — ils ne transitent jamais par ton navigateur.</div>
+              <div class="edw-l">URL du Worker de notifications</div>
+              <input class="prop-input" id="nt-url" placeholder="https://souanpt-notify.…workers.dev">
+              <div class="hintbox" style="margin-top:8px">Vide = seules les notifications internes fonctionnent. Déploiement : <code>wrangler deploy -c wrangler.notify.toml</code></div>
+              <div id="nt-events" style="margin-top:14px"></div>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                <button class="btn btn-accent" style="font-size:10px" onclick="notifsSave()">Enregistrer</button>
+                <button class="btn btn-ghost" style="font-size:10px" onclick="Notify.test()">📨 Envoyer un test</button>
+              </div>
             </div>
           </div>
           <div id="set-tab-soutien" class="set-tab" style="display:none">
@@ -1891,10 +1906,38 @@ function settingsTab(name, el) {
   if (tab) tab.style.display = '';
   if (el) el.classList.add('active');
   if (name === 'compte') renderCompte();
+  if (name === 'notifs') renderNotifs();
   if (name === 'integrations') {
     renderIntegrations(); renderBehancePage?.(); renderLoginLog?.();
     setTimeout(() => GHPage.init(), 50);
   }
+}
+
+/* ═══ NOTIFICATIONS — canaux par type d'événement ═══
+   Interne = toujours disponible et gratuit. Discord/email n'apparaissent
+   actifs que si le Worker est renseigné (les secrets vivent côté serveur). */
+function renderNotifs() {
+  const cfg = Notify.cfg();
+  const url = document.getElementById('nt-url'); if (url) url.value = cfg.url || '';
+  const box = document.getElementById('nt-events'); if (!box) return;
+  box.innerHTML = `<div class="edw-l">Canaux par événement</div>` + NOTIFY_EVENTS.map(([id, label]) => {
+    const e = cfg.events[id] || { internal: true };
+    return `<div class="qf-row">
+      <span class="qf-l">${label}</span>
+      <label class="edw-tog" style="margin:0 8px"><input type="checkbox" data-nt="${id}" data-ch="internal"${e.internal !== false ? ' checked' : ''}> Interne</label>
+      <label class="edw-tog" style="margin:0 8px"><input type="checkbox" data-nt="${id}" data-ch="discord"${e.discord ? ' checked' : ''}> Discord</label>
+      <label class="edw-tog" style="margin:0"><input type="checkbox" data-nt="${id}" data-ch="email"${e.email ? ' checked' : ''}> Email</label>
+    </div>`;
+  }).join('');
+}
+function notifsSave() {
+  const events = {};
+  document.querySelectorAll('[data-nt]').forEach(i => {
+    events[i.dataset.nt] = events[i.dataset.nt] || {};
+    events[i.dataset.nt][i.dataset.ch] = i.checked;
+  });
+  Notify.set({ url: (document.getElementById('nt-url').value || '').trim(), events });
+  showToast('Préférences de notification enregistrées ✓', '#2e9a63', 2500);
 }
 
 /* ═══ COMPTE — bannière profil + connexions ═══ */

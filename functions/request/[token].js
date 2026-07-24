@@ -173,6 +173,12 @@ function renderQuestions(pending, done, creator) {
     if (q.responseType === 'bool')   return `<select class="inp" id="${id}"><option value="">—</option><option value="oui">Oui</option><option value="non">Non</option></select>`;
     if (q.responseType === 'choice') return `<select class="inp" id="${id}"><option value="">—</option>${
       (q.options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`;
+    // Réponse par FICHIER : même dépôt que les références (Firebase Storage,
+    // chemin isolé par token). La réponse enregistrée est une référence
+    // structurée, pas une simple URL.
+    if (q.responseType === 'file') return `<div class="drop" data-drop="${id}"><b>Ajouter un fichier</b> ou glisse-le ici</div>
+      <input type="file" data-fin="${id}" multiple accept="${OK_EXT.map(e => '.' + e).join(',')}" style="display:none">
+      <div class="files" data-flist="${id}"></div>`;
     return `<input class="inp" id="${id}" type="text">`;
   };
   const ask = !pending.length ? '' : `<div class="card" style="border-color:rgba(200,255,0,.35)">
@@ -185,11 +191,15 @@ function renderQuestions(pending, done, creator) {
       <button type="button" class="btn p small" data-send="${esc(q.id)}" data-type="${esc(q.responseType || 'text')}" data-req="${q.required ? '1' : ''}">Envoyer la réponse</button>
     </div>`).join('')}
   </div>`;
+  // Une réponse « fichier » est un objet structuré → on affiche les noms.
+  const shown = a => (a && typeof a === 'object')
+    ? (Array.isArray(a.files) ? a.files.map(f => f.name).join(', ') : '(fichier envoyé)')
+    : String(a);
   const hist = !done.length ? '' : `<div class="card">
     <div class="sec-t">Précisions déjà données</div>
     ${done.map(q => `<div style="padding:7px 0;border-bottom:1px solid var(--b)">
       <div style="font-size:12px;color:var(--m)">${esc(q.question)}</div>
-      <div style="font-size:13px;font-weight:700">${esc(String(q.answer))}</div></div>`).join('')}
+      <div style="font-size:13px;font-weight:700">${esc(shown(q.answer))}</div></div>`).join('')}
   </div>`;
   return ask + hist;
 }
@@ -201,11 +211,82 @@ function renderQuestions(pending, done, creator) {
  */
 function answerScript(token, pending) {
   if (!pending.length) return '';
-  return `<script>
+  const needsFile = pending.some(q => q.responseType === 'file');
+  // Le SDK Storage n'est chargé QUE si une question attend un fichier.
+  const sdk = needsFile ? `<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>` : '';
+  return `${sdk}<script>
 (function(){
   var TOKEN=${JSON.stringify(token)}, KEY=${JSON.stringify(API_KEY)};
   var BASE=${JSON.stringify(DOCS)}+'/requests/'+encodeURIComponent(TOKEN)+'/questions/';
   var IDS=${JSON.stringify(pending.map(q => q.id))};
+  var MAX_BYTES=${MAX_MB}*1024*1024, OK=${JSON.stringify(OK_EXT)}, BLOCK=${JSON.stringify(BLOCK_EXT)};
+  var NEEDS_FILE=${needsFile ? 'true' : 'false'};
+  var storage=null;
+  if(NEEDS_FILE){ try{
+    if(!(window.firebase&&firebase.apps&&firebase.apps.length))
+      firebase.initializeApp({apiKey:KEY,projectId:'souanpt-hub',storageBucket:${JSON.stringify(STORAGE_BUCKET)}});
+    storage=firebase.storage();
+  }catch(e){ storage=null; } }
+
+  var ext=function(n){var m=String(n||'').toLowerCase().match(/\\.([a-z0-9]+)$/);return m?m[1]:'';};
+  var human=function(b){b=b||0;if(b<1024)return b+' o';if(b<1048576)return (b/1024).toFixed(0)+' Ko';return (b/1048576).toFixed(1)+' Mo';};
+  var escp=function(s){return String(s).replace(/[<>&"]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c];});};
+  var bag={};   // id de question -> fichiers joints
+
+  function draw(id){
+    var box=document.querySelector('[data-flist="'+id+'"]'); if(!box) return;
+    var list=bag[id]||[];
+    box.innerHTML='';
+    list.forEach(function(f,i){
+      var row=document.createElement('div'); row.className='f';
+      row.innerHTML='<span class="ic">📎</span><div class="meta"><div class="fn">'+escp(f.name)+'</div>'
+        +'<div class="fs">'+human(f.size)+' · '+(f.state==='done'?'✓ envoyé':f.state==='error'?'erreur':'envoi…')+'</div>'
+        +(f.state==='up'?'<div class="bar"><i style="width:'+(f.pct||0)+'%"></i></div>':'')+'</div>'
+        +(f.state==='error'?'<button class="x" data-retry="'+i+'" title="Réessayer">↻</button>':'')
+        +'<button class="x" data-del="'+i+'">✕</button>';
+      box.appendChild(row);
+    });
+    box.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){
+      var f=(bag[id]||[])[+b.dataset.del]; if(f&&f.task){try{f.task.cancel();}catch(e){}}
+      bag[id].splice(+b.dataset.del,1); draw(id); };});
+    box.querySelectorAll('[data-retry]').forEach(function(b){b.onclick=function(){ up(id,(bag[id]||[])[+b.dataset.retry]); };});
+  }
+  function up(id, rec){
+    if(!storage){ rec.state='error'; draw(id); return; }
+    var fid=Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+    var safe=rec.name.replace(/[^\\w.\\-]+/g,'_').slice(0,80);
+    rec.storagePath='requests/'+TOKEN+'/'+fid+'/'+safe; rec.state='up'; rec.pct=0; draw(id);
+    var ref=storage.ref(rec.storagePath);
+    rec.task=ref.put(rec.raw,{contentType:rec.type||'application/octet-stream'});
+    rec.task.on('state_changed',
+      function(s){ rec.pct=Math.round(s.bytesTransferred/s.totalBytes*100); draw(id); },
+      function(){ rec.state='error'; draw(id); },
+      function(){ ref.getDownloadURL().then(function(u){ rec.downloadUrl=u; rec.state='done'; rec.pct=100; draw(id); }); });
+  }
+  function addTo(id, list){
+    var err=document.querySelector('[data-qerr="'+id+'"]'); var msg='';
+    bag[id]=bag[id]||[];
+    for(var i=0;i<list.length;i++){ var f=list[i], e=ext(f.name);
+      if(BLOCK.indexOf(e)>=0){ msg='Type interdit : .'+e; continue; }
+      if(OK.indexOf(e)<0){ msg='Format non accepté : .'+e; continue; }
+      if(f.size>MAX_BYTES){ msg='« '+f.name+' » dépasse ${MAX_MB} Mo.'; continue; }
+      if(bag[id].some(function(x){return x.name===f.name&&x.size===f.size;})) continue;
+      var rec={name:f.name,size:f.size,type:f.type||'',raw:f,state:'wait',pct:0};
+      bag[id].push(rec); up(id,rec);
+    }
+    if(err) err.textContent=msg;
+    draw(id);
+  }
+  document.querySelectorAll('[data-drop]').forEach(function(d){
+    var id=d.dataset.drop.replace(/^ans-/,'');
+    var input=document.querySelector('[data-fin="ans-'+id+'"]');
+    d.onclick=function(){ input.click(); };
+    input.onchange=function(){ addTo(id,this.files); this.value=''; };
+    ['dragover','dragenter'].forEach(function(ev){d.addEventListener(ev,function(e){e.preventDefault();d.classList.add('over');});});
+    ['dragleave','drop'].forEach(function(ev){d.addEventListener(ev,function(e){e.preventDefault();d.classList.remove('over');});});
+    d.addEventListener('drop',function(e){ if(e.dataTransfer&&e.dataTransfer.files) addTo(id,e.dataTransfer.files); });
+  });
 
   // Accusé de lecture : le créateur saura que la question a été vue.
   IDS.forEach(function(id){
@@ -214,13 +295,38 @@ function answerScript(token, pending) {
        body:JSON.stringify({fields:{seenAt:{integerValue:String(Date.now())}}})}).catch(function(){});
   });
 
+  function fsVal(v){
+    if(v===null||v===undefined)return {nullValue:null};
+    if(typeof v==='boolean')return {booleanValue:v};
+    if(typeof v==='number')return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
+    if(Array.isArray(v))return {arrayValue:{values:v.map(fsVal)}};
+    if(typeof v==='object'){var f={};for(var k in v)f[k]=fsVal(v[k]);return {mapValue:{fields:f}};}
+    return {stringValue:String(v)};
+  }
+
   document.querySelectorAll('[data-send]').forEach(function(btn){
     btn.addEventListener('click', function(){
       var id=btn.dataset.send, type=btn.dataset.type, req=btn.dataset.req==='1';
       var inp=document.getElementById('ans-'+id);
       var err=document.querySelector('[data-qerr="'+id+'"]');
-      var raw=(inp.value||'').trim();
       err.textContent='';
+
+      // ── Réponse par FICHIER : référence structurée, jamais une simple URL ──
+      if(type==='file'){
+        var list=(bag[id]||[]);
+        if(!list.length){ err.textContent='Ajoute au moins un fichier.'; return; }
+        if(list.some(function(f){return f.state==='up'||f.state==='wait';})){ err.textContent='Attends la fin de l\\'envoi.'; return; }
+        var okFiles=list.filter(function(f){return f.state==='done';});
+        if(!okFiles.length){ err.textContent='Aucun fichier n\\'a pu être envoyé. Réessaie.'; return; }
+        send(btn, id, { type:'file', files: okFiles.map(function(f){
+          return { id:'q_'+Math.random().toString(36).slice(2,9), name:f.name, mimeType:f.type, size:f.size,
+                   storagePath:f.storagePath||'', downloadUrl:f.downloadUrl||'', url:f.downloadUrl||'',
+                   category:'client_reference', visibility:'client_visible', uploadedBy:'client',
+                   questionId:id, createdAt:Date.now() }; }) }, err);
+        return;
+      }
+
+      var raw=(inp.value||'').trim();
       if(!raw){ if(req){ err.textContent='Cette réponse est nécessaire.'; return; } err.textContent='Écris une réponse.'; return; }
       var value=raw;
       if(type==='number'){
@@ -235,19 +341,23 @@ function answerScript(token, pending) {
         value=v;
       }
       if(type==='bool') value = (raw==='oui');
-      btn.disabled=true; btn.textContent='Envoi…';
-      var fv = typeof value==='number' ? (Number.isInteger(value)?{integerValue:String(value)}:{doubleValue:value})
-             : typeof value==='boolean' ? {booleanValue:value} : {stringValue:String(value).slice(0,2000)};
-      fetch(BASE+encodeURIComponent(id)+'?key='+KEY
-            +'&updateMask.fieldPaths=answer&updateMask.fieldPaths=answeredAt&updateMask.fieldPaths=status',
-        {method:'PATCH',headers:{'content-type':'application/json'},
-         body:JSON.stringify({fields:{answer:fv,answeredAt:{integerValue:String(Date.now())},status:{stringValue:'answered'}}})})
-        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-        .then(function(){ btn.textContent='Réponse envoyée ✓'; setTimeout(function(){location.reload();},1200); })
-        .catch(function(){ btn.disabled=false; btn.textContent='Envoyer la réponse';
-          err.textContent='Envoi impossible. Vérifie ta connexion et réessaie.'; });
+      send(btn, id, value, err);
     });
   });
+
+  /** Écriture ciblée : answer + answeredAt + status. Les règles refusent le reste. */
+  function send(btn, id, value, err){
+    if(btn.disabled) return;
+    btn.disabled=true; btn.textContent='Envoi…';
+    fetch(BASE+encodeURIComponent(id)+'?key='+KEY
+          +'&updateMask.fieldPaths=answer&updateMask.fieldPaths=answeredAt&updateMask.fieldPaths=status',
+      {method:'PATCH',headers:{'content-type':'application/json'},
+       body:JSON.stringify({fields:{answer:fsVal(value),answeredAt:{integerValue:String(Date.now())},status:{stringValue:'answered'}}})})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(){ btn.textContent='Réponse envoyée ✓'; setTimeout(function(){location.reload();},1200); })
+      .catch(function(){ btn.disabled=false; btn.textContent='Envoyer la réponse';
+        err.textContent='Envoi impossible. Vérifie ta connexion et réessaie.'; });
+  }
 })();
 </script>`;
 }

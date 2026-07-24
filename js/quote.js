@@ -616,6 +616,8 @@ const QuoteUI = {
       if (box) box.textContent = `Lien client créé :\n${url}\n\nValable ${days} jours. Il s'ouvre sans compte, et restera le même quand le projet passera en production.`;
       navigator.clipboard?.writeText(url).catch(() => {});
       showToast?.(this._fromRequest ? 'Estimation créée sur le même lien ✓' : 'Lien créé et copié ✓', '#2e9a63', 3500);
+      // Notification « au mieux » : jamais attendue, jamais bloquante.
+      Notify.send('estimate.published', code, { entityId: code }).catch(() => {});
       this._fromRequest = null;   // consommé
     } catch (err) {
       showToast?.('✗ ' + (err.message || 'Publication impossible'), '#c0392b', 4000);
@@ -695,7 +697,14 @@ const QuoteUI = {
           const qs = await Cloud._db.collection('requests').doc(r.token).collection('questions').get();
           qs.forEach(q => r.questions.push({ id: q.id, ...q.data() }));
           r.questions.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+          // Réponses du client → notification (relais transitoire, cf. Notify).
+          r.questions.filter(q => q.status === 'answered' && !q.internal).forEach(q => {
+            Notify.send('request.question_answered', r.token, { entityId: q.id }).catch(() => {});
+            if (q.responseType === 'file')
+              Notify.send('request.file_added', r.token, { entityId: q.id }).catch(() => {});
+          });
         } catch (e) {}
+        Notify.send('request.created', r.token, { entityId: String(r.submittedAt || '') }).catch(() => {});
         this._reqs.push(r);
       }
       // Réutilise la lecture des estimations déjà faite ci-dessus (ests0).
@@ -717,9 +726,14 @@ const QuoteUI = {
         });
         // L'acceptation prime : si le client a fini par accepter, la contre-offre
         // n'a plus à être signalée.
-        if (accept) this._acc.push({ est, accept });
-        else if (lastCounter && !seen.has(est.code + ':' + (lastCounter.createdAt || 0))) {
+        if (accept) {
+          this._acc.push({ est, accept });
+          // Relais transitoire : c'est le tableau de bord qui détecte
+          // l'événement client, faute de déclencheur Firestore serveur.
+          Notify.send('estimate.accepted', est.code, { entityId: String(accept.createdAt || '') }).catch(() => {});
+        } else if (lastCounter && !seen.has(est.code + ':' + (lastCounter.createdAt || 0))) {
           this._neg.push({ est, offer: lastCounter });
+          Notify.send('estimate.counter_offer_received', est.code, { entityId: String(lastCounter.createdAt || '') }).catch(() => {});
         }
       }
     } catch (e) { console.warn('[quote] loadAcceptances', e); }
@@ -766,13 +780,21 @@ const QuoteUI = {
           ${qs.map(q => {
             const exp = q.expiresAt && Date.now() > Number(q.expiresAt) && q.status === 'pending';
             const state = q.status === 'answered' ? '✓ répondu' : exp ? '⏳ expirée' : q.seenAt ? '👁 vue' : '· envoyée';
+            // Une réponse « fichier » est un objet : on montre les noms.
+            const aTxt = q.responseType === 'file'
+              ? ((q.answer && Array.isArray(q.answer.files)) ? q.answer.files.map(f => f.name).join(', ') : 'fichier')
+              : String(q.answer);
             const ans = q.status === 'answered'
-              ? ` → <b style="color:var(--accent)">${this._esc(String(q.answer))}</b>` : '';
+              ? ` → <b style="color:var(--accent)">${this._esc(aTxt)}</b>` : '';
+            const added = this._addedFromQ().has(r.token + ':' + q.id);
             return `<div style="font-size:10px;color:var(--muted2);padding:3px 0;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap">
               <span style="flex:1;min-width:120px">${q.internal ? '🔒 ' : ''}${this._esc(q.question)}${ans}</span>
               <span>${state}</span>
               ${q.status === 'pending' ? `<button class="btn btn-ghost" style="font-size:9px;padding:2px 6px" onclick="QuoteUI.remind('${this._esc(r.token)}','${this._esc(q.id)}')">Relancer</button>
               <button class="btn btn-ghost" style="font-size:9px;padding:2px 6px" onclick="QuoteUI.cancelQuestion('${this._esc(r.token)}','${this._esc(q.id)}')">Retirer</button>` : ''}
+              ${q.status === 'answered' && !q.internal ? (added
+                ? '<span style="color:var(--accent)">✓ au devis</span>'
+                : `<button class="btn btn-ghost" style="font-size:9px;padding:2px 6px" onclick="QuoteUI.addToQuote('${this._esc(r.token)}','${this._esc(q.id)}')">➕ Au devis</button>`) : ''}
             </div>`;
           }).join('')}
         </div>`;
@@ -850,7 +872,15 @@ const QuoteUI = {
        portent un `mapsTo` alimentent directement la donnée structurée
        (quantité, délai, sources…) — jamais déduites du texte libre. */
     const qAnswered = (req.questions || []).filter(q => q.status === 'answered' && !q.internal);
+    // Fichiers envoyés EN RÉPONSE à une question → ils rejoignent les références
+    // (aucune copie : ce sont les mêmes objets Storage, juste référencés).
+    const qFiles = [];
     qAnswered.forEach(q => {
+      if (q.responseType === 'file') {
+        const a = q.answer || {};
+        (Array.isArray(a.files) ? a.files : []).forEach(f => qFiles.push(f));
+        return;   // pas de mapsTo scalaire pour un fichier
+      }
       const v = q.responseType === 'number' ? Number(q.answer)
               : q.responseType === 'bool' ? (q.answer === true || q.answer === 'true' || q.answer === 'oui')
               : q.answer;
@@ -866,7 +896,12 @@ const QuoteUI = {
     if (req.budget) lines.push('Budget : ' + req.budget);
     if (req.deadline) lines.push('Délai : ' + req.deadline);
     // Les précisions sans `mapsTo` restent utiles en texte pour le créateur.
-    qAnswered.filter(q => !q.mapsTo).forEach(q => lines.push(q.question + ' → ' + q.answer));
+    qAnswered.filter(q => !q.mapsTo).forEach(q => {
+      const a = q.responseType === 'file'
+        ? ((q.answer && Array.isArray(q.answer.files)) ? q.answer.files.map(f => f.name).join(', ') : 'fichier envoyé')
+        : q.answer;
+      lines.push(q.question + ' → ' + a);
+    });
     const text = (req.description || '') + (lines.length ? '\n\n' + lines.join('\n') : '');
     const inp = this._el('qf-input'); if (inp) inp.value = text.trim();
     const proj = this._el('qf-project'); if (proj) proj.value = svc || '';
@@ -876,7 +911,13 @@ const QuoteUI = {
         url: a.downloadUrl || a.url || '', storagePath: a.storagePath || '', category: 'client_reference', visibility: 'client_visible', uploadedBy: 'client', createdAt: a.createdAt }))),
       ...((req.links || []).map(l => ({ id: 'ext_' + Math.random().toString(36).slice(2, 8), name: l.label || l.url, type: 'external_link',
         url: l.url, category: 'client_reference', visibility: 'client_visible', uploadedBy: 'client', createdAt: Date.now() }))),
+      // Fichiers reçus via une réponse à question.
+      ...qFiles.map(f => ({ id: f.id, name: f.name, type: f.mimeType || '', size: f.size || 0,
+        url: f.downloadUrl || f.url || '', storagePath: f.storagePath || '', category: 'client_reference',
+        visibility: 'client_visible', uploadedBy: 'client', questionId: f.questionId, createdAt: f.createdAt })),
     ];
+    // dedupeAttachments protège d'un même fichier joint deux fois (demande + réponse).
+    if (typeof dedupeAttachments === 'function') this._attachments = dedupeAttachments(this._attachments);
     // Mémorise le token de la demande : publish() réutilisera CE token pour
     // garder le même /c/ tout au long du parcours.
     this._fromRequest = token;
@@ -898,13 +939,14 @@ const QuoteUI = {
      délai…) pour qu'elle ne dépende PAS de l'analyse du texte libre.
   ══════════════════════════════════════════════════════════════════════ */
   QTYPES: [['text', 'Texte court'], ['long', 'Texte long'], ['number', 'Nombre'],
-           ['bool', 'Oui / Non'], ['choice', 'Choix unique'], ['date', 'Date'], ['link', 'Lien']],
+           ['bool', 'Oui / Non'], ['choice', 'Choix unique'], ['date', 'Date'],
+           ['link', 'Lien'], ['file', 'Fichier']],
   QTPL: [
     { q: 'Combien de propositions souhaitez-vous ?', t: 'number', m: 'nb' },
     { q: 'Quelle est la date limite exacte ?',       t: 'date',   m: 'deadline' },
     { q: 'Avez-vous besoin des fichiers sources ?',  t: 'bool',   m: 'sources' },
     { q: 'Quel est votre budget approximatif ?',     t: 'text',   m: 'budget' },
-    { q: 'Pouvez-vous envoyer les éléments manquants ?', t: 'link', m: '' },
+    { q: 'Pouvez-vous envoyer les éléments manquants ?', t: 'file', m: '' },
   ],
 
   askDialog(token) {
@@ -969,6 +1011,7 @@ const QuoteUI = {
     });
     QDialog.close();
     showToast?.(data.internal ? 'Note interne enregistrée' : 'Question envoyée — le client la verra sur son lien', '#2e9a63', 3800);
+    if (!data.internal) Notify.send('request.question_sent', token, { entityId: id }).catch(() => {});
     this.loadAcceptances();
     return true;
   },
@@ -986,6 +1029,67 @@ const QuoteUI = {
       showToast?.('Relance enregistrée ✓ — pense à prévenir le client', '#2e9a63', 3000);
       this.loadAcceptances();
     } catch (e) { showToast?.('✗ ' + (e.message || 'Relance impossible'), '#c0392b', 3000); }
+  },
+
+  /* ── « Ajouter au devis » : transforme une réponse en ligne tarifaire ──
+     Pré-remplit à partir de la réponse, mais N'AJOUTE JAMAIS un prix sans
+     validation. `sourceQuestionId` empêche le double ajout. */
+  _addedFromQ() { try { return new Set(JSON.parse(localStorage.getItem('hub_q_added') || '[]')); } catch (e) { return new Set(); } },
+  _markAdded(key) {
+    const s = this._addedFromQ(); s.add(key);
+    localStorage.setItem('hub_q_added', JSON.stringify([...s].slice(-300)));
+  },
+  addToQuote(token, qid) {
+    const req = this._reqs.find(r => r.token === token); if (!req) return;
+    const q = (req.questions || []).find(x => x.id === qid); if (!q) return;
+    const key = token + ':' + qid;
+    if (this._addedFromQ().has(key)) return showToast?.('Cette réponse est déjà au devis.', '#e4b24a', 3000);
+
+    // Pré-remplissage : prestation de la demande, quantité issue de la réponse.
+    const svcId = req.service && QUOTE_SERVICES[req.service] ? req.service : Object.keys(QUOTE_SERVICES)[0];
+    const qtyGuess = q.responseType === 'number' ? Math.max(1, Number(q.answer) || 1) : 1;
+    const svcOpts = Object.keys(QUOTE_SERVICES).map(id =>
+      `<option value="${id}"${id === svcId ? ' selected' : ''}>${this._esc(QUOTE_SERVICES[id].label)}</option>`).join('');
+    const optOpts = Object.keys(QUOTE_OPTIONS).map(id =>
+      `<label class="edw-tog"><input type="checkbox" data-o="${id}"> ${this._esc(QUOTE_OPTIONS[id].label)} (+${Pricing.optPrice(id)} €)</label>`).join('');
+
+    QDialog.open({
+      title: '➕ Ajouter cette réponse au devis',
+      confirm: 'Ajouter au devis',
+      body: `<p class="edw-hint" style="margin-bottom:10px">« ${this._esc(q.question)} » → <b>${this._esc(String(q.responseType === 'file' ? 'fichier' : q.answer))}</b></p>
+        <div class="edw-l">Prestation</div><select class="prop-input" id="aq2-svc">${svcOpts}</select>
+        <div class="edw-l">Quantité</div><input class="prop-input" id="aq2-qty" type="number" min="1" value="${qtyGuess}">
+        <div class="edw-l">Prix unitaire (€)</div><input class="prop-input" id="aq2-price" type="number" min="0" step="1" value="${Pricing.price(svcId)}">
+        <div class="edw-l">Options</div>${optOpts}
+        <p class="edw-hint" style="margin-top:8px">Rien n'est facturé automatiquement : tu valides le prix ici.</p>`,
+      onConfirm: (dlg) => {
+        const sid = dlg.querySelector('#aq2-svc').value;
+        const qty = Math.max(1, Number(dlg.querySelector('#aq2-qty').value) || 1);
+        const price = Number(dlg.querySelector('#aq2-price').value) || 0;
+        const opts = [...dlg.querySelectorAll('[data-o]:checked')].map(c => c.dataset.o);
+        // Importe la demande si l'analyse n'est pas encore ouverte.
+        if (!this._a || this._fromRequest !== token) this.useRequest(token);
+        setTimeout(() => {
+          this._a = this._a || { services: [], options: [], missing: [], deadline: {}, confidence: 0 };
+          const ex = this._a.services.find(s => s.id === sid);
+          if (ex) { ex.qty = qty; ex.qtyFound = true; }
+          else this._a.services.push({ id: sid, label: QUOTE_SERVICES[sid].label, qty, qtyFound: true, matched: '' });
+          opts.forEach(o => { if (!this._a.options.some(x => x.id === o))
+            this._a.options.push({ id: o, label: QUOTE_OPTIONS[o].label, matched: 'ajouté' }); });
+          // Prix validé par le créateur → surcharge de sa grille pour ce devis.
+          if (price !== Pricing.price(sid)) {
+            const c = Pricing.get();
+            Pricing.set({ services: { ...(c.services || {}), [sid]: { ...((c.services || {})[sid] || {}), price } } });
+          }
+          this.recompute();
+          this._markAdded(key);
+          this._renderAcc();
+          showToast?.('✓ Ajouté au devis', '#2e9a63', 2600);
+        }, this._fromRequest === token ? 0 : 350);
+        QDialog.close();
+        return true;
+      },
+    });
   },
 
   async cancelQuestion(token, qid) {
@@ -1096,6 +1200,7 @@ const QuoteUI = {
       this._syncPortalLocal(portal);
       await Cloud._db.collection('estimates').doc(code).set({ status: 'confirmed', confirmedAt: Date.now() }, { merge: true });
       this._markLaunched(code);
+      Notify.send('mission.started', code, { entityId: code }).catch(() => {});
       QDialog.close();
       if (!silent) {
         showToast?.('✓ Mission lancée — le client suit tout depuis le même lien', '#2e9a63', 4000);
@@ -1172,6 +1277,99 @@ const QDialog = {
   },
 };
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Notify — couche de notifications, FACULTATIVE et NON BLOQUANTE.
+
+   Le navigateur n'envoie QUE { event, workspaceId } : il ne connaît ni le
+   webhook Discord ni la clé email (secrets du Worker). Le Worker relit les
+   montants côté serveur.
+
+   ⚠ SOLUTION TRANSITOIRE ASSUMÉE : sans déclencheur Firestore côté serveur,
+   les événements pilotés par le CLIENT (réponse, acceptation, contre-offre)
+   sont détectés par le tableau de bord du créateur puis relayés au Worker.
+   Un vrai déclencheur serveur les rendrait instantanés.
+══════════════════════════════════════════════════════════════════════════ */
+const NOTIFY_EVENTS = [
+  ['request.created', 'Nouvelle demande'],
+  ['request.file_added', 'Nouveau fichier client'],
+  ['request.question_sent', 'Question envoyée'],
+  ['request.question_answered', 'Réponse du client'],
+  ['estimate.published', 'Estimation publiée'],
+  ['estimate.counter_offer_received', 'Contre-offre reçue'],
+  ['estimate.accepted', 'Estimation acceptée'],
+  ['mission.started', 'Mission lancée'],
+  ['proposal.published', 'Proposition publiée'],
+  ['proposal.comment_added', 'Commentaire client'],
+  ['payment.received', 'Paiement reçu'],
+  ['delivery.unlocked', 'Livraison débloquée'],
+];
+
+const Notify = {
+  cfg() {
+    const c = SiteConfig.get().notify || {};
+    return { url: c.url || '', events: c.events || {} };
+  },
+  set(patch) { SiteConfig.set('notify', { ...this.cfg(), ...patch }); },
+  /** Canaux activés pour un événement (interne par défaut). */
+  channels(event) {
+    const e = this.cfg().events[event];
+    if (!e) return ['internal'];
+    return ['internal', 'discord', 'email'].filter(c => e[c]);
+  },
+  /** Déjà envoyé ? (idempotence locale, en plus de celle du Worker) */
+  _sent() { try { return new Set(JSON.parse(localStorage.getItem('hub_notified') || '[]')); } catch (e) { return new Set(); } },
+  _markSent(k) {
+    const s = this._sent(); s.add(k);
+    localStorage.setItem('hub_notified', JSON.stringify([...s].slice(-500)));
+  },
+  /**
+   * Envoi « au mieux » : ne lève JAMAIS, ne bloque JAMAIS l'action métier.
+   * @returns Promise<boolean> — true si la requête est partie.
+   */
+  async send(event, workspaceId, opts) {
+    opts = opts || {};
+    const { url } = this.cfg();
+    const ch = this.channels(event);
+    const key = `${workspaceId}_${event}_${opts.entityId || '0'}_${opts.version || 1}`;
+    if (!opts.test && this._sent().has(key)) return false;   // anti-doublon
+    if (!url) { if (!opts.test) this._markSent(key); return false; }   // canal externe non configuré
+    try {
+      const r = await fetch(url, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ event, workspaceId, entityId: opts.entityId || '', version: opts.version || 1,
+                               channels: ch, test: !!opts.test }),
+      });
+      if (!opts.test) this._markSent(key);
+      return r.ok;
+    } catch (e) {
+      // Panne du Worker → on n'empêche rien. L'action métier a déjà réussi.
+      console.warn('[notify] échec (sans conséquence)', e);
+      return false;
+    }
+  },
+  /** Bouton « Envoyer une notification de test » des Paramètres. */
+  async test() {
+    const { url } = this.cfg();
+    if (!url) return showToast?.('Renseigne d\'abord l\'URL du Worker de notifications.', '#e4b24a', 4000);
+    showToast?.('Envoi du test…', '#666', 1500);
+    try {
+      const r = await fetch(url, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ event: 'request.created', workspaceId: 'TESTTEST',
+                               channels: ['internal', 'discord', 'email'], test: true }),
+      });
+      const j = await r.json().catch(() => ({}));
+      const res = j.results || {};
+      const line = Object.entries(res).map(([k, v]) => `${k} : ${v}`).join(' · ') || 'aucune réponse';
+      showToast?.(r.ok ? '✓ ' + line : '✗ ' + (j.error || 'échec'), r.ok ? '#2e9a63' : '#c0392b', 7000);
+    } catch (e) {
+      showToast?.('✗ Worker injoignable — vérifie l\'URL', '#c0392b', 5000);
+    }
+  },
+};
+
+window.Notify = Notify;
+window.NOTIFY_EVENTS = NOTIFY_EVENTS;
 window.QDialog = QDialog;
 window.QuoteUI = QuoteUI;
 window.Pricing = Pricing;
