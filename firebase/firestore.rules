@@ -144,6 +144,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Registre central des liens publics (jeton canonique par projet) ──
+    // Lisible par tous : le résolveur /c/<token> (sans compte) doit pouvoir y
+    // lire l'étape et le statut du dossier. Il ne contient QUE des champs déjà
+    // publics ailleurs (nom du projet, du client, total) — jamais de prix
+    // plancher ni de note interne. Écrit uniquement par le propriétaire.
+    match /public_links/{token} {
+      allow read: if true;
+      allow create: if creatingSelf();
+      allow update, delete: if isOwner();
+    }
+
     // Collections privées scopées par owner
     match /{col}/{id} {
       allow read:   if isOwner();

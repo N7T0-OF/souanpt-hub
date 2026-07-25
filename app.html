@@ -1937,6 +1937,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase/firebase-config.js"></script>
 <script src="js/cloud.js"></script>
+<script src="js/registry.js"></script>
 <script src="js/core.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/canvas.js"></script>
@@ -3089,6 +3090,9 @@ function finishLogin(pseudo) {
   if (window.Cloud && Cloud.enabled && Cloud.user()) {
     Cloud.startMirror();
     Cloud.syncPull().then(changed => { if (changed) reloadAllData(); }).catch(() => {});
+    // Recense les projets existants dans le registre public_links (silencieux,
+    // une fois par session) — socle de la future section « Clients & Projets ».
+    window.Registry && Registry.sync().catch(() => {});
   }
   // ⚠ Course de restauration de session : ces blocs ont été rendus AVANT que
   // Firebase confirme l'utilisateur (au chargement, Cloud.user() était null).

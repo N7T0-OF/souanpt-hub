@@ -607,6 +607,10 @@ const QuoteUI = {
       // bord sait ainsi lesquelles surveiller (acceptations entrantes) sans
       // interroger toute la base.
       this._track(code, doc);
+      // Fait progresser le lien canonique à l'étape « estimation » (réutilise le
+      // même jeton que la demande si l'estimation en vient).
+      window.Registry && Registry.register(code, { stage: 'estimate',
+        projectName: doc.projectName || doc.title || '', total: doc.total, currency: doc.currency });
       /* Lien /c/<token> et non /estimate/<code> : c'est LE lien unique du
          dossier. Il suivra le client jusqu'à la livraison — il n'aura jamais
          à en recevoir un nouveau. /estimate/<code> reste valable pour les
@@ -665,6 +669,8 @@ const QuoteUI = {
         creatorName: localStorage.getItem('souanpt_pseudo') || Cloud.user().displayName || 'Créateur',
         status: 'open', createdAt: Date.now(),
       });
+      // Recense le lien canonique dès sa création (étape « demande »).
+      window.Registry && Registry.register(token, { stage: 'request' });
       const url = location.origin + '/c/' + token;
       const box = this._el('qf-msg');
       if (box) box.textContent = `Lien de demande créé :\n${url}\n\nEnvoie-le à ton client : il décrira son besoin et déposera ses références. Ce même lien deviendra ensuite l'estimation, puis la mission.`;
@@ -1200,6 +1206,10 @@ const QuoteUI = {
       this._syncPortalLocal(portal);
       await Cloud._db.collection('estimates').doc(code).set({ status: 'confirmed', confirmedAt: Date.now() }, { merge: true });
       this._markLaunched(code);
+      // Fait progresser le lien canonique à l'étape « mission » (production).
+      window.Registry && Registry.register(code, { stage: 'mission',
+        clientName: portal.client || '', projectName: portal.mission || '',
+        total: portal.total, currency: est.currency });
       Notify.send('mission.started', code, { entityId: code }).catch(() => {});
       QDialog.close();
       if (!silent) {
