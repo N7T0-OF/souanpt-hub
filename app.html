@@ -3090,6 +3090,16 @@ function finishLogin(pseudo) {
     Cloud.startMirror();
     Cloud.syncPull().then(changed => { if (changed) reloadAllData(); }).catch(() => {});
   }
+  // ⚠ Course de restauration de session : ces blocs ont été rendus AVANT que
+  // Firebase confirme l'utilisateur (au chargement, Cloud.user() était null).
+  // Maintenant que la session est établie, on les recharge pour qu'ils
+  // affichent les vraies données au lieu de rester sur « connecte-toi » / vide.
+  // (Analytics se recharge tout seul via son abonnement onAuth.)
+  try {
+    window.Analytics && Analytics.refresh();
+    window.QuoteUI && QuoteUI.loadAcceptances && QuoteUI.loadAcceptances();
+    window.Notify && Notify.loadInbox && Notify.loadInbox().then(() => Notify.renderInbox && Notify.renderInbox()).catch(() => {});
+  } catch (e) { console.warn('[finishLogin] refresh', e); }
 }
 /** Rafraîchit tout l'affichage après un tirage cloud */
 function reloadAllData() {

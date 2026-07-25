@@ -71,7 +71,31 @@ const Analytics = {
   data: null, _loaded: false,
   _lastSync: 0, _live: null, _tick: null,
 
+  _authPending: false,
+
+  /* S'abonne UNE fois à la restauration de session. onAuth rappelle
+     immédiatement si l'état est déjà résolu, sinon dès que Firebase répond →
+     les stats se rechargent alors avec le bon utilisateur. */
+  _authBound: false,
+  bindAuth() {
+    if (this._authBound || !(window.Cloud && Cloud.enabled && Cloud.onAuth)) return;
+    this._authBound = true;
+    Cloud.onAuth(() => { this._authPending = false; this.refresh(); });
+  },
+
   async refresh() {
+    this.bindAuth();
+    // ⚠ Course au démarrage : Firebase restaure la session de façon ASYNCHRONE.
+    // Tant que onAuthStateChanged n'a pas répondu (Cloud._resolved), Cloud.user()
+    // est null même quand on est bien connecté. On ne doit donc PAS conclure
+    // « déconnecté » ici — on affiche « chargement » et on laisse bindAuth
+    // relancer refresh() dès la résolution.
+    if (window.Cloud && Cloud.enabled && !Cloud._resolved) {
+      this._authPending = true;
+      this.render();
+      return;
+    }
+    this._authPending = false;
     let d = null;
     try { d = await (window.Cloud && Cloud.loadAnalytics ? Cloud.loadAnalytics() : null); }
     catch (e) { console.warn('[analytics]', e); }
@@ -112,6 +136,12 @@ const Analytics = {
   },
   /* Message d'état vide : dit précisément CE QU'IL MANQUE (sinon échec silencieux) */
   _emptyMsg() {
+    // Session Firebase encore en cours de restauration → ni « connecte-toi »,
+    // ni bouton d'activation : juste un état transitoire.
+    if (this._authPending || (window.Cloud && Cloud.enabled && !Cloud._resolved))
+      return '<span style="opacity:.7">Chargement de ta session…</span>';
+    // La décision « déconnecté » dépend UNIQUEMENT de Firebase Auth (Cloud.user()),
+    // jamais des intégrations Google/Discord affichées ailleurs.
     const logged = !!(window.Cloud && Cloud.enabled && Cloud.user());
     if (!logged) return '⚠️ <b>Connecte-toi avec Google ou Discord</b> pour activer les statistiques : elles sont rattachées à ton compte. Tout le reste est automatique.';
     const btn = '<button class="btn btn-accent" style="margin-top:10px" onclick="Analytics.activate()">⚡ Activer les statistiques sur mon site</button>';
