@@ -887,6 +887,55 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .ed-modes button:hover{color:var(--text)}
 .ed-modes button.active{background:var(--accent);color:#060606}
 
+/* ═══ CLIENTS & PROJETS (fusion) ═══ */
+.cp-empty{text-align:center;padding:44px 16px;color:var(--text)}
+.cp-empty-col{padding:14px 6px;text-align:center;color:var(--muted2);font-size:11px}
+/* Panneau de création (sélecteur des points d'entrée) */
+.cp-create{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.cp-create-h{font-size:12px;font-weight:800;margin-bottom:10px}
+.cp-create-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
+.cp-create-opt{display:flex;flex-direction:column;gap:3px;text-align:left;background:var(--s3);border:1px solid var(--border);border-radius:10px;padding:11px 12px;cursor:pointer;color:var(--text);font-family:inherit;transition:border-color .15s,transform .1s}
+.cp-create-opt:hover{border-color:var(--accent);transform:translateY(-1px)}
+.cp-create-opt b{font-size:11px}
+.cp-create-opt small{font-size:9.5px;color:var(--muted);line-height:1.5}
+.cp-create-ic{font-size:18px}
+/* Pipeline (colonnes par étape) */
+.cp-pipeline{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:start}
+.cp-col{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.cp-col-h{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;font-size:10.5px;font-weight:800;border-bottom:2px solid var(--border)}
+.cp-col-n{background:var(--s3);border-radius:20px;padding:1px 8px;font-size:9px;color:var(--muted)}
+.cp-col-body{display:flex;flex-direction:column;gap:8px;padding:8px;min-height:40px}
+.cp-pcard{background:var(--s3);border:1px solid var(--border);border-radius:9px;padding:9px 10px}
+.cp-pcard-title{font-size:11px;font-weight:700;line-height:1.35;word-break:break-word}
+.cp-pcard-client{font-size:9.5px;color:var(--muted);margin-top:2px}
+.cp-pcard-foot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:9.5px}
+.cp-pcard-total{font-weight:800;color:var(--text)}
+.cp-pcard-time{color:var(--muted2)}
+.cp-pcard-act{display:flex;gap:4px;margin-top:7px}
+/* Liste (lignes) */
+.cp-list{display:flex;flex-direction:column;gap:7px}
+.cp-row{display:flex;align-items:center;gap:12px;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.cp-row-main{flex:1;min-width:0}
+.cp-row-title{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-row-sub{font-size:9.5px;color:var(--muted);margin-top:2px}
+.cp-row-total{font-size:12px;font-weight:800;white-space:nowrap}
+.cp-row-act{display:flex;gap:4px;flex-shrink:0}
+/* Vue Clients (regroupée) */
+.cp-clients{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.cp-client-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.cp-client-h{display:flex;flex-direction:column;gap:2px;margin-bottom:9px}
+.cp-client-name{font-size:12px;font-weight:800}
+.cp-client-meta{font-size:9.5px;color:var(--muted)}
+.cp-client-projects{display:flex;flex-wrap:wrap;gap:5px}
+.cp-chip{font-size:9px;background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:3px 8px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cp-chip:hover{border-color:var(--accent)}
+/* Communs */
+.cp-badge{font-size:9px;font-weight:800;border:1px solid;border-radius:20px;padding:2px 8px;white-space:nowrap;flex-shrink:0}
+.cp-a{background:var(--s3);border:1px solid var(--border);border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1;color:var(--text);transition:border-color .15s}
+.cp-a:hover{border-color:var(--accent)}
+@media(max-width:900px){.cp-pipeline{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.cp-pipeline{grid-template-columns:1fr}.cp-row{flex-wrap:wrap}.cp-row-total{order:3}}
+
 /* ═══ ANALYTICS ═══ */
 /* Indicateur « stats en direct » (remplace le bouton Actualiser) */
 .an-sync{display:inline-flex;align-items:center;gap:6px;font-size:9px;color:var(--muted2);white-space:nowrap}
@@ -1088,6 +1137,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
   <div class="nav-section">
     <div class="nav-label">Business</div>
+    <button class="ni" data-page="cp" onclick="showPage('cp')">
+      <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="6.25" y="2.5" width="3.5" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="11" y="2.5" width="3.5" height="9" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+      Clients &amp; Projets <span class="nbadge" id="cp-badge" style="display:none"></span>
+    </button>
     <button class="ni" data-page="devis" onclick="showPage('devis')">
       <svg viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.2"/><path d="M9 2v4h4M5 9h6M5 11.5h4" stroke="currentColor" stroke-width="1.2"/></svg>
       Demandes &amp; Devis <span class="nbadge" id="devis-badge" style="display:none"></span>
@@ -1283,6 +1336,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ══ PAGE: CLIENTS & PROJETS (fusion — vue unifiée) ══ -->
+    <div class="page" id="page-cp">
+      <div class="section-header">
+        <div class="section-title">Clients &amp; Projets</div><div class="section-line"></div>
+        <div class="ed-modes" id="cp-views">
+          <button class="active" data-v="pipeline" onclick="CP.setView('pipeline')">Pipeline</button>
+          <button data-v="list" onclick="CP.setView('list')">Liste</button>
+          <button data-v="clients" onclick="CP.setView('clients')">Clients</button>
+        </div>
+        <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau client / projet</button>
+      </div>
+      <div class="infobox">🗂️ <strong>Tout ton relationnel client au même endroit.</strong> Chaque demande, devis et mission d'un même projet vit sur <strong>un seul lien</strong> qui suit son cycle de vie — de la première prise de contact à la livraison. Les outils détaillés (analyse, grille tarifaire, portail) restent accessibles depuis chaque projet.</div>
+      <div id="cp-body"></div>
     </div>
 
     <!-- ══ PAGE: DEMANDES & DEVIS ══ -->
@@ -1944,6 +2012,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/storage-ui.js"></script>
 <script src="js/analytics.js"></script>
 <script src="js/quote.js"></script>
+<script src="js/clients.js"></script>
 <script>
 /* ═══ SETTINGS ═══ */
 function settingsTab(name, el) {
