@@ -89,14 +89,18 @@ const Cloud = {
      SYNC — Firestore = source de vérité, localStorage = cache.
      Miroir des collections business (instantané, cross-appareil, sauvegardé).
   ══════════════════════════════════════════════════════ */
-  SYNC_KEYS: {                    // clé localStorage → nom de collection Firestore
+  /* Clé localStorage → nom de sous-collection Firestore.
+     Construit à partir du registre unique (js/hub-data.js) : les 3 listes
+     n'existent plus qu'une fois. Fallback conservé si le registre n'a pas
+     été chargé (ordre de <script> modifié par erreur). */
+  SYNC_KEYS: (typeof HubData !== 'undefined' ? HubData.syncMap() : {
     hub_clients: 'clients', hub_invoices: 'invoices', hub_catalog: 'catalog',
     hub_reviews: 'reviews', hub_links: 'links', hub_media: 'media', hub_portals: 'portals',
     hub_files: 'files',   // métadonnées des fichiers stockés sur GitHub (HubFiles)
     // Grille tarifaire — vit dans users/{uid}/data, donc PRIVÉE (règles Firestore).
     // Elle ne doit jamais atteindre une page vue par un client.
     hub_pricing: 'pricing',
-  },
+  }),
   _pushTimers: {}, _mirroring: false, _origSet: null,
 
   /** Intercepte les écritures localStorage hub_* pour pousser vers Firestore (débouncé) */

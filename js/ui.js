@@ -44,12 +44,17 @@ const GHPage = {
     if (lbl) lbl.textContent='@'+user.login+' · connecté';
     const sb = document.getElementById('set-gh-badge');
     if (sb) sb.style.display='inline-block';
-    // Auto-backup
-    setTimeout(autoBackup, 3000);
-    setInterval(autoBackup, 5*60*1000);
-    // Relève automatique des avis visiteurs (issues GitHub du site)
-    setTimeout(() => fetchVisitorReviews(true), 4000);
-    setInterval(() => fetchVisitorReviews(true), 5*60*1000);
+    // Auto-backup + relève des avis. Un SEUL jeu de timers par session :
+    // showConnected() est rappelé à chaque ouverture de l'onglet
+    // Intégrations, et chaque appel ajoutait 2 intervalles de plus
+    // (fuite : N sauvegardes + N relevés d'avis toutes les 5 min).
+    if (!GHPage._autoStarted) {
+      GHPage._autoStarted = true;
+      setTimeout(() => autoBackup({ force: true }), 3000);
+      setInterval(autoBackup, 5*60*1000);
+      setTimeout(() => fetchVisitorReviews(true), 4000);
+      setInterval(() => fetchVisitorReviews(true), 5*60*1000);
+    }
     // Bubble
     BubbleWidget?.init?.();
   },

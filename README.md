@@ -65,6 +65,33 @@ Navigation : la racine (`/`) affiche la vitrine publique ; le bouton **Tableau d
 2. **GitHub & Deploy** → colle le token → Se connecter
 3. Le repo privé `{user}-hub-data` (backup) est créé automatiquement
 
+## Sauvegarde des données — registre unique
+
+La liste des collections vit **une seule fois**, dans `js/hub-data.js` : elle
+alimente l'export JSON, la sauvegarde GitHub **et** le miroir Firestore (avant,
+trois tableaux divergents laissaient `hub_portals`, `hub_catalog`, `hub_media`,
+`hub_files` et `hub_pricing` sans aucune sauvegarde).
+
+Dépôt `{user}-hub-data` :
+
+```
+data/manifest.json     table des matières (version, comptes, sha256 de chaque fichier)
+data/projects.json     clients, factures, catalogue, portails, avis, liens, médias,
+…                      fichiers, devis, grille tarifaire, config du site, réglages
+data/*.partN.json      découpé automatiquement au-delà de ~440 Ko (limite API GitHub)
+backup.json            ancien format : plus écrit, toujours lu (restauration)
+```
+
+- **Rien ne change → 0 requête d'écriture** (comparaison `sha256` contre le
+  manifeste distant, 1 lecture) ;
+- **sinon 1 seul commit atomique**, uniquement pour les fichiers différents ;
+- 30 s minimum entre deux écritures, 1 jeu de timers par session ;
+- bouton **Paramètres → Intégrations → Sauvegarder maintenant** : force le
+  passage et affiche le résultat réel ;
+- restauration complète depuis **Paramètres → Confidentialité → Restaurer**.
+
+Détail du chantier : `docs/audits/backup-unification.md`.
+
 ## Pipeline de déploiement
 
 1 clic 🚀 Publier :

@@ -60,6 +60,18 @@ const GH = {
     } catch { return { data: null, sha: null }; }
   },
 
+  /** Lecture BRUTE d'un fichier (Accept: raw) — pas de base64 à décoder,
+      utile quand on tire une vingtaine de fichiers pendant une restauration. */
+  async rawFile(token, owner, repo, path) {
+    try {
+      const res = await fetch(this.BASE + `/repos/${owner}/${repo}/contents/${path}`, {
+        headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.raw+json' },
+      });
+      if (!res.ok) return null;
+      return await res.text();
+    } catch { return null; }
+  },
+
   /** Crée le dépôt s'il n'existe pas */
   async ensureRepo(token, username, repoName, isPrivate = true) {
     try { await this.api(token, `/repos/${username}/${repoName}`); return; } catch {}
@@ -76,6 +88,29 @@ const GH = {
       method: 'PUT',
       body: JSON.stringify({ message: msg || 'update', content: this.b64enc(content), ...(sha ? {sha} : {}) }),
     });
+  },
+
+  /** Supprime un fichier (nécessite le sha actuel). Silencieux si absent. */
+  async deleteFile(token, owner, repo, path, msg) {
+    try {
+      const sha = await this.fileSha(token, owner, repo, path);
+      if (!sha) return false;
+      await this.api(token, `/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ message: msg || 'remove', sha }),
+      });
+      return true;
+    } catch { return false; }
+  },
+
+  /** Fichiers réellement présents sous data/ (1 requête, [] si dossier absent).
+      Sert à repérer les orphelins qu'un manifeste en retard ne listerait plus. */
+  async dataPaths(token, owner, repo) {
+    try {
+      const res = await this.api(token, `/repos/${owner}/${repo}/contents/data`);
+      const list = Array.isArray(res) ? res : [res];
+      return list.filter(f => f && f.type === 'file').map(f => f.path);
+    } catch { return []; }
   },
 
   /**
@@ -2152,48 +2187,135 @@ async function fetchVisitorReviews(silent) {
 }
 
 /* ══════════════════════════════════════════════════════
-   AUTO-BACKUP — sauvegarde des données dans le dépôt privé
+   AUTO-BACKUP — sauvegarde COMPLÈTE des données dans le dépôt privé
 ══════════════════════════════════════════════════════ */
-async function autoBackup() {
+const BACKUP_MIN_INTERVAL = 30 * 1000;
+let _backupRunning = false;
+
+/**
+ * Sauvegarde COMPLÈTE — schéma data/*.json (voir js/hub-data.js).
+ *
+ * Trois règles, sans lesquelles le dépôt devient un trou noir Git :
+ *   1. RIEN NE CHANGE → 0 écriture (le manifeste est déterministe : aucun
+ *      horodatage dedans, sinon chaque appel créerait un commit) ;
+ *   2. 1 seul commit ATOMIQUE, et seulement pour les fichiers différents ;
+ *   3. 30 s minimum entre deux écritures (quota GitHub 5 000 requêtes/h +
+ *      historique git).
+ * La comparaison se fait contre le manifeste REMOT (1 GET) : c'est la source
+ * de vérité, donc un changement fait depuis un autre appareil ou un dépôt
+ * vidé entre-temps est détecté sans état local à désynchroniser.
+ *
+ * @param {{force?:boolean}} [opts] force = ignore le throttle (connexion, bouton)
+ * @returns {Promise<{pushed:number,deleted:number,skipped:boolean}|null>} null = pas de compte
+ */
+async function autoBackup(opts) {
   const token = Auth.token(); const user = Auth.user();
-  if (!token || !user) return;
+  if (!token || !user) return null;
+  if (_backupRunning) return null;                        // pas de 2 sauvegardes simultanées
+  const force = !!(opts && opts.force);
+  if (!force) {
+    const last = parseInt(localStorage.getItem('souanpt_last_backup') || '0', 10);
+    if (Date.now() - last < BACKUP_MIN_INTERVAL) return { pushed: 0, deleted: 0, skipped: true };
+  }
+
+  _backupRunning = true;
   try {
     const owner = user.login;
     const repo  = owner.toLowerCase() + REPO_DATA_SUFFIX;
-    await GH.ensureRepo(token, owner, repo, true);
+    const files = await HubData.buildFiles();
+    const manifest = files.find(f => f.key === 'manifest');
+    const payload  = files.filter(f => f.key !== 'manifest');
 
-    const data = {
-      exportedAt: new Date().toISOString(),
-      siteConfig: SiteConfig.get(),
-      projects:   getProjects(),
-      links:      JSON.parse(localStorage.getItem('hub_links')     || '[]'),
-      clients:    JSON.parse(localStorage.getItem('hub_clients')   || '[]'),
-      invoices:   JSON.parse(localStorage.getItem('hub_invoices')  || '[]'),
-      reviews:    getReviews(),
-    };
+    // 1 lecture : l'état réel du dépôt (le manifeste = table des matières sha256)
+    let remote = null;
+    try { remote = (await GH.loadFile(token, owner, repo, 'data/manifest.json')).data; } catch {}
+    if (remote === null) await GH.ensureRepo(token, owner, repo, true);  // 1re fois / dépôt recréé
+    const remoteMap = new Map();
+    let remoteVersion = null;
+    if (remote) {
+      try {
+        const m = JSON.parse(remote);
+        remoteVersion = (m.version === undefined ? null : m.version);
+        (m.files || []).forEach(f => remoteMap.set(f.path, f.sha256));
+      } catch {}
+    }
 
-    const { sha } = await GH.loadFile(token, owner, repo, 'backup.json');
-    await GH.putFile(token, owner, repo, 'backup.json', JSON.stringify(data, null, 2), sha, 'backup: ' + new Date().toISOString());
+    // Le manifeste ne peut pas contenir son propre sha256 (référence circulaire) :
+    // il est réécrit dès qu'une donnée bouge, ou si le schéma a changé de version.
+    const changed = payload.filter(f => remoteMap.get(f.path) !== f.sha256);
+    const needManifest = changed.length > 0 || remoteVersion !== HubData.VERSION;
+
+    if (!changed.length && !needManifest) {
+      localStorage.setItem('souanpt_last_backup', Date.now().toString());
+      return { pushed: 0, deleted: 0, skipped: true };    // 0 requête d'écriture
+    }
+
+    // Chemin d'écriture uniquement (1 GET de plus) : on repart de l'arbre réel,
+    // pas du manifeste — si une suppression a échoué au précédent tour, le
+    // fichier orphelin est ici rattrapé. Inutile sur un dépôt encore vide.
+    const localPaths = new Set(files.map(f => f.path));
+    const obsolete = remote === null ? []
+      : (await GH.dataPaths(token, owner, repo)).filter(p => !localPaths.has(p));
+
+    const msg = 'backup ' + new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const toPush = needManifest ? [...changed, manifest] : changed;
+    let pushed = 0;
+    if (toPush.length) {
+      await GH.commitFiles(token, owner, repo,
+        toPush.map(f => ({ path: f.path, content: f.content })), msg);
+      pushed = toPush.length;
+    }
+    // Fichiers devenus inutiles (collection rétrécie) : APRÈS le commit — si la
+    // suppression échoue on perd de la place, jamais des données.
+    let deleted = 0;
+    for (const p of obsolete) if (await GH.deleteFile(token, owner, repo, p, msg)) deleted++;
+
     localStorage.setItem('souanpt_last_backup', Date.now().toString());
-  } catch {}
+    return { pushed, deleted, skipped: false };
+  } catch (e) {
+    console.warn('[backup]', e);
+    return null;
+  } finally { _backupRunning = false; }
 }
 
-/** Restaure depuis le dépôt privé GitHub */
+/** Restaure depuis le dépôt privé GitHub : data/manifest.json + data/*.json,
+    avec repli sur l'ancien format mono-fichier backup.json (V1/V2). */
 async function restoreFromGitHub() {
   const token = Auth.token(); const user = Auth.user();
   if (!token || !user) throw new Error('Connecte GitHub d\'abord');
   const owner = user.login;
   const repo  = owner.toLowerCase() + REPO_DATA_SUFFIX;
+
+  const manifestRaw = await GH.rawFile(token, owner, repo, 'data/manifest.json');
+  if (manifestRaw) {
+    let paths = [];
+    try { paths = (JSON.parse(manifestRaw).files || []).map(f => f.path); } catch {}
+    const map = {};
+    // Séquentiel volontaire : 15 requêtes d'affilée tombent dans le
+    // rate-limit GitHub (5 000/h) bien plus vite qu'en parallèle.
+    for (const p of paths) {
+      const c = await GH.rawFile(token, owner, repo, p);
+      if (c !== null) map[p] = c;
+    }
+    const restored = HubData.applyFiles(map);
+    if (!restored.length) throw new Error('Sauvegarde vide ou illisible');
+    return { restored };
+  }
+
+  /* ── Ancien format (V1/V2) : 1 seul backup.json ── */
   const { data } = await GH.loadFile(token, owner, repo, 'backup.json');
   if (!data) throw new Error('Aucun backup trouvé');
   const parsed = JSON.parse(data);
   if (parsed.siteConfig) SiteConfig.save(parsed.siteConfig);
-  if (parsed.projects)   localStorage.setItem('hub_projects', JSON.stringify(parsed.projects));
-  if (parsed.links)      localStorage.setItem('hub_links',    JSON.stringify(parsed.links));
-  if (parsed.clients)    localStorage.setItem('hub_clients',  JSON.stringify(parsed.clients));
-  if (parsed.invoices)   localStorage.setItem('hub_invoices', JSON.stringify(parsed.invoices));
-  if (parsed.reviews)    localStorage.setItem('hub_reviews',  JSON.stringify(parsed.reviews));
-  return parsed;
+  const legacy = {
+    projects: 'hub_projects', links: 'hub_links', clients: 'hub_clients',
+    invoices: 'hub_invoices', reviews: 'hub_reviews',
+  };
+  const restored = [];
+  for (const [k, ls] of Object.entries(legacy)) {
+    if (Array.isArray(parsed[k])) { localStorage.setItem(ls, JSON.stringify(parsed[k])); restored.push(k); }
+  }
+  return { restored, legacy: true };
 }
 
 /* ══════════════════════════════════════════════════════

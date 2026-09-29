@@ -1870,7 +1870,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                   <div style="font-size:11px;font-weight:700;margin-bottom:8px">💾 Sauvegarde &amp; données</div>
                   <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted2);margin-bottom:10px">
                     <span style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
-                    Sauvegarde auto toutes les 5 min vers ton repo privé · dernière : <span id="int-bk-time" style="color:var(--text)">—</span>
+                    Sauvegarde auto toutes les 5 min, <strong>uniquement si quelque chose a changé</strong> (1 commit atomique, sinon 0 requête) · dernière : <span id="int-bk-time" style="color:var(--text)">—</span>
                   </div>
                   <div style="display:flex;gap:8px;flex-wrap:wrap">
                     <button class="btn btn-ghost" style="font-size:10px" onclick="intBackupNow()">↑ Sauvegarder maintenant</button>
@@ -2004,6 +2004,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase/firebase-config.js"></script>
+<!-- Registre UNIQUE des collections : do être chargé avant cloud.js (SYNC_KEYS)
+     et avant core.js (autoBackup / restauration). -->
+<script src="js/hub-data.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/registry.js"></script>
 <script src="js/core.js"></script>
@@ -2171,9 +2174,18 @@ async function intGoogleConnect() {
 async function intBackupNow() {
   if (!Auth.ok()) { showToast('Connecte GitHub d\'abord (carte GitHub, juste au-dessus)', '#e4b24a', 3000); intOpen('github'); return; }
   showToast('⟳ Sauvegarde en cours…', '#666', 1500);
-  await autoBackup();
+  const r = await autoBackup({ force: true });
   renderIntegrations();
-  showToast('✓ Données sauvegardées sur ton repo GitHub privé', '#2e9a63', 2500);
+  if (!r) { showToast('✗ Sauvegarde impossible (GitHub injoignable)', '#c0392b', 3500); return; }
+  let msg;
+  if (r.skipped) {
+    msg = '✓ Rien n\'avait changé : ta sauvegarde GitHub est déjà à jour';
+  } else {
+    msg = '✓ ' + r.pushed + ' fichier(s) sauvegardé(s)';
+    if (r.deleted) msg += ' · ' + r.deleted + ' obsolète(s) supprimé(s)';
+    msg += ' sur ton repo privé';
+  }
+  showToast(msg, '#2e9a63', 3200);
 }
 function saveIntLink(kind) {
   const inp = document.getElementById('int-' + kind + '-inp');
@@ -2208,19 +2220,16 @@ function settingsSaveDomain() {
   showToast('Domaine sauvegardé','#2e9a63');
 }
 /* ═══ EXPORT / IMPORT COMPLET DU HUB — filet de sécurité + base migration Firebase ═══ */
-/* Chaque clé mappe une future collection Firestore (users/UID/<clé>) */
-const HUB_COLLECTIONS = {
-  projects:'hub_projects', links:'hub_links', clients:'hub_clients',
-  invoices:'hub_invoices', catalog:'hub_catalog', reviews:'hub_reviews',
-  portals:'hub_portals', media:'hub_media',
-};
+/* La liste des collections n'est plus en dur ici : elle vit dans
+   js/hub-data.js (registre unique partagé avec la sauvegarde GitHub et le
+   miroir Firestore). Un tableau séparé = des sauvegardes incomplètes. */
 function hubExportObject() {
   const data = {};
-  Object.entries(HUB_COLLECTIONS).forEach(([k, key]) => {
-    try { data[k] = JSON.parse(localStorage.getItem(key) || '[]'); } catch { data[k] = []; }
-  });
+  // Type correct pour chaque clé (le JSON.stringify sur une valeur scalaire
+  // comme la qualité d'image plantait avant sur JSON.parse d'une string).
+  HubData.LIST.forEach(e => { data[e.key] = HubData.read(e); });
   return {
-    souanpt: 'hub-export', version: 2, exportedAt: new Date().toISOString(),
+    souanpt: 'hub-export', version: 3, exportedAt: new Date().toISOString(),
     user: Auth.user()?.login || null,
     config: SiteConfig.get(),
     imgQuality: localStorage.getItem('hub_img_quality') || 'balanced',
@@ -2247,7 +2256,14 @@ function importDataFull() {
         if (d.config) SiteConfig.save(d.config);
         if (d.imgQuality) localStorage.setItem('hub_img_quality', d.imgQuality);
         const dd = d.data || d; // tolère l'ancien format
-        Object.entries(HUB_COLLECTIONS).forEach(([k, key]) => { if (Array.isArray(dd[k])) localStorage.setItem(key, JSON.stringify(dd[k])); });
+        Object.entries(HUB_COLLECTIONS).forEach(([k, key]) => {
+          const e = HubData.byKey(k); if (!e) return;
+          const v = dd[k];
+          if (v === undefined || v === null) return;      // clé absente = on garde l'existant
+          if (e.type === 'value')      { if (typeof v === 'string') localStorage.setItem(key, v); }
+          else if (e.type === 'array') { if (Array.isArray(v))      localStorage.setItem(key, JSON.stringify(v)); }
+          else                         { if (typeof v === 'object') localStorage.setItem(key, JSON.stringify(v)); }
+        });
         // recharge tout l'affichage
         renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews();
         renderMedia(); renderCatalog(); refreshInvDatalists(); renderPortals(); syncKPIs();
@@ -2266,14 +2282,14 @@ async function restoreV1() {
     showPage('github');
     return;
   }
-  if (!confirm('Restaurer tes données V1 depuis ta sauvegarde GitHub ?\n\nProjets, liens, clients, factures et avis seront remplacés par la sauvegarde.')) return;
+  if (!confirm('Restaurer tes données depuis ta sauvegarde GitHub privée ?\n\nToutes les collections (projets, clients, factures, portails, devis, fichiers, avis…) seront remplacées par la sauvegarde.')) return;
   showToast('⟳ Restauration en cours…', '#666', 2000);
   try {
     await restoreFromGitHub();   // écrit en localStorage → le miroir cloud pousse tout seul si Google est connecté
     reloadAllData();
     renderBehancePage?.(); edLoad?.();
     const cloud = window.Cloud && Cloud.enabled && Cloud.user();
-    showToast('✓ Données V1 restaurées !' + (cloud ? ' Synchronisation cloud en cours…' : ''), '#2e9a63', 4500);
+    showToast('✓ Données restaurées depuis GitHub !' + (cloud ? ' Synchronisation cloud en cours…' : ''), '#2e9a63', 4500);
   } catch (e) {
     showToast('✗ ' + (e.message || 'Aucune sauvegarde trouvée'), '#c0392b', 4000);
   }
