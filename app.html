@@ -1870,11 +1870,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
                   <div style="font-size:11px;font-weight:700;margin-bottom:8px">💾 Sauvegarde &amp; données</div>
                   <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted2);margin-bottom:10px">
                     <span style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
-                    Sauvegarde auto toutes les 5 min, <strong>uniquement si quelque chose a changé</strong> (1 commit atomique, sinon 0 requête) · dernière : <span id="int-bk-time" style="color:var(--text)">—</span>
+                    Sauvegarde auto toutes les 5 min, <strong>uniquement si quelque chose a changé</strong> (1 commit atomique, sinon 0 requête) · dernière : <span id="int-bk-time" style="color:var(--text)">—</span><br>
+                    Restauration depuis GitHub à chaque connexion · dernier tirage : <span id="int-pull-time" style="color:var(--text)">jamais</span>
                   </div>
                   <div style="display:flex;gap:8px;flex-wrap:wrap">
                     <button class="btn btn-ghost" style="font-size:10px" onclick="intBackupNow()">↑ Sauvegarder maintenant</button>
-                    <button class="btn btn-ghost" style="font-size:10px" onclick="restoreV1()">☁ Restaurer mes données (V1)</button>
+                    <button class="btn btn-ghost" style="font-size:10px" onclick="intPullNow()">↓ Récupérer depuis GitHub</button>
+                    <button class="btn btn-ghost" style="font-size:10px" onclick="restoreV1()">☁ Restaurer la sauvegarde complète</button>
                   </div>
                 </div>
               </div>
@@ -2010,6 +2012,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/cloud.js"></script>
 <script src="js/registry.js"></script>
 <script src="js/core.js"></script>
+<!-- T3 : GitHub = source de vérité au login. Doit suivre core.js (GH, Auth,
+     autoBackup) et précéder ui.js (les timers d'auto-backup l'attendent). -->
+<script src="js/hub-sync.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/canvas.js"></script>
 <script src="js/storage-ui.js"></script>
@@ -2159,6 +2164,8 @@ function renderIntegrations() {
   set('stripe', cfg.stripeLink ? '✓ Configuré' : 'Non configuré', !!cfg.stripeLink);
   const bt = document.getElementById('int-bk-time');
   if (bt) { const ts = parseInt(localStorage.getItem('souanpt_last_backup') || '0'); bt.textContent = ts ? 'il y a ' + timeAgo(ts) : 'jamais'; }
+  const pt = document.getElementById('int-pull-time');
+  if (pt) { const ts = parseInt(localStorage.getItem('souanpt_last_pull') || '0'); pt.textContent = ts ? 'il y a ' + timeAgo(ts) : 'jamais'; }
   const pp = document.getElementById('int-paypal-inp'); if (pp && !pp.value) pp.value = cfg.paypalLink || '';
   const si = document.getElementById('int-stripe-inp'); if (si && !si.value) si.value = cfg.stripeLink || '';
   const gname = document.getElementById('int-google-name');
@@ -2186,6 +2193,18 @@ async function intBackupNow() {
     msg += ' sur ton repo privé';
   }
   showToast(msg, '#2e9a63', 3200);
+}
+/** TIRAGE CIBLÉ — récupère depuis GitHub ce qui a changé ailleurs (3 voies) :
+    on ne touche jamais à ce qui a bougé sur CE dispositivo. */
+async function intPullNow() {
+  if (!Auth.ok()) { showToast('Connecte GitHub d\'abord (carte GitHub, juste au-dessus)', '#e4b24a', 3000); intOpen('github'); return; }
+  showToast('⟳ Lecture de ta sauvegarde GitHub…', '#666', 1500);
+  const r = await HubSync.boot({ force: true });
+  renderIntegrations();
+  if (!r || r.error) { showToast('✗ Impossible de lire le dépôt GitHub', '#c0392b', 3500); return; }
+  if (r.none) { showToast('Aucune sauvegarde GitHub pour l\'instant — utilise « ↑ Sauvegarder maintenant »', '#e4b24a', 4500); return; }
+  if ((r.pulled && r.pulled.length) || (r.conflicts && r.conflicts.length)) return; // boot() a déjà affiché
+  showToast('✓ Déjà à jour : ton hub correspond à ta sauvegarde GitHub', '#2e9a63', 3000);
 }
 function saveIntLink(kind) {
   const inp = document.getElementById('int-' + kind + '-inp');
@@ -3174,10 +3193,17 @@ function finishLogin(pseudo) {
   // ── Synchro cloud : miroir des écritures + tirage des données Firestore ──
   if (window.Cloud && Cloud.enabled && Cloud.user()) {
     Cloud.startMirror();
-    Cloud.syncPull().then(changed => { if (changed) reloadAllData(); }).catch(() => {});
+    const firestorePull = Cloud.syncPull()
+      .then(changed => { if (changed) reloadAllData(); })
+      .catch(() => {});
+    // T3 : GitHub ensuite. C'est la source de vérité, il doit avoir le DERNIER
+    // mot — d'où le chaînage explicite (les deux tirages ne se croisent pas).
+    firestorePull.then(() => { window.HubSync && HubSync.boot(); });
     // Recense les projets existants dans le registre public_links (silencieux,
     // une fois par session) — socle de la future section « Clients & Projets ».
     window.Registry && Registry.sync().catch(() => {});
+  } else {
+    window.HubSync && HubSync.boot();            // pas de Google → rien à attendre
   }
   // ⚠ Course de restauration de session : ces blocs ont été rendus AVANT que
   // Firebase confirme l'utilisateur (au chargement, Cloud.user() était null).
@@ -3294,10 +3320,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!Auth.ok()) gateShow();                 // porte visible le temps que Firebase réponde
     Cloud.onAuth(u => {
       if (u) afterGoogleLogin(u);               // connecté Google → entre (+ pseudo si 1re fois)
-      else if (!Auth.ok()) gateShow();          // ni Google ni GitHub → verrouillé
+      else if (Auth.ok()) HubSync.boot();       // session GitHub seule → rien à attendre
+      else gateShow();                          // ni Google ni GitHub → verrouillé
     });
   } else {
     if (!Auth.ok()) gateShow();
+    else HubSync.boot();                        // pas de Firebase → GitHub immédiatement
   }
   // Déplace le bloc GitHub (connexion + repo + pipeline + runs) dans sa carte d'intégration
   const legacy = document.getElementById('page-github-legacy');

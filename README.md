@@ -86,11 +86,19 @@ backup.json            ancien format : plus écrit, toujours lu (restauration)
   manifeste distant, 1 lecture) ;
 - **sinon 1 seul commit atomique**, uniquement pour les fichiers différents ;
 - 30 s minimum entre deux écritures, 1 jeu de timers par session ;
+- **GitHub = source de vérité** : à chaque connexion, le hub *tire* ce qui a
+  changé depuis un autre appareil (résolution en 3 voies sur la baseline
+  `souanpt_sync_hashes` — en cas de conflit, la version de l'appareil en main
+  est conservée et un avertissement s'affiche) ;
 - bouton **Paramètres → Intégrations → Sauvegarder maintenant** : force le
-  passage et affiche le résultat réel ;
-- restauration complète depuis **Paramètres → Confidentialité → Restaurer**.
+  passage et affiche le résultat réel ; **↓ Récupérer depuis GitHub** fait le
+  tirage ciblé à la demande ;
+- bouton **☁ Restaurer la sauvegarde complète** : remplace *tout* par la
+  sauvegarde (réinstallation) — avec repli automatique sur l'ancien
+  `backup.json`.
 
-Détail du chantier : `docs/audits/backup-unification.md`.
+Détails : `docs/audits/backup-unification.md` (T1+T2) et
+`docs/audits/github-source-de-verite.md` (T3).
 
 ## Pipeline de déploiement
 

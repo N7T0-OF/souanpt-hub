@@ -695,6 +695,10 @@ async function connectGitHub(token) {
     cfg.repo = user.login + '/' + SITE_REPO_NAME;
     SiteConfig.save(cfg);
   }
+  // Le dépôt existe peut-être déjà (ancienne session, autre appareil) :
+  // on TIRE avant la première sauvegarde, sinon on écraserait son contenu.
+  // autoBackup attend HubSync.pending — pas de course possible.
+  try { window.HubSync && HubSync.boot({ force: true }); } catch {}
   return user;
 }
 
@@ -2212,6 +2216,10 @@ async function autoBackup(opts) {
   const token = Auth.token(); const user = Auth.user();
   if (!token || !user) return null;
   if (_backupRunning) return null;                        // pas de 2 sauvegardes simultanées
+  // Le tirage GitHub (hub-sync.js) doit finir AVANT toute écriture : sinon on
+  // pousserait une copie locale périmée par-dessus la sauvegarde d'un autre
+  // appareil. C'est la seule règle d'ordonnancement du système.
+  if (window.HubSync && HubSync.pending) { try { await HubSync.pending; } catch {} }
   const force = !!(opts && opts.force);
   if (!force) {
     const last = parseInt(localStorage.getItem('souanpt_last_backup') || '0', 10);
@@ -2247,6 +2255,7 @@ async function autoBackup(opts) {
 
     if (!changed.length && !needManifest) {
       localStorage.setItem('souanpt_last_backup', Date.now().toString());
+      window.HubSync && HubSync.record(files, false);   // accord local ↔ distant
       return { pushed: 0, deleted: 0, skipped: true };    // 0 requête d'écriture
     }
 
@@ -2271,6 +2280,7 @@ async function autoBackup(opts) {
     for (const p of obsolete) if (await GH.deleteFile(token, owner, repo, p, msg)) deleted++;
 
     localStorage.setItem('souanpt_last_backup', Date.now().toString());
+    window.HubSync && HubSync.record(files, false);      // accord rétabli : la baseline suit
     return { pushed, deleted, skipped: false };
   } catch (e) {
     console.warn('[backup]', e);

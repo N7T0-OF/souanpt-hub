@@ -110,9 +110,9 @@ l'ancien `backup.json` si le dépôt n'a jamais été migré.
 
 ## 4. Ce qui reste (T3 → T5)
 
-1. **T3** — faire de GitHub la source de vérité au login : tirer `data/` au
-   démarrage (aujourd'hui on ne fait que sauvegarder et restaurer à la main),
-   et réduire Firestore au temps réel.
+1. ~~**T3** — faire de GitHub la source de vérité au login~~ → **fait**,
+   voir `docs/audits/github-source-de-verite.md` (tirage incrémental en 3 voies
+   à chaque connexion).
 2. **T4** — sortir les images du localStorage (couvertures de projets, hero) :
    c'est ce qui fait peser `projects.json` et dépasser le quota 5 MiB.
 3. **T5** — remplacer la PAT collée par une vraie connexion GitHub
