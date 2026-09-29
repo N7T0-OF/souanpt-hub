@@ -1018,9 +1018,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     </button>
     <div class="gate-or" id="gate-or" style="display:none"><span>ou</span></div>
     <div id="gate-github-block">
-      <div class="gate-sub">Colle ton token GitHub<span id="gate-gh-why"> pour déverrouiller ton dashboard</span>.<br>Génère-le sur <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=souanpt.hub" target="_blank" style="color:var(--accent3)">github.com/settings/tokens →</a> · scope <code style="color:var(--text)">repo</code></div>
-      <input class="gate-input" id="gate-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" onkeydown="if(event.key==='Enter')gateConnect()">
-      <button class="gate-btn" id="gate-btn" onclick="gateConnect()">Se connecter avec GitHub</button>
+      <!-- T5 : connexion par CODE GitHub — aucun token à créer, aucun token
+           stocké dans le navigateur. Affiché seulement si le relais répond. -->
+      <div id="gate-gh-relay" style="display:none">
+        <div class="gate-sub">Un code à 8 caractères sur <a href="https://github.com/login/device" target="_blank" rel="noopener" style="color:var(--accent3)">github.com/login/device</a><span id="gate-gh-why"> pour déverrouiller ton dashboard</span>.<br>Le jeton reste côté relais — <b style="color:var(--text)">rien n'est écrit dans ce navigateur</b>.</div>
+        <button class="gate-btn" id="gate-relay-btn" onclick="gateConnectDevice()">Continuer avec GitHub</button>
+        <div id="gate-gh-code" style="display:none;margin-top:10px;padding:10px;background:var(--s2);border-radius:8px;text-align:center"></div>
+      </div>
+      <div class="gate-or" id="gate-relay-or" style="display:none"><span>ou</span></div>
+      <div id="gate-gh-token">
+        <div class="gate-sub">Colle ton token GitHub<span id="gate-gh-why-2"> pour déverrouiller ton dashboard</span>.<br>Génère-le sur <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=souanpt.hub" target="_blank" style="color:var(--accent3)">github.com/settings/tokens →</a> · scope <code style="color:var(--text)">repo</code></div>
+        <input class="gate-input" id="gate-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" onkeydown="if(event.key==='Enter')gateConnect()">
+        <button class="gate-btn" id="gate-btn" onclick="gateConnect()">Se connecter avec GitHub</button>
+      </div>
     </div>
     <div class="gate-msg" id="gate-msg"></div>
     <div class="gate-links"><a href="index.html">← Retour à l'accueil</a><a href="https://github.com/signup" target="_blank">Créer un compte GitHub</a></div>
@@ -1650,6 +1660,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
             <div id="gh-connect-badge" style="font-size:9px;padding:3px 10px;border-radius:10px;background:var(--s2);color:var(--muted2);font-weight:700">DÉCONNECTÉ</div>
           </div>
 
+          <!-- T5 : connexion SANS token (relais) + migration d'une PAT existante -->
+          <div id="gh-relay-block" style="display:none;margin-bottom:10px;padding:11px 12px;background:rgba(200,255,0,.05);border:1px solid rgba(200,255,0,.18);border-radius:8px">
+            <div style="font-size:10px;font-weight:700;margin-bottom:4px">🔗 Connexion sans token</div>
+            <div style="font-size:9px;color:var(--muted2);line-height:1.6;margin-bottom:9px">GitHub te donne un code à saisir une fois. Le jeton vit sur le relais (cookie <code style="color:var(--text)">HttpOnly</code>) : aucun secret n'est écrit dans ce navigateur, et il n'y a rien à générer ni copier.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-accent" id="gh-relay-btn" onclick="ghConnectDevice()" style="font-size:11px">Se connecter avec un code</button>
+              <button class="btn btn-ghost" id="gh-migrate-btn" onclick="ghSecureSession()" style="display:none;font-size:11px">🔒 Sécuriser ma connexion</button>
+            </div>
+            <div id="gh-relay-code" style="display:none;margin-top:9px;padding:9px 10px;background:var(--s2);border-radius:6px;font-size:11px;text-align:center"></div>
+          </div>
+
           <!-- Connexion via Personal Access Token — simple et gratuit -->
           <div style="font-size:9px;color:var(--muted2);margin-bottom:8px;line-height:1.6">
             Génère un token sur
@@ -2019,6 +2040,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/cloud.js"></script>
 <script src="js/registry.js"></script>
 <script src="js/core.js"></script>
+<!-- T5 : connexion GitHub SANS jeton dans le navigateur (relais + device flow).
+     Doit suivre core.js (GH, Auth, connectGitHubRelay) et précéder l'UI qui
+     l'appelle. Sans relais, ce module se tait : le mode token reste actif. -->
+<script src="js/gh-auth.js"></script>
 <!-- T4 : les images sortent du localStorage (miniature locale + plein format
      sur le dépôt privé). Doit suivre core.js (GH, HubFiles, withRepoLock). -->
 <script src="js/hub-images.js"></script>
@@ -3217,10 +3242,13 @@ function gateShow() {
     if (Cloud.discordReady()) document.getElementById('gate-discord').style.display = 'flex';
     document.getElementById('gate-or').style.display = 'flex';
     document.getElementById('gate-sub-google').style.display = '';
-    const why = document.getElementById('gate-gh-why'); if (why) why.textContent = ' (optionnel — pour publier sur GitHub Pages)';
-    const gb = document.getElementById('gate-btn'); if (gb) gb.textContent = 'Connecter GitHub (publication)';
+    const whyTxt = Cloud.enabled ? ' (optionnel — pour publier sur GitHub Pages)' : '';
+    document.querySelectorAll('#gate-gh-why, #gate-gh-why-2').forEach(w => { w.textContent = whyTxt; });
+    const gb = document.getElementById('gate-btn'); if (gb) gb.textContent = 'Connecter GitHub (token)';
+    const rb = document.getElementById('gate-relay-btn'); if (rb) rb.textContent = 'Continuer avec GitHub (publication)';
   }
   g.classList.add('on');
+  renderGhConnectState();   // T5 : n'affiche le « 1 clic » que si le relais répond
 }
 function gateHide() { document.getElementById('login-gate')?.classList.remove('on'); }
 
@@ -3376,6 +3404,117 @@ async function hubSignOut() {
 }
 window.hubSignOut = hubSignOut;
 
+/* ══ T5 — connexion GitHub par relais : le jeton ne traverse JAMAIS le
+   navigateur. Le code (device flow) ou l'import d'une PAT existante déposent
+   le jeton dans le cookie HttpOnly de functions/api/auth.js ; toutes les
+   requêtes API partent ensuite de /api/gh (GH.req). Sans relais, ces fonctions
+   restent inaccessibles et le mode token historique continue de fonctionner. ══ */
+let _ghCdTimer = null;
+function ghCdStart() {
+  if (_ghCdTimer) return;
+  _ghCdTimer = setInterval(() => {
+    let alive = false;
+    document.querySelectorAll('[data-expires]').forEach(el => {
+      const left = Math.max(0, Math.round((Number(el.dataset.expires) - Date.now()) / 1000));
+      el.textContent = '(' + left + 's)';
+      if (left) alive = true;
+    });
+    if (!alive) { clearInterval(_ghCdTimer); _ghCdTimer = null; }
+  }, 1000);
+}
+function ghCdStop() { if (_ghCdTimer) { clearInterval(_ghCdTimer); _ghCdTimer = null; } }
+
+/** Panneau de code : lien + gros code + compte à rebours. */
+function ghCodePanel(st) {
+  const cd = `<span data-expires="${st.expires || 0}"></span>`;
+  if (st.phase === 'code') {
+    return `<div style="font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px">github.com/login/device</div>
+      <div style="font-size:28px;font-weight:800;letter-spacing:4px;color:var(--accent);font-family:'DM Mono',monospace;margin:7px 0 5px">${esc(st.user_code)}</div>
+      <div style="font-size:10px;color:var(--muted2)">Ouvre le lien, colle le code, valide. ${cd}</div>`;
+  }
+  if (st.phase === 'pending') return `<div style="font-size:11px">… en attente de ta validation sur GitHub ${cd}</div>`;
+  return '';
+}
+function ghCodeRender(id, html) {
+  const box = document.getElementById(id); if (!box) return;
+  box.style.display = html ? 'block' : 'none';
+  box.innerHTML = html || '';
+}
+
+async function gateConnectDevice() { await ghDeviceFlow('gate-gh-code', 'gate-relay-btn', 'gate-msg', true); }
+async function ghConnectDevice()    { await ghDeviceFlow('gh-relay-code', 'gh-relay-btn', 'gh-connect-msg', false); }
+
+/** Boucle du device flow. `isGate` = porte de connexion (verrouillage) ou carte. */
+async function ghDeviceFlow(codeId, btnId, msgId, isGate) {
+  const btn = document.getElementById(btnId), msg = document.getElementById(msgId);
+  const setMsg = (t, c) => { if (msg) { msg.style.color = c || 'var(--muted2)'; msg.textContent = t || ''; } };
+  if (btn) { btn.dataset.label = btn.dataset.label || btn.textContent; btn.disabled = true; btn.textContent = '⟳ Demande du code…'; }
+  setMsg('');
+  try {
+    const user = await GhSession.deviceFlow(st => {
+      ghCodeRender(codeId, ghCodePanel(st));
+      if (st.expires) ghCdStart();
+      if (st.phase === 'pending') setMsg('En attente de la validation sur GitHub…');
+    });
+    ghCdStop(); ghCodeRender(codeId, '');
+    setMsg('✓ Bienvenue @' + user.login + ' !', '#2e9a63');
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Connecté'; }
+    const hi = () => {
+      GHPage.showConnected(user); GHPage.loadRepo(); GHPage.loadRuns();
+      syncKPIs(); renderLoginLog();
+      showToast('✓ Connecté — @' + user.login + ' · aucun token dans ce navigateur', '#2e9a63', 4500);
+      renderGhConnectState();
+    };
+    if (isGate) setTimeout(() => { gateHide(); hi(); }, 500); else hi();
+  } catch (e) {
+    ghCdStop(); ghCodeRender(codeId, '');
+    setMsg('✗ ' + (e && e.message || 'Connexion impossible'), '#c0392b');
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || 'Se connecter'; }
+  }
+}
+
+/** Migration : la PAT locale part au relais, le localStorage est vidé. */
+async function ghSecureSession() {
+  const btn = document.getElementById('gh-migrate-btn'), msg = document.getElementById('gh-connect-msg');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Transfert…'; }
+  try {
+    const u = await GhSession.migrate();
+    showToast('✓ Connexion sécurisée — le token a quitté ce navigateur (@' + u.login + ')', '#2e9a63', 5000);
+    if (msg) { msg.style.color = '#2e9a63'; msg.textContent = '✓ Session sécurisée : plus aucun token stocké ici.'; }
+    GHPage.showConnected(u);
+  } catch (e) {
+    const m = (e && e.message) || 'Transfert refusé';
+    showToast('✗ ' + m, '#c0392b', 4000);
+    if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✗ ' + m; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔒 Sécuriser ma connexion'; }
+    renderGhConnectState();
+  }
+}
+
+/** Affiche/masque les blocs « sans token » selon l'état du relais et de la session. */
+function renderGhConnectState() {
+  const A = (typeof Auth !== 'undefined') ? Auth : null;
+  const S = (typeof GhSession !== 'undefined') ? GhSession : null;
+  if (!A) return;
+  const relay     = !!(S && S.available);
+  const oneClick  = relay && !!(S && S.configured);
+  const connected = A.ok();
+  const localTok  = !!A.token();
+  const show      = v => (v ? '' : 'none');
+
+  ['gate-gh-relay', 'gate-relay-or'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = show(oneClick && !connected);
+  });
+  const rb = document.getElementById('gh-relay-block'); if (rb) rb.style.display = show(relay);
+  const rbtn = document.getElementById('gh-relay-btn'); if (rbtn) rbtn.style.display = show(oneClick && !connected);
+  const mig = document.getElementById('gh-migrate-btn'); if (mig) mig.style.display = show(connected && localTok && relay);
+  if (connected && A.isRelay && A.isRelay()) {
+    const sub = document.getElementById('gh-connect-sub');
+    if (sub && (relay || A.owner())) sub.textContent = 'Session sécurisée — aucun token dans ce navigateur';
+  }
+}
+
 async function gateConnect() {
   const inp = document.getElementById('gate-pat'), btn = document.getElementById('gate-btn'), msg = document.getElementById('gate-msg');
   const val = inp?.value.trim();
@@ -3388,7 +3527,7 @@ async function gateConnect() {
     setTimeout(() => {
       gateHide();
       GHPage.showConnected(user); GHPage.loadRepo(); GHPage.loadRuns();
-      syncKPIs(); renderLoginLog();
+      syncKPIs(); renderLoginLog(); renderGhConnectState();
       showToast('✓ Connecté — @' + user.login, '#2e9a63');
     }, 600);
   } catch (e) {
@@ -3407,6 +3546,8 @@ function renderLoginLog() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // T5 : état du relais (connexion sans token) — sondage déjà lancé par gh-auth.js
+  if (typeof GhSession !== 'undefined') { GhSession.onChange = renderGhConnectState; renderGhConnectState(); }
   // Auth : Google (Firebase) en principal si configuré, sinon token GitHub
   if (window.Cloud && Cloud.enabled) {
     Cloud.handleRedirectToken();                 // retour de Discord (#ct=…) → connexion

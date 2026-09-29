@@ -261,8 +261,9 @@ inspection de la source du relais + présence de l'en-tête dans la `Response`.
 
 ## Hors périmètre (volontairement)
 
-- **T5** — le PAT reste en clair dans `localStorage` : c'est le sujet suivant
-  (OAuth App / GitHub App, fin de la copie-coller du jeton).
+- ~~**T5** — le PAT reste en clair dans `localStorage`~~ → **livré en v3.5.0** :
+  device flow via relais Cloudflare, jeton déplacé dans un cookie `HttpOnly`,
+  migration en un clic des PAT existantes — voir `docs/audits/t5-github-auth.md`.
 - **`estimates/{code}` et `requests/{token}`** sont publics en lecture *par
   conception* (lien client sans compte) et ne contiennent ni prix plancher, ni
   taux horaire, ni marge — vérifié dans `firebase/firestore.rules:82` (estimates)

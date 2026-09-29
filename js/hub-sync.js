@@ -84,7 +84,7 @@ const HubSync = {
   /** @returns {Promise<{pulled?:string[],conflicts?:string[],none?:boolean,skipped?:string}>} */
   async run() {
     const token = Auth.token(); const user = Auth.user();
-    if (!token || !user) return { skipped: 'auth' };
+    if (!Auth.ok() || !user) return { skipped: 'auth' };
     const owner = user.login;
     const repo  = owner.toLowerCase() + REPO_DATA_SUFFIX;
 

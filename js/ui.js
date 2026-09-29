@@ -76,7 +76,7 @@ const GHPage = {
   async loadRepo() {
     const token = Auth.token(); const cfg = SiteConfig.get(); const user = Auth.user();
     const repo = cfg.repo || (user?.login ? user.login+'/'+SITE_REPO_NAME : '');
-    if (!token || !repo) return;
+    if (!Auth.ok() || !repo) return;
     const [owner, r] = repo.split('/');
     const dot = document.getElementById('gh-repo-dot');
     const lbl = document.getElementById('gh-repo-label');
@@ -100,7 +100,7 @@ const GHPage = {
   async loadRuns() {
     const token = Auth.token(); const cfg = SiteConfig.get(); const user = Auth.user();
     const repo = cfg.repo || (user?.login ? user.login+'/'+SITE_REPO_NAME : '');
-    if (!token || !repo) return;
+    if (!Auth.ok() || !repo) return;
     const [owner, r] = repo.split('/');
     const list = document.getElementById('gh-runs-list');
     if (list) list.innerHTML='<div style="color:var(--muted2);font-size:10px">Chargement…</div>';
@@ -168,6 +168,8 @@ async function ghStartConnect() {
     if (ri) ri.value = SiteConfig.get().repo || '';
 
     showToast('✓ GitHub connecté — @' + user.login, '#2e9a63');
+    // T5 : propose de faire migrer cette PAT vers le relais (si présent)
+    if (typeof renderGhConnectState === 'function') renderGhConnectState();
 
   } catch (e) {
     const errMsg = e.message.includes('401') ? 'Token invalide'
@@ -187,7 +189,7 @@ async function ghCheckRepo()  {
 }
 
 async function ghCreateRepo() {
-  const token = Auth.token(); if (!token) { showToast('Connecte GitHub d\'abord','#c0392b'); return; }
+  const token = Auth.token(); if (!Auth.ok()) { showToast('Connecte GitHub d\'abord','#c0392b'); return; }
   const val   = document.getElementById('gh-repo-inp')?.value.trim() || (Auth.owner()+'/souanpt-hub');
   const [owner, repo] = val.split('/');
   const dot = document.getElementById('gh-repo-dot');

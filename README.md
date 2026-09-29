@@ -52,21 +52,42 @@ hub/
 ├── index.html      # Landing page publique (vitrine, style haunt.gg)
 ├── app.html        # SPA complète du dashboard (espace privé)
 ├── js/
-│   ├── core.js     # GitHub API, Auth PAT, SiteConfig, Générateur, Deploy, Behance RSS, Avis
+│   ├── core.js     # GitHub API, Auth (token OU session relais), SiteConfig, Générateur, Deploy, Behance RSS, Avis
+│   ├── gh-auth.js  # T5 : connexion GitHub SANS jeton dans le navigateur (relais + device flow)
 │   ├── hub-data.js # registre unique des collections (export, sauvegarde, miroir)
 │   ├── hub-sync.js # GitHub = source de vérité : tirage incrémental à la connexion
 │   ├── hub-images.js # images hors du localStorage (miniature locale + plein format sur GitHub)
 │   └── ui.js       # GHPage, Éditeur, BubbleWidget, navigation
+├── functions/
+│   ├── api/auth.js # relais d'auth : device flow, import de PAT, cookie HttpOnly
+│   ├── api/gh.js   # proxy GitHub : l'Authorization est fabriqué ici, jamais côté client
+│   └── u/…         # relais de partage /u/<pseudo> (page publiée en origine opaque)
 └── scripts/sync-behance.js   # sync RSS optionnelle (Node, sans clé API)
 ```
 
 Navigation : la racine (`/`) affiche la vitrine publique ; le bouton **Tableau de bord** ouvre `app.html`. Dans le dashboard, cliquer le logo souanpt.hub ramène à la vitrine.
 
-## Connexion GitHub (PAT)
+## Connexion GitHub — 2 façons
+
+**Sans token (recommandé, v3.5.0)** — voir `docs/audits/t5-github-auth.md` :
+
+1. **Intégrations → GitHub → « Se connecter avec un code »** : GitHub affiche un
+   code à 8 caractères à saisir une fois sur
+   [github.com/login/device](https://github.com/login/device) ;
+2. le jeton est déposé dans le **cookie `HttpOnly` du relais** (`functions/api/`) :
+   il n'est jamais écrit dans `localStorage`, et toutes les requêtes API partent
+   de `/api/gh` ;
+3. un compte déjà en PAT migre en un clic : **« 🔒 Sécuriser ma connexion »**
+   vide le navigateur de son token.
+
+**Avec un token (repli, fonctionne partout — y compris sans relais)** :
 
 1. Génère un token sur [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo,workflow&description=souanpt.hub) — scope `repo`
-2. **GitHub & Deploy** → colle le token → Se connecter
+2. **Intégrations → GitHub** → colle le token → Se connecter
 3. Le repo privé `{user}-hub-data` (backup) est créé automatiquement
+
+Dans les deux cas le dépôt `{user}-hub-data` est créé automatiquement et le
+comportement de l'app est identique.
 
 ## Sauvegarde des données — registre unique
 
@@ -136,6 +157,27 @@ seconde couche, contre un client obsolète ou une écriture malveillante.
 fois Cloudflare Pages redéployé (projet connecté au repo, ou
 `deploy-cloudflare.ps1`). Vérification et configuration :
 `docs/audits/security-p0.md` § Déploiement.
+
+## Sécurité — le jeton quitte le navigateur (T5, v3.5.0)
+
+Le hub ne stocke plus aucun secret GitHub quand le relais est présent :
+
+- **connexion par code** (device flow GitHub) : `github.com/login/device`,
+  aucun `client_secret` à gérer — le relais n'a besoin que de `GH_CLIENT_ID` ;
+- **le jeton vit dans un cookie `HttpOnly`** (90 j, `Secure`, `SameSite=None`)
+  tenu par `functions/api/auth.js` : `localStorage` ne contient plus que
+  l'identité (`login`, `avatar`) ;
+- **`/api/gh` fabrique l'en-tête `Authorization` côté serveur** : le navigateur
+  appelle le relais en `credentials:'include'`, jamais `api.github.com`
+  directement (transport unique `GH.req`) ;
+- **liste blanche d'origines** (`GH_AUTH_ORIGINS` + défauts) : un autre site ne
+  peut pas jouer des cookies de la victime ;
+- **migration des PAT existantes** en un clic (« Sécuriser ma connexion »).
+
+Sans relais (hub servi par GitHub Pages seul), le sondage échoue silencieusement
+et **tout reste en mode token, inchangé**. Tests 105/105, résidus (cookies
+tiers refusés par Safari, mode PAT volontairement conservé) et étapes de
+déploiement manuelles : `docs/audits/t5-github-auth.md`.
 
 ## Pipeline de déploiement
 

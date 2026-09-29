@@ -116,7 +116,11 @@ l'ancien `backup.json` si le dépôt n'a jamais été migré.
 2. ~~**T4** — sortir les images du localStorage (couvertures de projets, hero)~~
    → **fait**, voir `docs/audits/images-out-of-localstorage.md` (miniature locale
    + plein format sur le dépôt privé ; c'est ce qui libérait le quota 5 MiB).
-3. **T5** — remplacer la PAT collée par une vraie connexion GitHub
-   (OAuth App / GitHub App, token à durée limitée + `refresh_token`),
-   pour que la création du compte crée automatiquement le dépôt de stockage
-   de l'utilisateur.
+3. ~~**T5** — remplacer la PAT collée par une vraie connexion GitHub~~ → **fait**
+   (v3.5.0), voir `docs/audits/t5-github-auth.md` : connexion par code (device
+   flow), **plus aucun jeton dans le navigateur** (cookie `HttpOnly` du relais
+   `functions/api/`), migration en un clic des PAT déjà collées. Le dépôt
+   `{user}-hub-data` est toujours créé automatiquement à la connexion.
+   - reste (optionnel, hors périmètre tant que Firebase porte l'identité) :
+     faire de GitHub l'**identité** du compte (authorization code + redirection)
+     pour créer le dépôt dès l'inscription.

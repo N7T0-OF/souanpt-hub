@@ -44,7 +44,7 @@ const HubImages = {
   /* ── dépôt cible : {login}-hub-data, le même que la sauvegarde ── */
   login() { try { return (Auth.user() && Auth.user().login) || Auth.owner() || ''; } catch { return ''; } },
   repo()  { return String(this.login()).toLowerCase() + REPO_DATA_SUFFIX; },
-  ready() { return !!(Auth.token && Auth.token() && this.login()); },
+  ready() { return !!(typeof Auth !== 'undefined' && Auth.ok && Auth.ok() && this.login()); },
 
   /* ───────────────────────── codage ───────────────────────── */
 
@@ -200,8 +200,8 @@ const HubImages = {
     if (!this.ready()) return null;
     let b64 = null;
     try {
-      const res = await fetch(GH.BASE + `/repos/${this.login()}/${this.repo()}/contents/${path}`, {
-        headers: { Authorization: 'token ' + Auth.token(), Accept: 'application/vnd.github.raw+json' },
+      const res = await GH.req(`/repos/${this.login()}/${this.repo()}/contents/${path}`, {
+        headers: { ...GH.authHeaders(Auth.token()), Accept: 'application/vnd.github.raw+json' },
       });
       if (res.ok) b64 = GH.b64encBytes(new Uint8Array(await res.arrayBuffer()));
     } catch {}

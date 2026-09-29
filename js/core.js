@@ -10,16 +10,52 @@
 const GH = {
   BASE: 'https://api.github.com',
 
+  /* ── T5 : relais d'authentification (functions/api/*.js sur Cloudflare) ──
+     `souanpt_relay_base` est écrit par GhSession (js/gh-auth.js) au moment où
+     le relais a répondu pour la première fois. Vide/null = aucun relais connu →
+     on reste en accès direct avec un token (mode historique, inchangé).        */
+  relayBase() {
+    try {
+      const v = localStorage.getItem('souanpt_relay_base');
+      // Valeur fantôme possible si localStorage a été pollué (« undefined »…) :
+      // seule une origine http(s) absolue est acceptée.
+      return (v && /^https?:\/\//.test(v)) ? v : null;
+    } catch { return null; }
+  },
+  /** Mode relais = session ouverte SANS jeton local : tout doit passer par /api/gh. */
+  relayMode() {
+    return !!(typeof Auth !== 'undefined' && Auth.isRelay && Auth.isRelay() && this.relayBase());
+  },
+  /** En-tête d'authentification : fabriqué ICI en mode token, fabriqué par le
+      serveur (cookie HttpOnly) en mode relais — le jeton ne quitte alors jamais
+      le relais. */
+  authHeaders(token) {
+    return (this.relayMode() || !token) ? {} : { 'Authorization': 'token ' + token };
+  },
+  /** TRANSPORT UNIQUE : la seule porte de sortie vers api.github.com. */
+  async req(path, init) {
+    init = init || {};
+    if (this.relayMode()) {
+      const headers = Object.assign({}, init.headers || {});
+      delete headers.Authorization; delete headers.authorization;
+      return fetch(this.relayBase() + '/api/gh?path=' + encodeURIComponent(path),
+        Object.assign({}, init, { headers, credentials: 'include' }));
+    }
+    return fetch(this.BASE + path, init);
+  },
+
   async api(token, path, opts) {
-    const res = await fetch(this.BASE + path, {
-      ...opts,
-      headers: {
-        'Authorization': 'token ' + token,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-        ...(opts?.headers || {}),
-      },
-    });
+    const headers = {
+      ...this.authHeaders(token),
+      'Accept': 'application/vnd.github.v3+json',
+      ...(opts?.headers || {}),
+    };
+    // Content-Type seulement quand il y a un corps : en mode relais, un GET
+    // « application/json » déclencherait un preflight CORS pour rien.
+    if (opts && opts.body != null && headers['Content-Type'] === undefined && headers['content-type'] === undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+    const res = await this.req(path, { ...opts, headers });
     if (res.status === 204) return {};
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || 'GitHub ' + res.status);
@@ -64,8 +100,8 @@ const GH = {
       utile quand on tire une vingtaine de fichiers pendant une restauration. */
   async rawFile(token, owner, repo, path) {
     try {
-      const res = await fetch(this.BASE + `/repos/${owner}/${repo}/contents/${path}`, {
-        headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.raw+json' },
+      const res = await this.req(`/repos/${owner}/${repo}/contents/${path}`, {
+        headers: { ...this.authHeaders(token), 'Accept': 'application/vnd.github.raw+json' },
       });
       if (!res.ok) return null;
       return await res.text();
@@ -184,18 +220,33 @@ const GH = {
 };
 
 /* ══════════════════════════════════════════════════════
-   AUTH — token + user dans localStorage
+   AUTH — identité + session (T5 : le jeton peut vivre AILLEURS)
+
+   Deux façons d'être « connecté GitHub » :
+     • mode token  : { token, user } — jeton PAT dans localStorage (historique) ;
+     • mode relais : { session:'relay', user } — AUCUN jeton dans le navigateur,
+       le jeton dort dans le cookie HttpOnly du relais (functions/api/auth.js).
+   `ok()` est le test de connexion à préférer ; `token()` peut être vide alors
+   que la connexion est bonne, ce n'est plus un signal d'erreur.
 ══════════════════════════════════════════════════════ */
 const Auth = {
   _K: 'souanpt_auth_v2',
   get()             { try { return JSON.parse(localStorage.getItem(this._K) || '{}'); } catch { return {}; } },
   save(d)           { localStorage.setItem(this._K, JSON.stringify(d)); },
-  token()           { return this.get().token || ''; },
+  token()           { const d = this.get(); return d.session ? '' : (d.token || ''); },
   user()            { return this.get().user  || null; },
   owner()           { return this.user()?.login || ''; },
   set(token, user)  { this.save({ token, user, ts: Date.now() }); },
-  clear()           { localStorage.removeItem(this._K); },
-  ok()              { return !!this.token(); },
+  /** Ouvre une session RELAIS : l'identité reste locale, le jeton reste au bord. */
+  setSession(user)  { this.save({ session: 'relay', user, ts: Date.now() }); },
+  isRelay()         { return this.get().session === 'relay'; },
+  ok()              { const d = this.get(); return !!(d.token || (d.session && d.user)); },
+  clear() {
+    const relay = this.isRelay();
+    localStorage.removeItem(this._K);
+    try { localStorage.removeItem('souanpt_relay_base'); } catch {}
+    if (relay && typeof GhSession !== 'undefined') { try { GhSession.logout(); } catch {} }
+  },
 };
 
 /* ══════════════════════════════════════════════════════
@@ -443,7 +494,7 @@ const HubFiles = {
     // ⚠ `Auth` est déclaré avec const → il n'existe PAS sur window (contrairement
     // à var/function). Tester window.Auth renvoyait toujours undefined et affichait
     // « Connecte GitHub » alors que l'utilisateur était bien connecté.
-    if (typeof Auth === 'undefined' || !Auth.token()) {
+    if (typeof Auth === 'undefined' || !Auth.ok()) {
       const viaCloud = !!(window.Cloud && Cloud.enabled && Cloud.user());
       return { ok: false, reason: viaCloud ? 'cloud-only' : 'none' };
     }
@@ -452,9 +503,14 @@ const HubFiles = {
   /** Répare le cas « jeton présent mais identité manquante » (login absent). */
   async ensureIdentity() {
     if (Auth.owner()) return Auth.owner();
-    const token = Auth.token(); if (!token) return '';
+    const token = Auth.token(); if (!Auth.ok()) return '';
     const user = await GH.getUser(token);          // /user
-    if (user && user.login) { Auth.set(token, user); return user.login; }
+    if (user && user.login) {
+      // En mode relais on ne doit JAMAIS réécrire { token:'' } : cela rendrait
+      // Auth.ok() faux alors que la session est bonne.
+      if (Auth.isRelay()) Auth.setSession(user); else Auth.set(token, user);
+      return user.login;
+    }
     return '';
   },
 
@@ -479,7 +535,7 @@ const HubFiles = {
     opts = opts || {};
     const visibility = opts.visibility === 'public' ? 'public' : 'private';   // PRIVÉ par défaut
     const token = Auth.token();
-    if (!token) throw new Error('GitHub non connecté');
+    if (!Auth.ok()) throw new Error('GitHub non connecté');
     await this.ensureIdentity();               // répare un login manquant avant d'écrire
     const name = this._safe(file.name), ext = this._ext(name);
     if (FILE_BLOCKED_EXT.includes(ext)) throw new Error('Type de fichier interdit : .' + ext);
@@ -515,7 +571,7 @@ const HubFiles = {
   /** Remplace le contenu SANS changer l'URL publique ni l'identifiant (§8). */
   async replace(id, file) {
     const meta = this.get(id); if (!meta) throw new Error('Fichier introuvable');
-    const token = Auth.token(); if (!token) throw new Error('Connecte GitHub');
+    const token = Auth.token(); if (!Auth.ok()) throw new Error('Connecte GitHub');
     if (file.size > FILE_MAX_BYTES) throw new Error('Fichier trop lourd (max 25 Mo)');
     const sha = await GH.fileSha(token, meta.owner, meta.repo, meta.path);
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -535,7 +591,7 @@ const HubFiles = {
   async setVisibility(id, visibility) {
     const meta = this.get(id); if (!meta) throw new Error('Fichier introuvable');
     if (meta.visibility === visibility) return meta;
-    const token = Auth.token(); if (!token) throw new Error('Connecte GitHub');
+    const token = Auth.token(); if (!Auth.ok()) throw new Error('Connecte GitHub');
     const cur = await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`);
     const b64 = String(cur.content || '').replace(/\n/g, '');
     const oldRepo = meta.repo, oldSha = cur.sha;
@@ -587,7 +643,7 @@ const HubFiles = {
     const preview = { type: p.type, generatedAt: Date.now() };
     if (p.type === 'thumbnail' && p.blob) {
       try {
-        const token = Auth.token(); if (!token) throw new Error('GitHub non connecté');
+        const token = Auth.token(); if (!Auth.ok()) throw new Error('GitHub non connecté');
         const path = this._thumbPath(meta, p.ext);
         const u8 = new Uint8Array(await p.blob.arrayBuffer());
         const sha = await GH.fileSha(token, meta.owner, meta.repo, path);   // régénération
@@ -622,7 +678,7 @@ const HubFiles = {
     // sinon chaque rendu de la grille relancerait un appel par fichier.
     const key = meta.id + ':' + meta.preview.generatedAt;
     if (this._thumbCache[key]) return this._thumbCache[key];
-    const token = Auth.token(); if (!token) return '';
+    const token = Auth.token(); if (!Auth.ok()) return '';
     try {
       const res = await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.preview.path}`);
       const url = 'data:image/webp;base64,' + String(res.content || '').replace(/\n/g, '');
@@ -635,7 +691,7 @@ const HubFiles = {
   async objectUrl(id) {
     const meta = this.get(id); if (!meta) throw new Error('Fichier introuvable');
     if (meta.visibility === 'public') return this.publicUrl(meta);
-    const token = Auth.token(); if (!token) throw new Error('Connecte GitHub');
+    const token = Auth.token(); if (!Auth.ok()) throw new Error('Connecte GitHub');
     const res = await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`);
     const bin = atob(String(res.content || '').replace(/\n/g, ''));
     const u8 = new Uint8Array(bin.length);
@@ -670,7 +726,7 @@ const HubFiles = {
   async destroy(id) {
     const meta = this.get(id); if (!meta) return;
     const token = Auth.token();
-    if (token) {
+    if (Auth.ok()) {
       const sha = await GH.fileSha(token, meta.owner, meta.repo, meta.path);
       if (sha) await GH.api(token, `/repos/${meta.owner}/${meta.repo}/contents/${meta.path}`, {
         method: 'DELETE', body: JSON.stringify({ message: 'delete: ' + meta.name, sha }),
@@ -692,13 +748,14 @@ const HUB_HOME_URL     = 'https://souanptjub.pages.dev/'; // accueil souanpt.hub
 const ANALYTICS_URL    = 'https://souanpt-analytics.titaneolinne13.workers.dev/hit'; // mouchard des sites publiés → agrégats Firestore (Worker gratuit)
 const SITE_REPO_NAME   = 'souanpt-folio'; // repo par défaut du site public
 
-async function connectGitHub(token) {
-  const t = token.trim();
-  if (!t) throw new Error('Token requis');
-  const user = await GH.getUser(t);
-  const dataRepo = user.login.toLowerCase() + REPO_DATA_SUFFIX;
-  await GH.ensureRepo(t, user.login, dataRepo, true);
-  Auth.set(t, { login: user.login, name: user.name, avatar_url: user.avatar_url });
+/* Origine candidate du relais d'authentification (T5) : le hub servi par
+   Cloudflare Pages expose /api/… sur SA propre origine (candidat n°1), GitHub
+   Pages y accède depuis une autre origine (candidat n°2). Vide = même origine.
+   Surcharge possible : window.GH_RELAY = 'https://mon-relais.pages.dev'. */
+const GH_RELAY_DEFAULT = 'https://souanpt-hub.pages.dev';
+
+/** Routine commune à TOUTES les connexions GitHub (token OU relais). */
+async function afterGithubConnect(user) {
   // Journal des connexions (local)
   try {
     const log = JSON.parse(localStorage.getItem('souanpt_login_log') || '[]');
@@ -715,6 +772,31 @@ async function connectGitHub(token) {
   // autoBackup attend HubSync.pending — pas de course possible.
   try { window.HubSync && HubSync.boot({ force: true }); } catch {}
   return user;
+}
+
+async function connectGitHub(token) {
+  const t = token.trim();
+  if (!t) throw new Error('Token requis');
+  const user = await GH.getUser(t);
+  const dataRepo = user.login.toLowerCase() + REPO_DATA_SUFFIX;
+  await GH.ensureRepo(t, user.login, dataRepo, true);
+  Auth.set(t, { login: user.login, name: user.name, avatar_url: user.avatar_url });
+  return afterGithubConnect(user);
+}
+
+/**
+ * T5 — connexion par RELAIS : le jeton vient d'être posé dans le cookie HttpOnly
+ * du relais (functions/api/auth.js), le navigateur ne le voit pas. Le dépôt de
+ * sauvegarde est créé depuis le relais, comme en mode token.
+ */
+async function connectGitHubRelay(user, base) {
+  if (!user || !user.login) throw new Error('Profil GitHub introuvable');
+  const u = { login: user.login, name: user.name || '', avatar_url: user.avatar_url || '' };
+  try { localStorage.setItem('souanpt_relay_base', base || location.origin); } catch {}
+  Auth.setSession(u);                       // AVANT les appels API (mode relais actif)
+  const dataRepo = u.login.toLowerCase() + REPO_DATA_SUFFIX;
+  await GH.ensureRepo('', u.login, dataRepo, true);
+  return afterGithubConnect(u);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1666,7 +1748,7 @@ ${cfg.ownerUid ? `<script>(function(){var U=${JSON.stringify(String(cfg.ownerUid
 ══════════════════════════════════════════════════════ */
 async function deployPortfolio(onLog, onStep) {
   const token = Auth.token();
-  if (!token) throw new Error('Non connecté — connecte GitHub d\'abord');
+  if (!Auth.ok()) throw new Error('Non connecté — connecte GitHub d\'abord');
   const cfg   = SiteConfig.get();
   const owner = Auth.owner();
   if (!owner) throw new Error('Profil GitHub introuvable');
@@ -2126,7 +2208,7 @@ function portalRepo(cfg) {
  * → { url, built }
  */
 async function publishPortal(p, onStatus) {
-  const token = Auth.token(); if (!token) throw new Error('Connecte GitHub d\'abord');
+  const token = Auth.token(); if (!Auth.ok()) throw new Error('Connecte GitHub d\'abord');
   const owner = Auth.owner(); if (!owner) throw new Error('Profil GitHub introuvable');
   const cfg = SiteConfig.get();
   const repo = portalRepo(cfg);
@@ -2159,7 +2241,7 @@ async function publishPortal(p, onStatus) {
 /** Vérifie qu'un portail est réellement en ligne (fichier + build Pages) */
 async function verifyPortal(id) {
   const token = Auth.token(); const owner = Auth.owner(); const cfg = SiteConfig.get();
-  if (!token || !owner) return { ok: false, reason: 'Non connecté' };
+  if (!Auth.ok() || !owner) return { ok: false, reason: 'Non connecté' };
   const repo = portalRepo(cfg);
   const sha = await GH.fileSha(token, owner, repo, 'p/' + id + '/index.html');
   if (!sha) return { ok: false, reason: 'Page introuvable — clique Publier' };
@@ -2292,7 +2374,7 @@ async function behanceSyncNow(silent) {
 async function fetchVisitorReviews(silent) {
   const token = Auth.token();
   const cfg   = SiteConfig.get();
-  if (!token || !cfg.repo || !cfg.repo.includes('/')) return 0;
+  if (!Auth.ok() || !cfg.repo || !cfg.repo.includes('/')) return 0;
   const [owner, repo] = cfg.repo.split('/');
   let issues = [];
   try { issues = await GH.api(token, `/repos/${owner}/${repo}/issues?state=open&per_page=50`); }
@@ -2367,7 +2449,7 @@ async function withRepoLock(fn) {
  */
 async function autoBackup(opts) {
   const token = Auth.token(); const user = Auth.user();
-  if (!token || !user) return null;
+  if (!Auth.ok() || !user) return null;
   if (_backupRunning) return null;                        // pas de 2 sauvegardes simultanées
   // Le tirage GitHub (hub-sync.js) doit finir AVANT toute écriture : sinon on
   // pousserait une copie locale périmée par-dessus la sauvegarde d'un autre
@@ -2449,7 +2531,7 @@ async function autoBackup(opts) {
     avec repli sur l'ancien format mono-fichier backup.json (V1/V2). */
 async function restoreFromGitHub() {
   const token = Auth.token(); const user = Auth.user();
-  if (!token || !user) throw new Error('Connecte GitHub d\'abord');
+  if (!Auth.ok() || !user) throw new Error('Connecte GitHub d\'abord');
   const owner = user.login;
   const repo  = owner.toLowerCase() + REPO_DATA_SUFFIX;
 
