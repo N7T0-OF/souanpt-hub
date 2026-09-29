@@ -53,6 +53,9 @@ hub/
 ├── app.html        # SPA complète du dashboard (espace privé)
 ├── js/
 │   ├── core.js     # GitHub API, Auth PAT, SiteConfig, Générateur, Deploy, Behance RSS, Avis
+│   ├── hub-data.js # registre unique des collections (export, sauvegarde, miroir)
+│   ├── hub-sync.js # GitHub = source de vérité : tirage incrémental à la connexion
+│   ├── hub-images.js # images hors du localStorage (miniature locale + plein format sur GitHub)
 │   └── ui.js       # GHPage, Éditeur, BubbleWidget, navigation
 └── scripts/sync-behance.js   # sync RSS optionnelle (Node, sans clé API)
 ```
@@ -79,6 +82,7 @@ data/manifest.json     table des matières (version, comptes, sha256 de chaque f
 data/projects.json     clients, factures, catalogue, portails, avis, liens, médias,
 …                      fichiers, devis, grille tarifaire, config du site, réglages
 data/*.partN.json      découpé automatiquement au-delà de ~440 Ko (limite API GitHub)
+media/<empreinte>.jpg  couvertures pleine taille (hors data/ → jamais purgées par la sauvegarde)
 backup.json            ancien format : plus écrit, toujours lu (restauration)
 ```
 
@@ -95,7 +99,13 @@ backup.json            ancien format : plus écrit, toujours lu (restauration)
   tirage ciblé à la demande ;
 - bouton **☁ Restaurer la sauvegarde complète** : remplace *tout* par la
   sauvegarde (réinstallation) — avec repli automatique sur l'ancien
-  `backup.json`.
+  `backup.json` ;
+- **les images sortent du navigateur** (`js/hub-images.js`) : le quota de
+  5 MiB du `localStorage` ne porte plus que des miniatures 420 px, les
+  couvertures pleine taille vivent en `media/` sur le dépôt privé et sont
+  réinjectées à la volée à la publication, dans l'aperçu et dans l'export
+  autonome. Bouton **Stockage → Sortir les images du navigateur** pour
+  migrer l'existant (voir `docs/audits/images-out-of-localstorage.md`).
 
 Détails : `docs/audits/backup-unification.md` (T1+T2) et
 `docs/audits/github-source-de-verite.md` (T3).

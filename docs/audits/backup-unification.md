@@ -113,8 +113,9 @@ l'ancien `backup.json` si le dépôt n'a jamais été migré.
 1. ~~**T3** — faire de GitHub la source de vérité au login~~ → **fait**,
    voir `docs/audits/github-source-de-verite.md` (tirage incrémental en 3 voies
    à chaque connexion).
-2. **T4** — sortir les images du localStorage (couvertures de projets, hero) :
-   c'est ce qui fait peser `projects.json` et dépasser le quota 5 MiB.
+2. ~~**T4** — sortir les images du localStorage (couvertures de projets, hero)~~
+   → **fait**, voir `docs/audits/images-out-of-localstorage.md` (miniature locale
+   + plein format sur le dépôt privé ; c'est ce qui libérait le quota 5 MiB).
 3. **T5** — remplacer la PAT collée par une vraie connexion GitHub
    (OAuth App / GitHub App, token à durée limitée + `refresh_token`),
    pour que la création du compte crée automatiquement le dépôt de stockage

@@ -45,10 +45,10 @@ const HubData = {
 
   LIST: [
     { key: 'projects',  ls: 'hub_projects',     file: 'projects.json',  sync: 'projects',  type: 'array',
-      // Couvertures en base64 : `hub_projects` dépasse souvent la limite de
-      // 1 Mo d'un document Firestore → la pousser échouerait en permanence.
-      // Le binaire est porté par GitHub (et par HubFiles) ; à rebrancher sur
-      // Firestore le jour où les images sortent du localStorage (T4).
+      // T4 : les images pleine taille vivent sur GitHub (media/, js/hub-images.js),
+      // il ne reste que des miniatures (~20 Ko) en base64. `mirror:'github'` reste
+      // volontaire : 40 miniatures ≈ 800 Ko, déjà à la limite du document
+      // Firestore de 1 Mo — le miroir ne servirait ici que le temps réel.
       mirror: 'github' },
     { key: 'links',     ls: 'hub_links',        file: 'links.json',     sync: 'links',     type: 'array' },
     { key: 'clients',   ls: 'hub_clients',      file: 'clients.json',   sync: 'clients',   type: 'array' },

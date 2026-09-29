@@ -1265,7 +1265,7 @@ function edAddProject() {
       <select class="edw-in" id="ap-dup"><option value="">— choisir —</option>${projs.map(p => `<option value="${_eesc(p.id)}">${_eesc(p.title || 'Sans titre')}</option>`).join('')}</select>` : ''}
     <button class="edw-ok" id="ap-ok">Créer le projet</button>`;
   EdWin.open(null, '＋ Nouveau projet', html, w => {
-    let cover = '';
+    let cover = '', coverFile = '';
     const dz = w.querySelector('#ap-dz'), prev = w.querySelector('#ap-prev'),
           info = w.querySelector('#ap-info'), drop = w.querySelector('#ap-drop'), file = w.querySelector('#ap-file');
     const ko = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.round(n / 1024) + ' Ko';
@@ -1277,7 +1277,7 @@ function edAddProject() {
       rd.onload = e => {
         const raw = e.target.result;
         const done = (src, note) => {
-          cover = src; prev.src = src; drop.classList.add('has');
+          cover = src; coverFile = ''; prev.src = src; drop.classList.add('has');
           info.textContent = f.name + ' · ' + ko(f.size) + ' → ' + ko(Math.round(src.length * 0.75)) + ' · ' + note;
         };
         // ⚠ Un GIF ne doit JAMAIS passer par la compression WebP : elle le figerait.
@@ -1297,7 +1297,7 @@ function edAddProject() {
       w.querySelector('#ap-title').value = (p.title || '') + ' (copie)';
       w.querySelector('#ap-tags').value = (p.tags || []).join(', ');
       w.querySelector('#ap-link').value = p.url || '';
-      if (p.cover) { cover = p.cover; prev.src = p.cover; drop.classList.add('has'); info.textContent = 'Couverture reprise du projet dupliqué'; }
+      if (p.cover) { cover = p.cover; coverFile = p.coverFile || ''; prev.src = p.cover; drop.classList.add('has'); info.textContent = 'Couverture reprise du projet dupliqué'; }
     };
     w.querySelector('#ap-ok').onclick = () => {
       const title = w.querySelector('#ap-title').value.trim();
@@ -1305,7 +1305,8 @@ function edAddProject() {
       const src = cover || w.querySelector('#ap-url').value.trim();
       const p = { id: Date.now().toString(), title,
         tags: w.querySelector('#ap-tags').value.split(',').map(t => t.trim()).filter(Boolean),
-        url: w.querySelector('#ap-link').value.trim(), cover: src, views: 0, createdAt: Date.now() };
+        url: w.querySelector('#ap-link').value.trim(), cover: src, coverFile: coverFile || '',
+        views: 0, createdAt: Date.now() };
       const ps = getProjects(); ps.push(p);
       try { localStorage.setItem('hub_projects', JSON.stringify(ps)); }
       catch (err) { return showToast?.('⚠ Image trop lourde pour le stockage local — utilise une URL', '#c0392b', 4000); }
@@ -1315,6 +1316,12 @@ function edAddProject() {
       if (typeof syncKPIs === 'function') syncKPIs();
       edRefreshPreview();
       showToast?.('Projet « ' + title + ' » ajouté ✓', '#2e9a63', 2200);
+      // T4 : couverture complète → dépôt privé, miniature conservée ici
+      if (!p.coverFile && window.HubImages) {
+        HubImages.offloadProject(p.id).then(q => {
+          if (q) { if (typeof renderProjects === 'function') renderProjects(); if (typeof syncKPIs === 'function') syncKPIs(); edRefreshPreview(); }
+        });
+      }
     };
   });
 }

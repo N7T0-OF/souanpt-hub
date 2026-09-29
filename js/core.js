@@ -116,7 +116,11 @@ const GH = {
   /**
    * Commit ATOMIQUE de plusieurs fichiers en un seul commit (Git Data API).
    * Évite les builds Pages concurrents → cause du "Deployment failed, try again later".
-   * files: [{ path, content }]
+   * files: [{ path, content }]  texte UTF-8
+   *        [{ path, b64 }]      BINAIRE (image, PDF) — le blob est créé à part
+   *                             puis référencé par son sha : `content` de l'API
+   *                             des arbres n'accepte que du texte, il corromprait
+   *                             un octet hors UTF-8.
    */
   async commitFiles(token, owner, repo, files, message) {
     const info   = await this.api(token, `/repos/${owner}/${repo}`);
@@ -124,12 +128,23 @@ const GH = {
     const ref    = await this.api(token, `/repos/${owner}/${repo}/git/ref/heads/${branch}`);
     const baseSha    = ref.object.sha;
     const baseCommit = await this.api(token, `/repos/${owner}/${repo}/git/commits/${baseSha}`);
+    // Binaire d'abord (séquentiellement : GitHub limite les requêtes simultanées),
+    // puis un seul arbre — les blobs sont réutilisés s'ils existent déjà.
+    const entries = [];
+    for (const f of files) {
+      if (f.b64) {
+        const blob = await this.api(token, `/repos/${owner}/${repo}/git/blobs`, {
+          method: 'POST',
+          body: JSON.stringify({ content: f.b64, encoding: 'base64' }),
+        });
+        entries.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha });
+      } else {
+        entries.push({ path: f.path, mode: '100644', type: 'blob', content: f.content });
+      }
+    }
     const tree = await this.api(token, `/repos/${owner}/${repo}/git/trees`, {
       method: 'POST',
-      body: JSON.stringify({
-        base_tree: baseCommit.tree.sha,
-        tree: files.map(f => ({ path: f.path, mode: '100644', type: 'blob', content: f.content })),
-      }),
+      body: JSON.stringify({ base_tree: baseCommit.tree.sha, tree: entries }),
     });
     const commit = await this.api(token, `/repos/${owner}/${repo}/git/commits`, {
       method: 'POST',
@@ -1671,7 +1686,18 @@ async function deployPortfolio(onLog, onStep) {
 
   onStep?.('generate', 'active'); onLog?.('Génération du HTML…');
   const cfgToUse = { ...cfg, repo: owner + '/' + repoName };
-  const siteHTML = generateSite(cfgToUse, projects);
+  /* Les images vivent sur GitHub (media/) : localStorage ne garde qu'une
+     miniature. Avant de générer, on remet le PLEIN FORMAT en mémoire — sinon
+     le site publié recevrait les miniatures. `site-config.json` (lui, reste en
+     miniature) reçoit `cfgToUse`, jamais l'objet résolu. */
+  let pubProjects = projects, pubCfg = cfgToUse;
+  if (window.HubImages) {
+    try {
+      pubProjects = await HubImages.resolveProjects(projects);
+      pubCfg      = await HubImages.resolveCfg(cfgToUse);
+    } catch (e) { console.warn('[images] résolution plein format', e); }
+  }
+  const siteHTML = generateSite(pubCfg, pubProjects);
   onLog?.(`  → ${Math.round(siteHTML.length/1024)} KB`);
   onStep?.('generate', 'done');
 
@@ -2197,6 +2223,21 @@ const BACKUP_MIN_INTERVAL = 30 * 1000;
 let _backupRunning = false;
 
 /**
+ * Verrou d'écriture sur le dépôt privé {login}-hub-data.
+ * Deux codeurs écrivent sur la même branche : la sauvegarde (autoBackup) et
+ * l'envoi des images (hub-images.js). Sans verrou, leurs PATCH refs/heads/main
+ * se marchent dessus → « Update is not a fast forward » et une image perdue.
+ * (Les dépôts du site sont différents : ils n'ont pas besoin de ce verrou.)
+ */
+let _repoBusy = false;
+async function withRepoLock(fn) {
+  let tries = 0;
+  while (_repoBusy && tries++ < 240) await new Promise(r => setTimeout(r, 250));
+  _repoBusy = true;
+  try { return await fn(); } finally { _repoBusy = false; }
+}
+
+/**
  * Sauvegarde COMPLÈTE — schéma data/*.json (voir js/hub-data.js).
  *
  * Trois règles, sans lesquelles le dépôt devient un trou noir Git :
@@ -2268,16 +2309,20 @@ async function autoBackup(opts) {
 
     const msg = 'backup ' + new Date().toISOString().slice(0, 16).replace('T', ' ');
     const toPush = needManifest ? [...changed, manifest] : changed;
-    let pushed = 0;
-    if (toPush.length) {
-      await GH.commitFiles(token, owner, repo,
-        toPush.map(f => ({ path: f.path, content: f.content })), msg);
-      pushed = toPush.length;
-    }
-    // Fichiers devenus inutiles (collection rétrécie) : APRÈS le commit — si la
-    // suppression échoue on perd de la place, jamais des données.
-    let deleted = 0;
-    for (const p of obsolete) if (await GH.deleteFile(token, owner, repo, p, msg)) deleted++;
+    let pushed = 0, deleted = 0;
+    /* Écritures sous verrou : les images (hub-images.js) peuvent pousser un
+       commit sur le même dépôt au même moment — deux PATCH de ref concurrents
+       perdent le second. Les suppressions restent APRÈS le commit des données :
+       si elles échouent on perd de la place, jamais des données. */
+    await withRepoLock(async () => {
+      if (toPush.length) {
+        await GH.commitFiles(token, owner, repo,
+          toPush.map(f => ({ path: f.path, content: f.content })), msg);
+        pushed = toPush.length;
+      }
+      // Fichiers devenus inutiles (collection rétrécie) : après le commit.
+      for (const p of obsolete) if (await GH.deleteFile(token, owner, repo, p, msg)) deleted++;
+    });
 
     localStorage.setItem('souanpt_last_backup', Date.now().toString());
     window.HubSync && HubSync.record(files, false);      // accord rétabli : la baseline suit

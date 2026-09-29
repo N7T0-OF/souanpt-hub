@@ -223,6 +223,13 @@ const StorageUI = {
   },
   async toggleVis(id) {
     const f = HubFiles.get(id); if (!f) return;
+    /* Une image de couverture (media/) est référencée par son chemin EXACT :
+       la rendre publique la déplacerait vers le dépôt du site et casserait les
+       projets qui pointent dessus. Elle ne sort que lors de la publication. */
+    if (String(f.path || '').startsWith('media/')) {
+      showToast?.('🔒 Image de couverture : visibilité fixée (dépôt privé, publiée avec ton site)', '#e4b24a', 4000);
+      return;
+    }
     const toPublic = f.visibility !== 'public';
     if (toPublic && !confirm('Rendre « ' + (f.displayName || f.name) + ' » PUBLIC ?\n\nIl sera accessible par n\'importe qui via son lien, et publié avec ton site.')) return;
     showToast?.('⟳ Changement de visibilité…', '#666', 2000);
@@ -253,7 +260,9 @@ const StorageUI = {
   restore(id) { HubFiles.restore(id); this.render(); showToast?.('↩ Restauré', '#2e9a63', 2000); },
   async destroy(id) {
     const f = HubFiles.get(id); if (!f) return;
-    if (!confirm('Supprimer DÉFINITIVEMENT « ' + (f.displayName || f.name) + ' » ?\n\nLe fichier sera retiré de GitHub. Cette action est irréversible.')) return;
+    const media = String(f.path || '').startsWith('media/');
+    if (!confirm('Supprimer DÉFINITIVEMENT « ' + (f.displayName || f.name) + ' » ?\n\nLe fichier sera retiré de GitHub. Cette action est irréversible.'
+      + (media ? '\n\n⚠ C\'est une image de couverture : les projets concernés retomberont sur leur miniature.' : ''))) return;
     try { await HubFiles.destroy(id); this.render(); showToast?.('Supprimé définitivement', '#666', 2500); }
     catch (e) { showToast?.('✗ ' + (e.message || 'échec'), '#c0392b', 4000); }
   },

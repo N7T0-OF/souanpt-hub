@@ -1618,12 +1618,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <span>📁 Projets : <strong id="stor-projects" style="color:var(--text)">0 / 50</strong></span>
           <span>localStorage · <span id="stor-username">—</span></span>
         </div>
-        <div id="stor-warn" style="display:none;font-size:9px;color:var(--gold-l);margin-top:8px;line-height:1.6">⚠ Espace navigateur presque plein — clique « Optimiser les images » ci-dessous pour libérer de la place.</div>
+        <div id="stor-warn" style="display:none;font-size:9px;color:var(--gold-l);margin-top:8px;line-height:1.6">⚠ Espace navigateur presque plein — clique « Sortir les images du navigateur » ci-dessous : les images passent sur GitHub, le local se vide.</div>
       </div>
       <div class="gc" style="padding:16px;max-width:500px;margin-bottom:16px">
-        <div style="font-size:11px;font-weight:700;margin-bottom:6px">🗜 Optimisation des images</div>
-        <div class="hintbox" style="margin-bottom:10px">Recompresse en <strong style="color:var(--text)">WebP ≤900px</strong> toutes les couvertures importées (déjà présentes et futures) pour libérer de l'espace. Les projets Behance et les couvertures par URL ne sont pas concernés (ce sont des liens, ils ne pèsent rien).</div>
-        <button class="btn btn-accent" id="opt-btn" onclick="optimizeAllCovers()" style="font-size:11px">🗜 Optimiser les images</button>
+        <div style="font-size:11px;font-weight:700;margin-bottom:6px">🖼 Images &amp; espace navigateur</div>
+        <div class="hintbox" style="margin-bottom:10px">
+          <strong style="color:var(--text)">Sortir les images</strong> envoie les couvertures pleine taille sur ton dépôt GitHub privé et ne garde qu'une miniature locale — c'est ça qui libère le quota de 5 Mo du navigateur (une quarantaine de projets le saturent sinon, et toute écriture échoue). Le site publié, lui, reçoit les images pleine qualité : aucune perte visible.<br><br>
+          <strong style="color:var(--text)">Optimiser</strong> recompresse en WebP ≤900px les couvertures encore stockées localement (utile hors ligne). Les liens Behance/URL ne pèsent rien.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-accent" id="offload-btn" onclick="offloadImages()" style="font-size:11px">📤 Sortir les images du navigateur</button>
+          <button class="btn btn-ghost" id="opt-btn" onclick="optimizeAllCovers()" style="font-size:11px">🗜 Optimiser</button>
+        </div>
+        <div id="offload-status" style="display:none;font-size:10px;color:var(--muted2);margin-top:8px"></div>
       </div>
       <div class="gc" id="stor-files"></div>
     </div>
@@ -2012,6 +2019,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/cloud.js"></script>
 <script src="js/registry.js"></script>
 <script src="js/core.js"></script>
+<!-- T4 : les images sortent du localStorage (miniature locale + plein format
+     sur le dépôt privé). Doit suivre core.js (GH, HubFiles, withRepoLock). -->
+<script src="js/hub-images.js"></script>
 <!-- T3 : GitHub = source de vérité au login. Doit suivre core.js (GH, Auth,
      autoBackup) et précéder ui.js (les timers d'auto-backup l'attendent). -->
 <script src="js/hub-sync.js"></script>
@@ -2446,16 +2456,29 @@ function addProject() {
   const wasEdit = !!_editingId;
   const finalize = (cover) => {
     const projs = getProjects();
+    let newId = null;
     if (wasEdit) {
       const p = projs.find(x => x.id === _editingId);
-      if (p) { p.title = title; p.tags = tags; p.url = url; if (cover) p.cover = cover; }
+      if (p) {
+        p.title = title; p.tags = tags; p.url = url;
+        // Une couverture REMPLACÉE invalide le fichier déjà envoyé (sinon on
+        // publierait l'ancienne image) ; une couverture inchangée le garde.
+        if (cover && cover !== p.cover) { p.cover = cover; p.coverFile = ''; }
+      }
     } else {
-      projs.unshift({ id: Date.now().toString(), title, tags, url, cover, views:0, createdAt:Date.now() });
+      newId = Date.now().toString();
+      projs.unshift({ id: newId, title, tags, url, cover, views:0, createdAt:Date.now() });
     }
     try { localStorage.setItem('hub_projects', JSON.stringify(projs)); }
     catch { showToast('⚠ Image trop lourde — utilise une URL d\'image à la place','#c0392b',3500); return; }
+    const target = wasEdit ? _editingId : newId;      // avant reset (qui efface _editingId)
     resetProjectForm(); renderProjects(); syncKPIs();
     showToast(wasEdit ? 'Projet mis à jour ✓' : 'Projet ajouté ✓','#2e9a63');
+    // T4 : la couverture quitte le navigateur dès qu'on est connecté (1 commit,
+    // miniature conservée). Silencieux si échec → le base64 reste en local.
+    if (target && window.HubImages) {
+      HubImages.offloadProject(target).then(p => { if (p) { renderProjects(); syncKPIs(); } });
+    }
   };
   // Couverture collée en data: (ex : champ URL) non-WebP → on compresse avant de stocker
   if (rawCover.startsWith('data:') && !rawCover.startsWith('data:image/webp')) {
@@ -2465,10 +2488,12 @@ function addProject() {
   }
 }
 
-/* ═══ OPTIMISATION DES IMAGES — compresse les couvertures data: déjà stockées ═══ */
+/* ═══ OPTIMISATION DES IMAGES — compresse les couvertures data: encore locales ═══ */
 async function optimizeAllCovers() {
   const projs = getProjects();
-  const targets = projs.filter(p => p.cover && p.cover.startsWith('data:'));
+  // Une couverture déjà sortie sur GitHub (coverFile) n'a plus rien à compresser
+  // ici : sa miniature est déjà légère, et son plein format est sur le dépôt.
+  const targets = projs.filter(p => p.cover && p.cover.startsWith('data:') && !p.coverFile);
   if (!targets.length) { showToast('Aucune couverture à optimiser (les liens Behance/URL ne pèsent rien) ✓','#2e9a63',3000); return; }
   const btn = document.getElementById('opt-btn'); if (btn) { btn.disabled = true; btn.textContent = '⟳ Optimisation…'; }
   let before = 0, after = 0, done = 0;
@@ -2481,8 +2506,41 @@ async function optimizeAllCovers() {
   try { localStorage.setItem('hub_projects', JSON.stringify(projs)); } catch {}
   const savedKo = Math.max(0, Math.round((before - after) * 0.75 / 1024));
   renderProjects(); renderBehancePage?.(); syncKPIs();
-  if (btn) { btn.disabled = false; btn.textContent = '🗜 Optimiser les images'; }
+  if (btn) { btn.disabled = false; btn.textContent = '🗜 Optimiser'; }
   showToast(`✓ ${done} couverture(s) optimisée(s) — ${savedKo} Ko économisés`, '#2e9a63', 4000);
+}
+
+/* ═══ T4 — SORTIE DES IMAGES DU NAVIGATEUR (miniature locale + plein format
+   sur le dépôt privé {login}-hub-data). Voir js/hub-images.js ═══ */
+async function offloadImages() {
+  if (!window.HubImages) return;
+  const btn = document.getElementById('offload-btn');
+  const st  = document.getElementById('offload-status');
+  const say = t => { if (st) { st.style.display = 'block'; st.textContent = t; } };
+  if (!HubImages.ready()) {
+    showToast('Connecte GitHub d\'abord : les images vivent sur ton dépôt privé','#c0392b',4500);
+    return;
+  }
+  const before = HubImages.stats();
+  if (!before.heavy) { say('Aucune image lourde dans le navigateur ✓'); showToast('Rien à sortir — le navigateur est léger ✓','#2e9a63',3000); return; }
+  const savedLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ ' + before.heavy + ' image(s)…'; }
+  try {
+    const r = await HubImages.migrate((d, t, phase) => say(
+      phase === 'envoi' ? `Envoi vers GitHub (${d}/${t})…` : `Préparation des miniatures (${d}/${t})…`));
+    const ko = Math.max(0, Math.round(r.freed / 1024));
+    say(`${r.moved} image(s) sortie(s) · ${ko} Ko libérés${r.failed ? ' · ' + r.failed + ' en échec' : ''}`);
+    if (r.moved) {
+      showToast(`✓ ${r.moved} image(s) sur GitHub — ${ko} Ko libérés du navigateur`, '#2e9a63', 5000);
+      renderProjects(); renderBehancePage?.(); syncKPIs();
+    }
+  } catch (e) {
+    const msg = (e && e.message) || String(e);
+    say('⚠ ' + msg);
+    showToast('⚠ ' + msg, '#c0392b', 5000);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = savedLabel; }
+  }
 }
 function editProject(id) {
   const p = getProjects().find(x => x.id === id); if (!p) return;

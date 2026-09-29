@@ -351,7 +351,12 @@ function edPerf() {
   let load = anim + (fx.tilt ? 8 : 0) + (fx.shine ? 4 : 0) + (fx.lift ? 2 : 0)
            + (fx.glow ? 4 : 0) + (fx.mouseglow ? 6 : 0);
   let projs = 0, heavyCovers = 0;
-  try { const P = JSON.parse(localStorage.getItem('hub_projects') || '[]'); projs = P.length; heavyCovers = P.filter(p => (p.cover || '').startsWith('data:')).length; } catch {}
+  try { projs = JSON.parse(localStorage.getItem('hub_projects') || '[]').length; } catch {}
+  /* Seules les couvertures ENCORE en base64 comptent : celles déjà sorties sur
+     GitHub (coverFile) ne pèsent plus qu'une miniature locale. */
+  if (window.HubImages) heavyCovers = HubImages.stats().heavy;
+  else { try { heavyCovers = JSON.parse(localStorage.getItem('hub_projects') || '[]')
+            .filter(p => (p.cover || '').startsWith('data:')).length; } catch {} }
   load += Math.max(0, projs - 12) * 1.5 + heavyCovers * 3 + (g.heroImage ? 4 : 0);
   const score = Math.max(35, Math.round(100 - load));
   const col = score >= 85 ? 'var(--green)' : score >= 65 ? 'var(--gold-l)' : 'var(--red)';
@@ -364,7 +369,7 @@ function edPerf() {
   if (mob) mob.textContent = '≈' + (0.6 + load / 55).toFixed(1) + 's mobile';
   // Suggestions dans la barre (avec bouton Optimiser)
   const tips = [];
-  if (heavyCovers) tips.push(`🖼 ${heavyCovers} couverture(s) non optimisée(s) <button onclick="optimizeAllCovers();return false">Optimiser</button>`);
+  if (heavyCovers) tips.push(`🖼 ${heavyCovers} couverture(s) encore dans le navigateur <button onclick="offloadImages();return false">Sortir</button>`);
   if (g.animLevel === 'premium') tips.push('⚡ Animations intenses activées');
   if (g.layoutStyle === 'sidebar' && !g.heroImage) tips.push('🌄 Hero conseillé pour le thème latéral');
   const box = document.getElementById('ed-tips');
@@ -406,13 +411,19 @@ function edToggleBlock(k){
 
 function edUpdatePreview() { try{ edPerf(); }catch{} clearTimeout(_edTimer); _edTimer=setTimeout(edRefreshPreview,600); }
 
-function edRefreshPreview() {
+async function edRefreshPreview() {
   const frame=document.getElementById('ed-preview-frame');
   const loading=document.getElementById('ed-preview-loading');
   if (!frame) return;
   if (loading) loading.style.display='flex';
-  const cfg = edGetConfig();
-  const siteHtml = generateSite(cfg, null, null, { editor: true });  // rend les blocs masqués (grisés)
+  let cfg = edGetConfig(), projects = null;
+  /* Les images pleine taille sont sur GitHub : on les remet en mémoire avant
+     de générer (miniatures sinon). Hors ligne → la miniature sert, sans erreur. */
+  if (window.HubImages) {
+    try { cfg = await HubImages.resolveCfg(cfg); projects = await HubImages.resolveProjects(getProjects()); } catch {}
+  }
+  if (!document.body.contains(frame)) return;
+  const siteHtml = generateSite(cfg, projects, null, { editor: true });  // rend les blocs masqués (grisés)
   if (_edBlobUrl) URL.revokeObjectURL(_edBlobUrl);
   const blob = new Blob([siteHtml],{type:'text/html'});
   _edBlobUrl = URL.createObjectURL(blob);
@@ -456,8 +467,14 @@ window.addEventListener('beforeunload', () => {
   if (document.getElementById('page-editor')?.classList.contains('active')) edSaveConfig(true);
 });
 
-function edPreviewExternal() {
-  const html=generateSite(edGetConfig()); const win=window.open('','_blank'); if(win){win.document.write(html);win.document.close();}
+async function edPreviewExternal() {
+  const win = window.open('','_blank');                 // OUVERT AVANT les awaits (anti-popup)
+  if (!win) return;
+  let cfg = edGetConfig(), projects = null;
+  if (window.HubImages) {
+    try { cfg = await HubImages.resolveCfg(cfg); projects = await HubImages.resolveProjects(getProjects()); } catch {}
+  }
+  win.document.write(generateSite(cfg, projects)); win.document.close();
 }
 
 /**
@@ -466,9 +483,14 @@ function edPreviewExternal() {
  * serveur), sans dépendre de souanpt.hub. Aucun compte, aucun backend requis.
  * Le rendu est celui du site PUBLIC (pas d'outils d'édition, blocs masqués absents).
  */
-function edExportSite() {
-  const cfg = edGetConfig();
-  const html = generateSite(cfg, null, null);          // sans {editor:true} = site public exact
+async function edExportSite() {
+  let cfg = edGetConfig(), projects = null;
+  /* Fichier autonome : les images pleine taille doivent être INLINÉES dedans
+     (sinon l'exporté afficherait les miniatures). */
+  if (window.HubImages) {
+    try { cfg = await HubImages.resolveCfg(cfg); projects = await HubImages.resolveProjects(getProjects()); } catch {}
+  }
+  const html = generateSite(cfg, projects, null);       // sans {editor:true} = site public exact
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
