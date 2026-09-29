@@ -110,6 +110,28 @@ backup.json            ancien format : plus écrit, toujours lu (restauration)
 Détails : `docs/audits/backup-unification.md` (T1+T2) et
 `docs/audits/github-source-de-verite.md` (T3).
 
+## Sécurité (P0)
+
+Trois failles corrigées en **v3.4.0** — détail, tests (59/59) et résidus dans
+`docs/audits/security-p0.md` :
+
+- **l'e-mail du compte n'est plus écrit en clair** dans `users/{uid}`, un
+  document lisible par tous (annuaire, `/u/<pseudo>`) : il reste dans Auth
+  Google, et une purge automatique le retire des documents déjà écrits ;
+- **le mot de passe d'un portail n'est plus écrit en clair** : ni dans
+  `portals/{id}` (lien du client, sans compte), ni dans la page publiée —
+  seul un SHA-256 itéré 4096× avec sel de 16 octets y figure ; le clair ne
+  quitte que le navigateur du propriétaire et les copies privées ;
+- **le relais `/u/<pseudo>` sert la page d'un créateur dans une origine
+  opaque** (`Content-Security-Policy: sandbox`) : son JavaScript ne peut plus
+  lire `localStorage`, donc plus voler le jeton GitHub du visiteur.
+
+⚠ Les règles Firestore ne sont **pas** déployées par la CI. Après chaque
+modification de `firebase/firestore.rules` : Firebase console → Firestore →
+**Règles** → coller → **Publier** (voir `firebase/FIREBASE.md` § étape 7).
+Les correctifs client ferment les trois failles sans elles ; les règles sont la
+seconde couche, contre un client obsolète ou une écriture malveillante.
+
 ## Pipeline de déploiement
 
 1 clic 🚀 Publier :

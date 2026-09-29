@@ -5,6 +5,10 @@ rules_version = '2';
 // les données d'un autre. Les profils, portails et avis publiés sont lisibles
 // publiquement (pour /@pseudo et les liens de portail sans compte), mais seuls
 // leurs propriétaires peuvent les modifier.
+//
+// P0 — un document public doit rester VIDE de secrets. Ces règles ne font que
+// verrouiller ce que le client écrit déjà : l'e-mail du profil et le mot de
+// passe du portail ne sont plus jamais acceptés en clair (voir plus bas).
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -14,10 +18,39 @@ service cloud.firestore {
     function isOwner()  { return signedIn() && request.auth.uid == resource.data.owner; }
     function creatingSelf() { return signedIn() && request.resource.data.owner == request.auth.uid; }
 
+    // ── P0 : interdiction d'écrire un secret dans un document public ──
+    // `users/{uid}` et `portals/{id}` sont en lecture ouverte (annuaire,
+    // liens de portail sans compte) : n'importe qui peut les récupérer avec la
+    // clé Web publique, sans authentification.
+    // · email  → reste dans Auth Google (la page Compte lit Cloud.user().email)
+    // · password → remplacé par passwordHash + passwordSalt (hachage itéré salé)
+    // Chaque variant tolère la VALEUR HÉRITÉE (doc publié avant la correction)
+    // et accepte sa SUPPRESSION — c'est ce qui rend la purge automatique au
+    // login possible. Il interdit en revanche d'en introduire un neuf.
+    function emailAllowed(d) {
+      return !('email' in d) || d.get('email','') == '';
+    }
+    function emailAllowedUpdate(prev, next) {
+      return !('email' in next) || next.get('email','') == ''
+          || prev.get('email','') == next.get('email','');
+    }
+    function passwordAllowed(d) {
+      return !('password' in d) || d.get('password','') == '';
+    }
+    function passwordAllowedUpdate(prev, next) {
+      return !('password' in next) || next.get('password','') == ''
+          || prev.get('password','') == next.get('password','');
+    }
+
     // Profil public (portfolio /@pseudo) — lecture ouverte, écriture propriétaire
     match /users/{uid} {
       allow read: if true;
-      allow write: if owns(uid);
+      // Une déclaration par opération : `resource.data` n'est jamais évalué
+      // sur une création (il n'existe pas encore), `request.resource` sur une
+      // suppression — sinon la condition ferait erreur et nierait l'accès.
+      allow create: if owns(uid) && emailAllowed(request.resource.data);
+      allow update: if owns(uid) && emailAllowedUpdate(resource.data, request.resource.data);
+      allow delete: if owns(uid);
 
       // Sous-collections privées de l'utilisateur
       match /{sub}/{docId} {
@@ -28,8 +61,9 @@ service cloud.firestore {
     // Portails clients — lisibles par tous (lien privé sans compte), écrits par le propriétaire
     match /portals/{id} {
       allow read: if true;
-      allow create: if creatingSelf();
-      allow update, delete: if isOwner();
+      allow create: if creatingSelf() && passwordAllowed(request.resource.data);
+      allow update: if isOwner() && passwordAllowedUpdate(resource.data, request.resource.data);
+      allow delete: if isOwner();
     }
 
     // Avis publiés — lisibles par tous, créés par un visiteur (validés ensuite), gérés par le propriétaire

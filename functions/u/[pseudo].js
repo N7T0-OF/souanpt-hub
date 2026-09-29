@@ -14,10 +14,24 @@
  * l'adresse affichée reste souanpt-hub.fr/u/<pseudo>. Une balise <base> est
  * injectée afin que les liens relatifs du site continuent de pointer vers
  * leur origine réelle.
+ *
+ * ⚠ P0 — relayer revient à exécuter le HTML d'AUTRUI sur NOTRE origine. Le
+ * JavaScript du créateur y aurait alors lu localStorage et volé les jetons des
+ * visiteurs (dont le jeton GitHub d'organisation, souanpt_auth_v2). La réponse
+ * porte donc un `Content-Security-Policy: sandbox` sans `allow-same-origin` :
+ * le document reçoit une ORIGINE OPAQUE, sans accès à notre localStorage, à nos
+ * cookies ni à nos service workers, pendant que scripts, formulaires et liens
+ * restent pleinement fonctionnels.
  */
 
 const FIRESTORE = 'https://firestore.googleapis.com/v1/projects/souanpt-hub/databases/(default)/documents:runQuery';
 const API_KEY   = 'AIzaSyCBe6IUWsTBJ0H29KNxw5qU3YiC32Nenvk';   // clé Web publique par conception
+
+// `sandbox` seul : aucune restriction de ressource (pas de default-src), donc
+// polices, images et scripts distants du site relayé continuent de charger.
+// allow-top-navigation = les liens du site peuvent naviguer l'onglet.
+const RELAY_CSP = 'sandbox allow-scripts allow-popups allow-forms allow-modals '
+                + 'allow-top-navigation allow-downloads';
 
 /** Valeur Firestore → valeur JS (on ne gère que ce dont on a besoin). */
 function val(v) {
@@ -28,18 +42,47 @@ function val(v) {
   return undefined;
 }
 
+/** Échappement d'attribut — la balise <base> reçoit une valeur de profil. */
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/** P0 : n'accepte que des URL http(s) réellement valides, normalisées par le
+ *  parseur d'URL du runtime. Tout le reste (javascript:, data:, forme
+ *  cassée…) est rejeté avant d'atteindre un fetch ou une redirection. */
+function safeUrl(raw) {
+  try {
+    const u = new URL(String(raw));
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    return u.href;
+  } catch { return ''; }
+}
+
 /** URL publique du créateur : domaine perso > site déclaré > GitHub Pages. */
 function siteUrl(u) {
   const dom = val(u.customDomain);
-  if (dom) return /^https?:\/\//.test(dom) ? dom : 'https://' + dom;
+  if (dom) {
+    const s = safeUrl(/^https?:\/\//.test(dom) ? dom : 'https://' + dom);
+    if (s) return s;
+  }
   const declared = val(u.siteUrl);
-  if (declared) return declared;
+  if (declared) {
+    const s = safeUrl(declared);
+    if (s) return s;
+  }
   const repo = val(u.repo);
   if (repo) {
     const [owner, name] = String(repo).split('/');
-    if (owner && name) return `https://${owner.toLowerCase()}.github.io/${name}/`;
+    if (owner && name) return safeUrl(`https://${owner.toLowerCase()}.github.io/${name}/`);
   }
   return '';
+}
+
+/** Redirection sûre : `Response.redirect` lève sur une URL non http(s). */
+function redirectTo(target) {
+  try { return Response.redirect(target, 302); }
+  catch { return page('Site injoignable', 'Ce site ne répond pas pour le moment.', 502); }
 }
 
 function page(title, message, code) {
@@ -100,15 +143,32 @@ export async function onRequestGet({ params }) {
   // on redirige plutôt que d'afficher une erreur — son site reste accessible.
   try {
     const upstream = await fetch(target, { cf: { cacheTtl: 60, cacheEverything: true } });
-    if (!upstream.ok) return Response.redirect(target, 302);
+    if (!upstream.ok) return redirectTo(target);
     let html = await upstream.text();
-    const base = `<base href="${target.endsWith('/') ? target : target + '/'}">`;
+    // La base est construite sur l'URL FINALE (après redirections), déjà
+    // normalisée par le parseur, puis échappée : une valeur de profil ne doit
+    // jamais casser hors de l'attribut href. On pointe sur le répertoire de la
+    // page pour que les liens relatifs restent sur l'origine du créateur —
+    // sauf quand l'URL finit déjà par un fichier.
+    const finalUrl = upstream.url || target;
+    const lastSeg = finalUrl.split('/').pop() || '';
+    const dirUrl  = (lastSeg.includes('.') || finalUrl.endsWith('/'))
+      ? finalUrl
+      : finalUrl + '/';
+    const base = `<base href="${esc(dirUrl)}">`;
     html = html.includes('<head>') ? html.replace('<head>', '<head>' + base) : base + html;
     return new Response(html, {
       status: 200,
-      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=60' },
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'public, max-age=60',
+        // P0 : origine opaque pour ce HTML tiers (voir l'en-tête du fichier).
+        'content-security-policy': RELAY_CSP,
+        'x-content-type-options': 'nosniff',
+        'referrer-policy': 'strict-origin-when-cross-origin',
+      },
     });
   } catch (e) {
-    return Response.redirect(target, 302);
+    return redirectTo(target);
   }
 }

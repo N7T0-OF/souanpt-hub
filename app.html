@@ -3002,6 +3002,17 @@ function portalSave() {
     note: document.getElementById('pt-note')?.value.trim()||'',
     deliverables: portalCollectDeliv(),
   };
+  // P0 #2 — le mot de passe en clair reste dans CE navigateur (et les copies
+  // privées : users/{uid}/data, dépôt de sauvegarde). Tout ce qui part en
+  // public (Firestore portals/{id}, page publiée sur GitHub Pages) n'embarque
+  // que l'hachage itéré salé. Effacer le mot de passe efface aussi le hachage.
+  if (data.password) {
+    data.passwordSalt = portalSalt();
+    data.passwordHash = portalPasswordHash(data.password, data.passwordSalt);
+    data.hashRounds = PORTAL_HASH_ROUNDS;
+  } else {
+    data.passwordSalt = ''; data.passwordHash = ''; data.hashRounds = 0;
+  }
   const portals = getPortals();
   if (_ptEditId) {
     const p = portals.find(x=>x.id===_ptEditId);
@@ -3045,7 +3056,13 @@ function portalUrlFor(id) { return location.origin + location.pathname.replace(/
 function portalRegen(id) {
   if(!confirm('Régénérer le lien ? L\'ancien lien cessera de fonctionner.')) return;
   const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
+  const oldId=p.id, wasPublished=!!p.publishedAt;
   p.id=randomId(16); p.publishedAt=0; setPortals(portals); renderPortals();
+  // P0 #2 : le document Firestore de l'ancien lien est LISIBLE PAR TOUS et
+  // garde l'ancien mot de passe — il faut le supprimer, sinon l'ancien lien
+  // continue de répondre (la promesse faite dans le confirm ci-dessus) et le
+  // secret reste exposé.
+  if (wasPublished && portalCloud()) Cloud.deletePortalDoc(oldId).catch(()=>{});
   showToast('Nouveau lien généré — clique « Publier »','#e4b24a',3000);
 }
 async function portalToggleActive(id) {
@@ -3117,7 +3134,7 @@ function renderPortals() {
     return `<div class="gc" style="padding:14px;${p.active===false?'opacity:.55':''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:160px">
-          <div style="font-size:13px;font-weight:700">${esc(p.mission)}${p.password?' <span title="Protégé par mot de passe">🔒</span>':''}${p.active===false?' <span style="color:var(--red);font-size:9px">DÉSACTIVÉ</span>':''}</div>
+          <div style="font-size:13px;font-weight:700">${esc(p.mission)}${(p.password||p.passwordHash)?' <span title="Protégé par mot de passe">🔒</span>':''}${p.active===false?' <span style="color:var(--red);font-size:9px">DÉSACTIVÉ</span>':''}</div>
           <div style="font-size:10px;color:var(--muted2)">${esc(p.client||'Sans client')} · ${stepLbl} · ${t.toLocaleString('fr')} € (solde ${solde.toLocaleString('fr')} €)</div>
         </div>
         <span style="font-size:9px;padding:3px 9px;border-radius:10px;background:${pub?'var(--green-dim)':'var(--gold-dim)'};color:${pub?'var(--green)':'var(--gold-l)'};font-weight:700">${pub?'En ligne':'Non publié'}</span>
@@ -3230,6 +3247,21 @@ async function afterGoogleLogin(user) {
   let prof = null, loadErr = false;
   try { prof = await Cloud.loadProfile(user.uid); } catch (e) { loadErr = true; console.warn('[profil]', e); }
   _myProfile = prof;
+  // P0 — purge des secrets déjà écrits en PUBLIC par les versions précédentes :
+  // e-mail du profil users/{uid}, mots de passe en clair des portails
+  // portals/{id}. Idempotent, et surtout NON BLOQUANT : on ne retarde jamais la
+  // connexion, la purge part en tâche de fond avec un plafond de 8 s.
+  if (prof) {
+    Promise.race([
+      Cloud.scrubPublicSecrets(),
+      new Promise(r => setTimeout(r, 8000)),
+    ]).then(s => {
+      if (s && s.cleaned) console.info('[sécurité] ' + s.cleaned + ' document(s) public(s) nettoyé(s)');
+      if (s && s.stale) setTimeout(() => showToast(
+        '⚠️ ' + s.stale + ' portail(s) publié(s) avant la mise à jour : republie-les pour retirer l’ancien mot de passe de la page en ligne.',
+        '#e4b24a', 7000), 1500);
+    }).catch(e => console.warn('[sécurité] purge impossible', e));
+  }
   if (prof && prof.pseudo) finishLogin(prof.pseudo);
   else if (!loadErr) pseudoShow(user);     // pas encore de profil → 1re connexion
   else finishLogin(null);                    // souci réseau → on entre quand même
@@ -3308,7 +3340,10 @@ async function pseudoClaim() {
     const u = _googleUser;
     await Cloud.saveProfile(u.uid, {
       uid: u.uid, owner: u.uid, pseudo,
-      email: u.email || '', name: u.displayName || '', avatar: u.photoURL || '',
+      // P0 #1 : PAS d'e-mail ici. Ce profil est en lecture publique (annuaire,
+      // API REST sans auth) — l'e-mail reste côté Auth Google et la page Compte
+      // le lit sur Cloud.user().email.
+      name: u.displayName || '', avatar: u.photoURL || '',
       createdAt: Date.now(),   // plus de champ `plan` : il n'y a plus d'offre payante
       // Champs classement (remplis au fil de l'activité)
       public: true, verified: false, country: '',

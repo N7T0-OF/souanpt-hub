@@ -192,6 +192,14 @@ const Cloud = {
   /* ── Portails sur Firestore (lecture publique → instantané, sans 404) ── */
   async savePortalDoc(p) {
     if (!this._user) throw new Error('Non connecté');
+    // P0 #2 — ce document est LISIBLE PAR TOUS (le lien du client n'a pas de
+    // compte) et le miroir `allow read: if true` le rendait consultable avec
+    // n'importe quelle clé Web publique. On n'y écrit donc JAMAIS le mot de
+    // passe en clair : seulement son hachage itéré salé.
+    // FieldValue.delete() efface l'éventuel `password` déposé par une version
+    // antérieure — un set(..., {merge:true}) ne supprime jamais un champ.
+    const gate = typeof portalGate === 'function' ? portalGate(p) : null;
+    if ((p.password || p.passwordHash) && !gate) throw new Error('Hachage du mot de passe indisponible');
     const doc = {
       id: p.id, owner: this._user.uid,
       mission: p.mission || '', client: p.client || '',
@@ -200,7 +208,10 @@ const Cloud = {
       note: p.note || '', deliverables: p.deliverables || [],
       // Pièces jointes = RÉFÉRENCES (id + url + méta), jamais le binaire.
       attachments: Array.isArray(p.attachments) ? p.attachments : [],
-      password: p.password || '', active: p.active !== false,
+      password: firebase.firestore.FieldValue.delete(),
+      passwordHash: gate ? gate.hash : '', passwordSalt: gate ? gate.salt : '',
+      hashRounds: gate ? gate.rounds : 0,
+      active: p.active !== false,
       siteName: p.siteName || '', accent: p.accent || '#C8FF00', theme: p.theme || '#060606',
       updatedAt: Date.now(),
     };
@@ -210,6 +221,70 @@ const Cloud = {
   async deletePortalDoc(id) {
     if (!this._user) return;
     try { await this._db.collection('portals').doc(id).delete(); } catch {}
+  },
+
+  /* ══════════════════════════════════════════════════════════════════
+     P0 — purge des secrets déjà écrites en PUBLIC (à chaque connexion)
+     ────────────────────────────────────────────────────────────────────
+     · users/{uid}  → champ `email` retiré. Ce profil est lisible par tous
+       (annuaire, API REST sans auth) : l'y laisser le rendait récupérable en
+       deux requêtes. L'e-mail reste dans Auth Google et la page Compte le lit
+       sur Cloud.user().email.
+     · portals/{id} → un éventuel `password` en clair est remplacé par son
+       hachage salé (document publié par une version antérieure).
+     Idempotent : chaque objet nettoyé est marqué localement (secretScrubbedAt)
+     puis plus rien n'est écrit au login suivant.
+     → { cleaned, stale } : `stale` = portails dont la PAGE GitHub publiée
+       (HTML public) date d'avant la correction et doit être republiée.
+  ══════════════════════════════════════════════════════════════════ */
+  async scrubPublicSecrets() {
+    const out = { cleaned: 0, stale: 0 };
+    if (!this.enabled || !this._user) return out;
+
+    try {
+      const ref = this._db.collection('users').doc(this._user.uid);
+      const snap = await ref.get();
+      if (snap.exists && snap.data().email) {
+        await ref.set({ email: firebase.firestore.FieldValue.delete() }, { merge: true });
+        out.cleaned++;
+        console.info('[sécurité] e-mail retiré du profil public');
+      }
+    } catch (e) { console.warn('[sync] purge e-mail', e); }
+
+    try {
+      if (typeof portalGate !== 'function') return out;          // core.js absent
+      const list = JSON.parse(localStorage.getItem('hub_portals') || '[]');
+      if (!Array.isArray(list)) return out;
+      const todo = list.filter(p => p && p.id && p.publishedAt && !p.secretScrubbedAt
+                                && (p.password || p.passwordHash));
+      if (!todo.length) return out;
+      // Avant mutation : un portail sans hachage local est une donnée d'avant
+      // la correction. Publié sur GitHub Pages → son HTML public embarque
+      // encore le mot de passe en clair jusqu'à la prochaine publication.
+      out.stale = todo.filter(p => !p.passwordHash && p.url
+                                && String(p.url).includes('github.io')).length;
+      for (const p of todo) {
+        const g = portalGate(p);
+        if (!g) continue;
+        p.passwordSalt = g.salt; p.passwordHash = g.hash; p.hashRounds = g.rounds;
+      }
+      for (const p of todo) {
+        try {
+          await this._db.collection('portals').doc(p.id).set({
+            owner: this._user.uid,
+            password: firebase.firestore.FieldValue.delete(),
+            passwordHash: p.passwordHash || '', passwordSalt: p.passwordSalt || '',
+            hashRounds: p.hashRounds || 0,
+            updatedAt: Date.now(),
+          }, { merge: true });
+          p.secretScrubbedAt = Date.now();
+          out.cleaned++;
+          console.info('[sécurité] mot de passe de portail haché : ' + p.id);
+        } catch (e) { console.warn('[sync] purge portail ' + p.id, e); }
+      }
+      if (todo.some(p => p.secretScrubbedAt)) localStorage.setItem('hub_portals', JSON.stringify(list));
+    } catch (e) { console.warn('[sync] purge portails', e); }
+    return out;
   },
 };
 

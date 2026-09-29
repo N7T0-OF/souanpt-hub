@@ -1856,6 +1856,113 @@ function randomId(len = 16) {
   return Array.from(a, b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   P0 #2 — mots de passe de portail HACHÉS (jamais en clair)
+   ────────────────────────────────────────────────────────────────────────
+   Deux endroits lisibles par tout le monde embarquent le portail :
+   Firestore `portals/{id}` (allow read: if true — le lien du client n'a pas
+   de compte) et la page publiée sur GitHub Pages. Y écrire le mot de passe
+   en clair le rendait lisible d'un simple view-source, sur les deux.
+   On n'y écrit / n'y affiche plus qu'un hachage itéré salé. Le mot de passe
+   en clair ne quitte jamais le navigateur du propriétaire : localStorage et
+   copies privées (users/{uid}/data, dépôt de sauvegarde privé).
+   ══════════════════════════════════════════════════════════════════════ */
+const PORTAL_HASH_ROUNDS = 4096;
+
+/* SHA-256 synchrone et AUTONOME : le générateur de portail rend une chaîne de
+   façon synchrone (deployPortal, document.write de portal.html) et ne peut donc
+   pas attendre `crypto.subtle`. La même fonction est copiée telle quelle dans la
+   page publiée via `String(sha256hex)` : elle ne doit rien capturer au-dessus
+   d'elle, sinon la source embarquée serait incomplète. */
+function sha256hex(str) {
+  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const bytes = [];
+  const s = String(str);
+  for (let i = 0; i < s.length; i++) {                       // → UTF-8
+    const c = s.charCodeAt(i);
+    if (c < 0x80) bytes.push(c);
+    else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) {
+      const lo = s.charCodeAt(i + 1);
+      const cp = 0x10000 + ((c - 0xd800) << 10) + (lo - 0xdc00);
+      bytes.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      i++;
+    } else bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+  }
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);            // bourrage jusqu'à 56 octets
+  bytes.push(0, 0, 0, 0, (bitLen >>> 24) & 255, (bitLen >>> 16) & 255, (bitLen >>> 8) & 255, bitLen & 255);
+  const H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w = new Array(64);
+  for (let off = 0; off < bytes.length; off += 64) {
+    for (let i = 0; i < 16; i++) {
+      const j = off + i * 4;
+      w[i] = ((bytes[j] << 24) | (bytes[j + 1] << 16) | (bytes[j + 2] << 8) | bytes[j + 3]) | 0;
+    }
+    for (let i = 16; i < 64; i++) {
+      const x = w[i - 15], y = w[i - 2];
+      const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+      const s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+    }
+    let a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (let i = 0; i < 64; i++) {
+      const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+      const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+      const mj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + mj) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+    H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+  let out = '';
+  for (let i = 0; i < 8; i++) out += ('00000000' + (H[i] >>> 0).toString(16)).slice(-8);
+  return out;
+}
+
+/** Sel aléatoire de 16 octets (hex) — un par portail. */
+function portalSalt() {
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  let s = '';
+  for (let i = 0; i < a.length; i++) s += ('0' + a[i].toString(16)).slice(-2);
+  return s;
+}
+
+/** Hachage itéré salé du mot de passe d'un portail (~2 ms). */
+function portalPasswordHash(pw, salt, rounds) {
+  let x = String(pw);
+  const n = Number(rounds) || PORTAL_HASH_ROUNDS;
+  for (let i = 0; i < n; i++) x = sha256hex(String(salt) + ':' + x);
+  return x;
+}
+
+/* Données du verrou à embarquer dans la page — JAMAIS le mot de passe en clair.
+   Une donnée locale non migrée (password seul) est hachée à la volée. */
+function portalGate(p) {
+  if (!p) return null;
+  if (p.passwordHash && p.passwordSalt) {
+    return { salt: String(p.passwordSalt), hash: String(p.passwordHash),
+             rounds: Number(p.hashRounds) || PORTAL_HASH_ROUNDS };
+  }
+  if (p.password) {
+    const salt = p.passwordSalt || portalSalt();
+    return { salt, hash: portalPasswordHash(p.password, salt), rounds: PORTAL_HASH_ROUNDS };
+  }
+  return null;
+}
+
 function generatePortal(p, cfg) {
   cfg = cfg || SiteConfig.get();
   const dark   = cfg.theme !== '#f8f8f8';
@@ -1941,7 +2048,8 @@ function generatePortal(p, cfg) {
   <footer class="foot">Propulsé par <a href="${HUB_HOME_URL}" target="_blank" rel="noopener">Souanpt HUB</a> · L'espace client des créatifs freelance</footer>
 </div>`;
 
-  const gate = p.password
+  const gateData = portalGate(p);
+  const gate = gateData
     ? `<div id="lock"><div class="lockbox"><div class="brand" style="justify-content:center;margin-bottom:8px"><span class="ic">✳</span> ${esc(cfg.siteName || 'FOLIO')}</div><div class="muted sm" style="text-align:center;margin-bottom:14px">Cet espace est protégé par un mot de passe.</div><input id="pw" type="password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')chk()"><button onclick="chk()">Déverrouiller</button><div id="pwmsg" class="muted sm" style="text-align:center;margin-top:8px;min-height:14px"></div></div></div>` : '';
 
   return `<!DOCTYPE html>
@@ -1992,9 +2100,13 @@ h1{font-size:clamp(24px,5vw,32px);font-weight:800;letter-spacing:-1px;margin:2px
 </style></head><body>
 ${gate}
 ${body}
-${p.password ? `<script>
+${gateData ? `<script>
+/* P0 : le mot de passe n'est jamais écrit dans la page, seulement son
+   hachage itéré salé. On vérifie en recalculant le même nombre de tours. */
+${String(sha256hex)}
+var GATE=${JSON.stringify(gateData)};
 document.querySelector('.wrap').style.display='none';
-function chk(){var v=document.getElementById('pw').value;if(v===${JSON.stringify(String(p.password))}){document.getElementById('lock').style.display='none';document.querySelector('.wrap').style.display='';}else{document.getElementById('pwmsg').textContent='Mot de passe incorrect';}}
+function chk(){var v=document.getElementById('pw').value,x=v,i;for(i=0;i<GATE.rounds;i++)x=sha256hex(GATE.salt+':'+x);if(x===GATE.hash){document.getElementById('lock').style.display='none';document.querySelector('.wrap').style.display='';}else{document.getElementById('pwmsg').textContent='Mot de passe incorrect';}}
 </script>` : ''}
 </body></html>`;
 }

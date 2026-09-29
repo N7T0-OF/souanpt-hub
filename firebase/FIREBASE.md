@@ -34,6 +34,25 @@ que souanpt.hub.
 7. Onglet **Règles** de Firestore → colle le contenu de `firestore.rules`.
    Onglet **Règles** de Storage → colle `storage.rules`.
 
+   ⚠ **Étape manuelle, à refaire à chaque modification** : rien ne déploie ces
+   règles depuis le dépôt (pas de `firebase.json`, pas de CI Firebase). Tant que
+   tu ne re-colles pas le fichier, l'ancien texte reste actif en production.
+
+### Deux champs interdits dans les documents publics (P0)
+
+`users/{uid}` (annuaire, `/u/<pseudo>`) et `portals/{id}` (lien du client, sans
+compte) sont **lisibles par tout le monde** avec la seule clé Web publique. Les
+règles refusent donc d'y écrire un secret :
+
+| Document | Interdit en clair | À la place |
+|---|---|---|
+| `users/{uid}` | `email` | rien — l'e-mail reste dans Auth Google (page Compte) |
+| `portals/{id}` | `password` | `passwordHash` + `passwordSalt` (SHA-256 itéré 4096×, sel 16 octets) |
+
+Un champ hérité d'une version antérieure reste lisible tel quel **ou peut être
+supprimé** — c'est ce qui rend possible la purge automatique faite au login.
+Détails et tests : `docs/audits/security-p0.md`.
+
 Quand `firebase-config.js` contient de vraies valeurs, dis-le moi : j'activerai alors
 l'authentification GitHub et la synchronisation Firestore (mode CLOUD), avec import
 automatique de tes données actuelles (via l'export JSON déjà en place).
