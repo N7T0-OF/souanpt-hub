@@ -4,9 +4,10 @@ Trois failles de priorité **P0** relevées lors de l'audit `github-source-de-ve
 (§ « à faire ») et corrigées dans cette version. Elles ont un même point commun :
 **de l'écriture destinée à un propriétaire s'est retrouvée lisible par n'importe qui.**
 
-- Sortie : `v3.4.0`
+- Sortie : `v3.4.0` — commit `8dbf89f`, Pages run `36616075362` (succès, vérifié en ligne)
 - Tests : **59 / 59** (page de test locale, non publiée — détail § Tests)
-- Déploiement client : automatique (GitHub Pages, Cloudflare Pages Functions)
+- Déploiement GitHub Pages (`app.html`, `js/*.js`) : **automatique** ✓ vérifié
+- Déploiement Cloudflare (le relais `/u/`) : **à vérifier** — voir § Déploiement
 - Déploiement des règles Firestore : **MANUEL** — voir § Déploiement
 
 ---
@@ -183,9 +184,37 @@ pas affecté.
 
 | Élément | Déploiement | Statut |
 |---|---|---|
-| `app.html`, `js/*.js` | GitHub Pages (`main` → build) | automatique |
-| `functions/u/[pseudo].js` | Cloudflare Pages Functions (build du dépôt) | automatique |
+| `app.html`, `js/*.js` | GitHub Pages (`main` → build) | ✅ **automatique** — run `36616075362`, `success` ; les 3 fichiers vérifiés en ligne (contiennent `sha256hex`, `scrubPublicSecrets`, le bloc P0) |
+| `functions/u/[pseudo].js` | Cloudflare Pages Functions | ⚠ **à vérifier** (voir ci-dessous) |
 | `firebase/firestore.rules` | **Rien ne le déploie** (pas de `firebase.json`, pas de CI Firebase) | ⚠ **manuel** |
+
+### ⚠ Le relais `/u/` est le seul correctif pas encore vérifié en ligne
+
+`cloudflare/README.md` §1 décrit un projet Pages **connecté au repo** (chaque
+push redéploie) — dans ce cas, `functions/u/[pseudo].js` part automatiquement.
+Mais `deploy-cloudflare.ps1` décrit un déploiement **direct via wrangler**
+(« sans GitHub »), qui demande Node.js : ni l'un ni l'autre n'est vérifiable
+depuis cette machine (DNS de `souanpt-hub.fr` / `souanpt*.pages.dev` non
+résoluble ici, pas de CLI Cloudflare).
+
+**À faire une fois** : ouvrir le site en production et contrôler qu'une page
+`/u/<pseudo>` renvoie bien
+
+```
+content-security-policy: sandbox allow-scripts allow-popups allow-forms allow-modals allow-top-navigation allow-downloads
+x-content-type-options: nosniff
+```
+
+Si le projet Pages n'est pas connecté au repo, lancer `.\deploy-cloudflare.ps1`
+(Node requis) : le dossier `functions/` n'est **pas** exclu de la copie publiée
+(`robocopy`, `deploy-cloudflare.ps1:29-31`) — mais rien ne prouve ici que
+`wrangler pages deploy` en embarque la construction. En cas de doute, appliquer
+la configuration de `cloudflare/README.md` §1 (projet **Connect to Git**) : c'est
+la seule qui garantisse que `functions/` part à chaque push.
+
+Tant que ce n'est pas déployé, la faille 3 reste ouverte **sur le domaine de
+production** : les failles 1 et 2, elles, sont closes par le client GitHub Pages
+(déjà en ligne).
 
 ### ⚠ Action manuelle requise
 

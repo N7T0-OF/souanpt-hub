@@ -132,6 +132,11 @@ modification de `firebase/firestore.rules` : Firebase console → Firestore →
 Les correctifs client ferment les trois failles sans elles ; les règles sont la
 seconde couche, contre un client obsolète ou une écriture malveillante.
 
+⚠ Le correctif du relais `/u/` vit dans `functions/` : il ne prend effet qu'une
+fois Cloudflare Pages redéployé (projet connecté au repo, ou
+`deploy-cloudflare.ps1`). Vérification et configuration :
+`docs/audits/security-p0.md` § Déploiement.
+
 ## Pipeline de déploiement
 
 1 clic 🚀 Publier :
