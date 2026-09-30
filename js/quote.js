@@ -1314,6 +1314,23 @@ const NOTIFY_EVENTS = [
   ['delivery.unlocked', 'Livraison débloquée'],
 ];
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Versions publiées — UNE ligne par release, la PREMIÈRE fait foi :
+   `HUB_VERSION` en découle, donc l'annonce ne peut jamais partir d'une
+   version obsolète. C'est ce tableau qui alimente la notification
+   « 📦 Nouvelle version » de la catégorie GÉNÉRALE du centre de
+   notifications : interne, locale, gratuite — rien ne part vers le Worker ni
+   vers Firestore, et elle s'affiche même sans être connecté.
+   À chaque release : prépendre une ligne ici (et rien d'autre).
+══════════════════════════════════════════════════════════════════════════ */
+const HUB_VERSIONS = [
+  ['3.8.1', "Le centre de notification annonce désormais chaque nouvelle version (catégorie Générale)."],
+  ['3.8.0', "Observatoire du dossier client : audit des rattachements, réparation additive et rapport copiable."],
+  ['3.7.0', "ClientWorkspace : un dossier unique par projet, migration non destructive."],
+];
+const HUB_VERSION = HUB_VERSIONS[0][0];
+const HUB_RELEASE_URL = v => `https://github.com/N7T0-OF/souanpt-hub/releases/tag/v${v}`;
+
 const Notify = {
   cfg() {
     const c = SiteConfig.get().notify || {};
@@ -1362,19 +1379,76 @@ const Notify = {
     }
   },
 
+  /* ── Annonces générales (LOCALES : une par version publiée) ─────────────
+     État lu/archivé stocké sur l'appareil, comme `hub_notified` — ce sont
+     des messages d'information, pas des événements métier : pas de
+     sauvegarde GitHub ni de miroir Firestore à prévoir. */
+  _sysKey: 'hub_sys_notifs',
+  _sysAll() { try { return JSON.parse(localStorage.getItem(this._sysKey) || '[]') || []; } catch { return []; } },
+  _sysSave(list) { try { localStorage.setItem(this._sysKey, JSON.stringify(list.slice(0, 20))); } catch {} },
+  sys() { return this._sysAll().filter(n => !n.archivedAt).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); },
+  _sysPatch(id, patch) {
+    const all = this._sysAll();
+    const i = all.findIndex(n => n.id === id); if (i < 0) return false;
+    all[i] = { ...all[i], ...patch };
+    this._sysSave(all);
+    return true;
+  },
+  /** Pose l'annonce « Nouvelle version » si le visiteur n'a pas encore vu
+      HUB_VERSION. Idempotent (id déterministe) et jamais bloquant. */
+  checkVersion() {
+    try {
+      const id = 'sys-v' + HUB_VERSION;
+      if (localStorage.getItem('hub_seen_version') === HUB_VERSION) return null;
+      localStorage.setItem('hub_seen_version', HUB_VERSION);
+      if (this._sysAll().some(n => n.id === id)) return null;   // déjà posée
+      const note = HUB_VERSIONS.find(v => v[0] === HUB_VERSION);
+      this._sysSave([{
+        id, local: true, event: 'app.version', category: 'general',
+        title: '📦 Nouvelle version v' + HUB_VERSION,
+        message: note ? note[1] : 'Mise à jour appliquée.',
+        link: HUB_RELEASE_URL(HUB_VERSION),
+        createdAt: Date.now(),
+      }, ...this._sysAll()]);
+      return id;
+    } catch { return null; }                     // stockage plein/cloisonné
+  },
+
   /* ── Boîte de réception interne ─────────────────────────────────────── */
   _inbox: [], _unread: 0,
   async loadInbox() {
-    if (!(window.Cloud && Cloud.enabled && Cloud.user())) return;
+    /* Les annonces locales sont TOUJOURS présentes (connectée ou non) : c'est
+       la boîte cloud Firestore qui vient s'y AJOUTER. Avant, la fonction
+       s'arrêtait net sans utilisateur Google et la cloche restait muette. */
+    const local = this.sys();
+    if (!(window.Cloud && Cloud.enabled && Cloud.user())) {
+      this._inbox = local;
+      this._unread = local.filter(n => !n.readAt).length;
+      this.renderBell();
+      return;
+    }
     try {
       const snap = await Cloud._db.collection('notifications')
         .where('ownerId', '==', Cloud.user().uid).limit(60).get();
-      this._inbox = [];
-      snap.forEach(d => this._inbox.push({ id: d.id, ...d.data() }));
-      this._inbox = this._inbox.filter(n => !n.archivedAt).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const remote = [];
+      snap.forEach(d => remote.push({ id: d.id, ...d.data() }));
+      this._inbox = [...local, ...remote.filter(n => !n.archivedAt)]
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       this._unread = this._inbox.filter(n => !n.readAt).length;
       this.renderBell();
-    } catch (e) { console.warn('[notify] boîte de réception', e); }
+    } catch (e) {
+      console.warn('[notify] boîte de réception', e);
+      this._inbox = local;                      // cloud en panne → local quand même
+      this._unread = local.filter(n => !n.readAt).length;
+      this.renderBell();
+    }
+  },
+  /** Démarrage : annonce de version + première peinture de la cloche. */
+  init() {
+    this.checkVersion();
+    this.loadInbox().then(() => this.renderInbox()).catch(() => {});
+    const v = document.getElementById('nt-ver');
+    if (v) v.textContent = 'v' + HUB_VERSION;
   },
   renderBell() {
     const b = document.getElementById('nt-bell-count'); if (!b) return;
@@ -1384,6 +1458,7 @@ const Notify = {
   async markRead(id) {
     const n = this._inbox.find(x => x.id === id); if (!n || n.readAt) return;
     n.readAt = Date.now(); this._unread = Math.max(0, this._unread - 1); this.renderBell(); this.renderInbox();
+    if (n.local) { this._sysPatch(id, { readAt: n.readAt }); return; }   // annonce locale
     try { await Cloud._db.collection('notifications').doc(id).set({ readAt: n.readAt }, { merge: true }); } catch (e) {}
   },
   async markAllRead() {
@@ -1391,6 +1466,7 @@ const Notify = {
     todo.forEach(n => { n.readAt = Date.now(); });
     this._unread = 0; this.renderBell(); this.renderInbox();
     for (const n of todo) {
+      if (n.local) { this._sysPatch(n.id, { readAt: n.readAt }); continue; }
       try { await Cloud._db.collection('notifications').doc(n.id).set({ readAt: n.readAt }, { merge: true }); } catch (e) {}
     }
     showToast?.('Tout marqué comme lu ✓', '#666', 2000);
@@ -1401,6 +1477,7 @@ const Notify = {
     this._inbox = this._inbox.filter(x => x.id !== id);
     this.renderBell(); this.renderInbox();
     // Archivage LOGIQUE : le document reste, il sort simplement de la liste.
+    if (n.local) { this._sysPatch(id, { archivedAt: Date.now() }); return; }
     try { await Cloud._db.collection('notifications').doc(id).set({ archivedAt: Date.now() }, { merge: true }); } catch (e) {}
   },
   _filter: 'all',
@@ -1425,6 +1502,7 @@ const Notify = {
           <div class="nt-d">${QuoteUI._when(n.createdAt)}</div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
+          ${n.link ? `<a class="btn btn-ghost" style="font-size:9px;padding:3px 7px" href="${esc(n.link)}" target="_blank" rel="noopener" onclick="Notify.markRead('${esc(n.id)}')">Voir la release</a>` : ''}
           ${n.workspaceId ? `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.open('${esc(n.id)}','${esc(n.workspaceId)}')">Ouvrir</button>` : ''}
           ${n.readAt ? '' : `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.markRead('${esc(n.id)}')" title="Marquer comme lu">✓</button>`}
           <button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.archive('${esc(n.id)}')" title="Archiver">✕</button>

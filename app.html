@@ -1322,12 +1322,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <button class="btn btn-ghost nt-bell" onclick="Notify.toggleInbox()" title="Notifications">🔔<span class="nbadge" id="nt-bell-count" style="display:none"></span></button>
       <div class="nt-panel" id="nt-panel" style="display:none">
         <div class="nt-head">
-          <b>Notifications</b>
+          <b>Notifications<span id="nt-ver" style="font-size:9px;color:var(--muted2);font-weight:600;margin-left:6px"></span></b>
           <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="Notify.markAllRead()">Tout marquer comme lu</button>
         </div>
         <div class="nt-filters">
           <button onclick="Notify.setFilter('all')">Toutes</button>
           <button onclick="Notify.setFilter('unread')">Non lues</button>
+          <button onclick="Notify.setFilter('general')">Générale</button>
           <button onclick="Notify.setFilter('requests')">Demandes</button>
           <button onclick="Notify.setFilter('estimates')">Estimations</button>
           <button onclick="Notify.setFilter('missions')">Missions</button>
@@ -3727,6 +3728,9 @@ function openClientForm() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Annonce de version : pose (une seule fois par version) la notification
+  // « 📦 Nouvelle version » dans la catégorie Générale et peint la cloche.
+  try { window.Notify && Notify.init(); } catch (e) { console.warn('[notify] init', e); }
   // T5 : état du relais (connexion sans token) — sondage déjà lancé par gh-auth.js
   if (typeof GhSession !== 'undefined') { GhSession.onChange = renderGhConnectState; renderGhConnectState(); }
   // Auth : Google (Firebase) en principal si configuré, sinon token GitHub
