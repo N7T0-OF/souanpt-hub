@@ -255,10 +255,23 @@
       }
       this.save(list);                   // UNE écriture
       this._lastReport = rep;
+      this._pushRun(rep);
       if (rep.created || rep.invoices || rep.portals || rep.ambiguous)
         console.log('[client-workspace] migration', JSON.stringify(rep));
       return rep;
     },
+
+    /* Journal des passes (max 20) : c'est CE que la migration a fait, alors
+       que `audit()` décrit l'état ACTUEL — les deux se lisent dans le panneau
+       de validation. */
+    _pushRun(rep) {
+      try {
+        const runs = read('hub_ws_runs', []);
+        runs.unshift({ at: Date.now(), rep: Object.assign({}, rep) });
+        write('hub_ws_runs', runs.slice(0, 20));
+      } catch { /* diagnostic : jamais bloquant */ }
+    },
+    runs() { return read('hub_ws_runs', []); },
 
     /* ── le dossier ─────────────────────────────────────────────────────── */
     /** Rassemble toutes les pièces d'un projet : local d'abord, cloud en
@@ -277,12 +290,28 @@
       const ests     = read('hub_estimates', []);
       const roster   = read('hub_clients', []);
 
-      const attached  = invoices.filter(i => i.workspaceId === token);
-      const candidates = invoices.filter(i => !i.workspaceId && norm(i.client) && norm(i.client) === norm(w.clientName));
+      /* Lecture PAR RÉFÉRENCE : `workspaceId` (écrit sur la pièce) ∪ `refs`
+         (écrit sur le dossier) — `audit()` signale ceux des deux signaux qui
+         divergent, `resync()` les remet d'accord.
+         Le filtre par nom qui suit ne sert plus qu'aux pièces ENCORE LIBRES :
+         c'est l'ancienne jointure, tolérée pendant la transition et appelée à
+         disparaître en v3.9 — jamais la voie normale de lecture. */
+      const refIds = new Set((w.refs && Array.isArray(w.refs.invoices)) ? w.refs.invoices : []);
+      const attached = invoices.filter(i => i.workspaceId === token || (refIds.has(i.id) && !i.workspaceId));
+      const candidates = invoices.filter(i => !i.workspaceId && !refIds.has(i.id)
+        && norm(i.client) && norm(i.client) === norm(w.clientName));
       const portal = portals.find(p => p.id === token || p.workspaceId === token) || null;
       const est = ests.find(e => e.code === token) || null;
       const client = roster.find(c => norm(c.name) === norm(w.clientName)) || null;
       const siblings = this.all().filter(x => x.token !== token && norm(x.clientName) === norm(w.clientName));
+
+      /* Références du dossier dont la pièce n'existe plus (signalées, jamais
+         supprimées d'elles-mêmes : retrait = action explicite de l'utilisateur) */
+      const known = new Set(invoices.map(i => i.id));
+      const broken = [];
+      if (w.refs && w.refs.portal && !portals.some(p => p.id === w.refs.portal))
+        broken.push({ kind: 'portal', id: w.refs.portal });
+      refIds.forEach(id => { if (!known.has(id)) broken.push({ kind: 'invoice', id }); });
 
       let req = null, estDoc = null;
       if (this._cloudOk()) {
@@ -298,7 +327,7 @@
       vias.push('token');
       return {
         w, client, portal, est, estDoc, req, siblings,
-        invoices: attached, candidates,
+        invoices: attached, candidates, broken,
         stage: STAGE_META[w.stage] || STAGE_META.request,
         via: [...new Set(vias)].join(' + '),
         totals: {
@@ -363,6 +392,229 @@
         } catch { /* dégradation douce : le prochain push de migration rattrapera */ }
       }
       return this.open(token);
+    },
+
+    /* ── validation (v3.8) : ce que les VRAIES données donnent ───────────── */
+    /**
+     * État ACTUEL, non destructif. `_pushRun()` raconte ce que la migration a
+     * FAIT ; `audit()` répond « qu'est-ce qui reste à traiter » — c'est ce que
+     * le panneau affiche et ce qu'on te demandera de copier pour la validation
+     * sur données réelles.
+     * @returns {Object} rapport JSON copiable
+     */
+    audit() {
+      const ws  = this.all();
+      const inv = read('hub_invoices', []);
+      const por = read('hub_portals', []);
+      const tokens = new Set(ws.map(w => w.token));
+
+      // Nom de client → dossiers portant ce nom (la vieille jointure, mesurée).
+      const byName = new Map();
+      ws.forEach(w => {
+        const k = norm(w.clientName); if (!k) return;
+        if (!byName.has(k)) byName.set(k, []);
+        byName.get(k).push(w.token);
+      });
+
+      /* Pièces : rattachées (workspaceId → dossier existant) vs encore libres,
+         et POURQUOI elles le sont (aucun dossier / nom partagé / en attente). */
+      const classify = arr => {
+        const out = { total: arr.length, rattachees: 0, via: { token: 0, name: 0, manual: 0, ref: 0 },
+                      libres: 0, aAttacher: 0, orphelines: [], ambigues: [] };
+        arr.forEach(it => {
+          if (!it) return;
+          if (it.workspaceId) {
+            if (tokens.has(it.workspaceId)) {
+              out.rattachees++;
+              const v = it.linkVia || 'token';
+              out.via[v] = (out.via[v] || 0) + 1;
+            }
+            return;                       // dossier fantôme → traité dans refs
+          }
+          out.libres++;
+          const c = norm(it.client) ? (byName.get(norm(it.client)) || []) : [];
+          if (!norm(it.client)) return;   // sans client : rien à joindre
+          if (c.length === 1) out.aAttacher++;
+          else if (c.length > 1) out.ambigues.push({ id: it.id, name: it.name, n: c.length });
+          else out.orphelines.push({ id: it.id, name: it.name, client: it.client });
+        });
+        return out;
+      };
+
+      /* Les deux signaux de référence, confrontés pièce par pièce :
+         cassees   = refs pointant vers une pièce qui n'existe plus (retrait
+                     EXPLICITE via dropRef, jamais automatique)
+         manquantes= pièce rattachée mais absente de refs (resync l'ajoute)
+         conflits  = refs dit A, la pièce dit B (jamais corrigé tout seul)   */
+      const invById = new Map(inv.map(i => [i.id, i]));
+      const porById = new Map(por.map(p => [p.id, p]));
+      const refs = { cassees: [], manquantes: [], conflits: [], sansWorkspaceId: [] };
+      ws.forEach(w => {
+        const r = w.refs || {};
+        const inRef = Array.isArray(r.invoices) ? r.invoices : [];
+        if (r.portal && !porById.has(r.portal)) refs.cassees.push({ token: w.token, kind: 'portal', id: r.portal });
+        inRef.forEach(id => {
+          const it = invById.get(id);
+          if (!it) refs.cassees.push({ token: w.token, kind: 'invoice', id });
+          else if (!it.workspaceId) refs.sansWorkspaceId.push({ token: w.token, kind: 'invoice', id });
+          else if (it.workspaceId !== w.token) refs.conflits.push({ token: w.token, kind: 'invoice', id, autre: it.workspaceId });
+        });
+        const set = new Set(inRef);
+        inv.forEach(i => { if (i.workspaceId === w.token && !set.has(i.id)) refs.manquantes.push({ token: w.token, kind: 'invoice', id: i.id }); });
+        const p = por.find(x => x.id === w.token || x.workspaceId === w.token);
+        if (p && r.portal !== p.id) refs.manquantes.push({ token: w.token, kind: 'portal', id: p.id });
+      });
+      // Pièce marquée d'un dossier qui n'existe (plus) nulle part.
+      const fantomes = [
+        ...inv.filter(i => i.workspaceId && !tokens.has(i.workspaceId)).map(i => ({ kind: 'invoice', id: i.id, token: i.workspaceId })),
+        ...por.filter(p => p.workspaceId && !tokens.has(p.workspaceId)).map(p => ({ kind: 'portal', id: p.id, token: p.workspaceId })),
+      ];
+
+      const byStage = {};
+      ws.forEach(w => { byStage[w.stage || 'request'] = (byStage[w.stage || 'request'] || 0) + 1; });
+
+      return {
+        at: Date.now(),
+        ws:   { total: ws.length, byStage,
+                sansClient: ws.filter(w => !norm(w.clientName)).length,
+                sansProjet: ws.filter(w => !norm(w.projectName)).length },
+        inv:  classify(inv),
+        por:  classify(por),
+        refs, fantomes,
+        runs: this.runs(),
+        ok: !refs.cassees.length && !refs.conflits.length && !fantomes.length,
+      };
+    },
+
+    /** Complète / répare les références. AJOUTE UNIQUEMENT : ne supprime ni
+        pièce ni référence (le retrait d'une référence cassée est `dropRef`,
+        un clic explicite de l'utilisateur). */
+    resync() {
+      const rep = { refsAjoutees: 0, wsRestaurees: 0, conflits: 0, introuvables: 0 };
+      const list = this.all();
+      const inv = read('hub_invoices', []);
+      const por = read('hub_portals', []);
+      let invDirty = false, porDirty = false;
+
+      list.forEach(w => {
+        w.refs = w.refs || {};
+        const set = new Set(Array.isArray(w.refs.invoices) ? w.refs.invoices : []);
+
+        // a) toute pièce marquée de ce dossier doit figurer dans ses refs
+        inv.forEach(i => { if (i.workspaceId === w.token && !set.has(i.id)) { set.add(i.id); rep.refsAjoutees++; } });
+        const p = por.find(x => x.id === w.token || x.workspaceId === w.token);
+        if (p) {
+          if (w.refs.portal !== p.id) { w.refs.portal = p.id; rep.refsAjoutees++; }
+          if (p.id === w.token && !p.workspaceId) { this._stamp(p, w.token, 'token'); rep.wsRestaurees++; porDirty = true; }
+        }
+
+        // b) toute référence dont la pièce n'a AUCUN dossier → workspaceId restauré
+        [...set].forEach(id => {
+          const it = inv.find(x => x.id === id);
+          if (!it) { rep.introuvables++; return; }              // cassée : à trancher à la main
+          if (it.workspaceId && it.workspaceId !== w.token) { rep.conflits++; return; }
+          if (!it.workspaceId) { this._stamp(it, w.token, 'ref'); rep.wsRestaurees++; invDirty = true; }
+        });
+        w.refs.invoices = [...set];
+      });
+
+      if (invDirty) write('hub_invoices', inv);
+      if (porDirty) write('hub_portals', por);
+      this.save(list);
+      this._pushRun({ at: Date.now(), resync: rep });
+      return rep;
+    },
+
+    /** Retrait EXPLICITE d'une référence cassée (aucune écriture ailleurs). */
+    dropRef(token, kind, id) {
+      const list = this.all();
+      const w = list.find(x => x.token === token); if (!w) return false;
+      w.refs = w.refs || {};
+      if (kind === 'portal') { if (w.refs.portal !== id) return false; w.refs.portal = ''; }
+      else {
+        if (!Array.isArray(w.refs.invoices) || !w.refs.invoices.includes(id)) return false;
+        w.refs.invoices = w.refs.invoices.filter(x => x !== id);
+      }
+      w.updatedAt = Date.now();
+      this.save(list);
+      this._pushRun({ at: Date.now(), dropRef: { token, kind, id } });
+      return true;
+    },
+
+    /* ── panneau de validation (vue « Clients ») ──────────────────────────── */
+    valPanel() {
+      if (!this.all().length) return '';     // rien à valider = pas de bruit
+      return `<div class="cw-val" id="cw-val">${this._valInner(this.audit())}</div>`;
+    },
+    paintValidation() {
+      const el = document.getElementById('cw-val');
+      if (el) el.innerHTML = this._valInner(this.audit());
+    },
+    _valInner(a) {
+      const n = x => `<b>${x}</b>`;
+      const li = (arr, txt) => arr.length
+        ? arr.slice(0, 3).map(x => `<div class="cw-val-li">• ${txt(x)}</div>`).join('')
+          + (arr.length > 3 ? `<div class="cw-val-li">… et ${arr.length - 3}</div>` : '')
+        : '';
+      const attached = a.inv.rattachees + a.por.rattachees;
+      const viaTxt = ['token', 'name', 'manual', 'ref'].filter(k => a.inv.via[k] || a.por.via[k])
+        .map(k => `${k} ${a.inv.via[k] + a.por.via[k]}`).join(' · ');
+
+      const issues = [
+        li(a.inv.orphelines, x => `${n(esc(x.name || x.id))} — client <i>${esc(x.client)}</i> sans dossier`),
+        li(a.por.orphelines, x => `portail ${n(esc(x.id))} — client <i>${esc(x.client)}</i> sans dossier`),
+        li(a.inv.ambigues,   x => `facture ${n(esc(x.name || x.id))} — ${x.n} dossiers portent ce nom`),
+        li(a.refs.cassees,   x => `${x.kind === 'portal' ? 'portail' : 'facture'} <code>${esc(x.id)}</code> introuvable`
+            + ` <button class="cw-mini-btn" onclick="ClientWorkspace.dropRef('${esc(x.token)}','${esc(x.kind)}','${esc(x.id)}');ClientWorkspace.paintValidation()">retirer</button>`),
+        li(a.refs.conflits,  x => `<code>${esc(x.id)}</code> porte déjà le dossier <code>${esc(x.autre)}</code>`),
+        li(a.fantomes,       x => `${x.kind === 'portal' ? 'portail' : 'facture'} <code>${esc(x.id)}</code> → dossier <code>${esc(x.token)}</code> absent`),
+      ].join('');
+
+      const last = a.runs[0];
+      return `
+        <div class="cw-val-h">
+          <span><b>🔍 Validation des rattachements</b>
+            <span class="cw-val-sub">${n(a.ws.total)} dossier${a.ws.total > 1 ? 's' : ''} ·
+              ${a.inv.total} facture${a.inv.total > 1 ? 's' : ''} · ${a.por.total} portail${a.por.total > 1 ? 's' : ''}</span></span>
+          <span class="cw-val-ok ${a.ok ? 'yes' : 'no'}">${a.ok ? '✔ cohérent' : '⚠ à vérifier'}</span>
+        </div>
+        <div class="cw-val-b">
+          <div class="cw-val-li">• ${n(attached)} pièce${attached > 1 ? 's' : ''} rattachée${attached > 1 ? 's' : ''}${viaTxt ? ` <span class="cw-val-via">(${esc(viaTxt)})</span>` : ''}</div>
+          ${a.inv.aAttacher + a.por.aAttacher ? `<div class="cw-val-li">• ${n(a.inv.aAttacher + a.por.aAttacher)} à rattacher à la prochaine passe <span class="cw-val-via">(nom de client à dossier unique)</span></div>` : ''}
+          ${a.inv.libres && !a.inv.aAttacher && !a.inv.orphelines.length && !a.inv.ambigues.length ? `<div class="cw-val-li">• ${n(a.inv.libres)} facture${a.inv.libres > 1 ? 's' : ''} sans client</div>` : ''}
+          ${issues}
+          ${a.refs.manquantes.length ? `<div class="cw-val-li">• ${n(a.refs.manquantes.length)} référence${a.refs.manquantes.length > 1 ? 's' : ''} manquante${a.refs.manquantes.length > 1 ? 's' : ''} dans les dossiers</div>` : ''}
+          ${a.refs.sansWorkspaceId.length ? `<div class="cw-val-li">• ${n(a.refs.sansWorkspaceId.length)} pièce${a.refs.sansWorkspaceId.length > 1 ? 's' : ''} référencée${a.refs.sansWorkspaceId.length > 1 ? 's' : ''} mais sans <code>workspaceId</code></div>` : ''}
+        </div>
+        <div class="cw-val-a">
+          <button class="cw-btn sm" onclick="ClientWorkspace.rerunMigration()">↻ Relancer la migration</button>
+          ${(a.refs.manquantes.length || a.refs.sansWorkspaceId.length) ? `<button class="cw-btn sm" onclick="ClientWorkspace.resyncRefs()">🧩 Compléter les références</button>` : ''}
+          <button class="cw-btn sm" onclick="ClientWorkspace.copyReport()">📋 Copier le rapport</button>
+        </div>
+        <div class="cw-val-f">${last ? `dernière passe ${window.timeAgo ? timeAgo(last.at) : new Date(last.at).toLocaleString('fr-FR')}` : 'aucune passe enregistrée'} —
+          jointures par nom tolérées jusqu'en v3.9, où <code>workspaceId</code> + <code>refs</code> deviennent la seule voie.</div>`;
+    },
+    async rerunMigration() {
+      const rep = await this.migrate({ force: true });
+      this.paintValidation();
+      window.showToast?.(`Migration : ${rep.created} dossier(s) créé(s), ${rep.invoices + rep.portals} rattaché(s), ${rep.ambiguous} ambigu(s)`, rep.ambiguous ? '#e4b24a' : '#2e9a63', 3500);
+      window.CP?.render?.();
+      return rep;
+    },
+    resyncRefs() {
+      const rep = this.resync();
+      this.paintValidation();
+      window.showToast?.(`Références : ${rep.refsAjoutees} ajoutée(s), ${rep.wsRestaurees} workspaceId restauré(s)${rep.conflits ? ', ' + rep.conflits + ' conflit(s) non touchés' : ''}`, rep.conflits ? '#e4b24a' : '#2e9a63', 3500);
+      return rep;
+    },
+    copyReport() {
+      const a = this.audit();
+      const runs = a.runs || []; delete a.runs;
+      const txt = JSON.stringify({ audit: a, runs }, null, 2);
+      const done = ok => window.showToast?.(ok ? 'Rapport copié ✓ — colle-le tel quel' : 'Copie impossible', ok ? '#2e9a63' : '#c0392b', 2500);
+      try { navigator.clipboard?.writeText(txt).then(() => done(true)).catch(() => done(false)); }
+      catch { done(false); }
+      return txt;
     },
 
     /* ── rendu du dossier ───────────────────────────────────────────────── */
@@ -471,6 +723,8 @@
         <footer class="cw-foot">
           dossier <code>${esc(w.token)}</code> · ouvert le ${this._date(w.createdAt)}${w.closedAt ? ' · clôturé le ' + this._date(w.closedAt) : ''}
           <br><span class="cw-via">rattachement : ${esc(d.via)} — pièces référencées, rien n'a été déplacé ni supprimé</span>
+          ${(d.broken && d.broken.length) ? `<div class="cw-warn">⚠ ${d.broken.length} référence${d.broken.length > 1 ? 's' : ''} vers une pièce introuvable :
+            ${d.broken.map(b => `<button class="cw-mini-btn" onclick="ClientWorkspace.dropRef('${esc(w.token)}','${esc(b.kind)}','${esc(b.id)}')">${b.kind === 'portal' ? 'Portail' : 'Facture'} ${esc(b.id)} — retirer</button>`).join(' ')}</div>` : ''}
         </footer>
       </aside>`;
     },

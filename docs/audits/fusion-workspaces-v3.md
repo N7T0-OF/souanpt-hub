@@ -74,9 +74,15 @@ La fusion **n'est pas terminée** ; seule sa fondation l'est.
    rattachement des factures/portails sans jeton par nom non ambigu (tracé
    `linkVia`), et dossier unique ouvrable depuis Clients & Projets.
    Voir `docs/audits/client-workspace-v3.7.md`.
+   - **fait (v3.8.0)** : l'**observatoire de validation** — `audit()`,
+     `resync()`, `dropRef()`, journal des passages et panneau « 🔍 Validation
+     des rattachements » dans la vue *Clients* ; `build()` lit désormais par
+     `workspaceId` ∪ `refs`. Voir `docs/audits/validation-workspace-v3.8.md` ;
    - reste : **supprimer les doublons** (`hub_invoices.workspaceId` et
-     `refs` deviennent la seule voie, les lectures par nom partent) — uniquement
-     après migration validée sur données réelles ;
+     `refs` deviennent la seule voie, les lectures par nom partent — y compris
+     `candidates`, `bindByClient`, `bind`, et l'annuaire passera par
+     `refs.client = hub_clients[].id`) — uniquement après migration validée sur
+     données réelles ;
    - reste : les 7 blocs métier complets (brief, questions, fichiers, messages,
      échéances) et le **nettoyage physique** en fin de mission (aujourd'hui
      `closeMission()` est logique : étape `done` + `closedAt`, rien n'est

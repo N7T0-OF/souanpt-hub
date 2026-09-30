@@ -180,7 +180,7 @@
           <div class="cp-client-projects">${chips}</div>
         </div>`;
       }).join('');
-      return rosterHtml + (cards
+      return (window.ClientWorkspace ? ClientWorkspace.valPanel() : '') + rosterHtml + (cards
         ? `<div class="cp-clients">${cards}</div>`
         : `<div class="cp-empty" style="padding:20px 16px">
              <div style="font-size:12px;color:var(--muted);max-width:430px;margin:0 auto">Aucun projet rattaché pour l'instant. Crée une demande ou un devis : il viendra se ranger ici sous le nom de son client.</div>

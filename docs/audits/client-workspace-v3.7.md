@@ -124,8 +124,10 @@ après les captures (origin de développement uniquement).
 
 ## 7. Prochaines tranches
 
-1. **Validation sur données réelles** du rattachement (rapport `migrate()` en
-   console : `created / invoices / portals / ambiguous / skipped`).
+1. **Validation sur données réelles** ~~du rattachement~~ → **fait (v3.8.0)** :
+   panneau « 🔍 Validation des rattachements » + rapport copiable
+   (`docs/audits/validation-workspace-v3.8.md`). À exécuter sur les données
+   réelles, puis à recopier ici pour analyse.
 2. **Suppression des doublons** : les lectures « par nom » partent, `refs` et
    `workspaceId` deviennent la seule voie.
 3. **Les 7 blocs complets** : brief, questions, fichiers, messages, échéances,

@@ -56,6 +56,10 @@ const HubData = {
     // Couche canonique « un projet = UN dossier » (js/client-workspace.js) :
     // un document par jeton, qui RÉFÉRENCE les pièces (refs) sans les copier.
     { key: 'workspaces', ls: 'hub_workspaces',  file: 'workspaces.json', sync: 'workspaces', type: 'array' },
+    // Journal des passes de migration (diagnostic de la validation, v3.8) :
+    // sauvé comme le reste, mais PAS de miroir Firestore (rien à synchroniser,
+    // c'est un journal local de ce que la migration a fait ici).
+    { key: 'wsruns',     ls: 'hub_ws_runs',     file: 'wsruns.json',    sync: null,        type: 'array' },
     { key: 'catalog',   ls: 'hub_catalog',      file: 'catalog.json',   sync: 'catalog',   type: 'array' },
     { key: 'reviews',   ls: 'hub_reviews',      file: 'reviews.json',   sync: 'reviews',   type: 'array' },
     { key: 'portals',   ls: 'hub_portals',      file: 'portals.json',   sync: 'portals',   type: 'array' },
