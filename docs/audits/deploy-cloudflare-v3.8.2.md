@@ -47,6 +47,13 @@ plus été lancée depuis avant v3.1.0.
 
 ## 3. L'étape à faire UNE fois (au choix)
 
+> ✅ **FAIT le 30/09/2026 — option A choisie** : la connexion Git a été établie
+> depuis le dashboard Cloudflare (projet `souanpthub` ← repo
+> `N7T0-OF/souanpt-hub`, branche `main`, framework *None*, build command vide,
+> output `/`). Vérifications en §4.
+> L'option **B** (secret `CLOUDFLARE_API_TOKEN`) est donc **à ne pas
+> configurer** : elle ferait déployer deux fois en parallèle.
+
 ### Option A — connexion Git (recommandée, aucun jeton)
 
 Cloudflare dashboard → **Workers & Pages** → projet **souanpthub** →
@@ -71,14 +78,24 @@ publie `souanptjub.pages.dev`.
 Installer Node.js LTS puis double-cliquer sur `deploy-cloudflare.ps1` : le site
 est mis à jour sur-le-champ, mais **uniquement quand on y pense**.
 
-## 4. Vérification après l'une des options
+## 4. Vérification — ✅ faite le 30/09/2026 (après l'option A)
 
 ```text
-https://souanptjub.pages.dev/js/hub-data.js     → 200 (404 = toujours ancien)
-https://souanptjub.pages.dev/js/quote.js        → contient « HUB_VERSIONS »
+https://souanptjub.pages.dev/js/hub-data.js       → 200  (404 avant)
+https://souanptjub.pages.dev/js/client-workspace.js → 200  (404 avant)
 ```
 
-puis, dans l'app : cloche 🔔 → « 📦 Nouvelle version v3.8.1 » (catégorie
+Contrôles effectués depuis la machine de travail :
+
+| Contrôle | Résultat |
+|---|---|
+| `js/quote.js`, `js/hub-data.js`, `js/clients.js`, `js/client-workspace.js` | **identiques** au dépôt (SHA/lenghts) |
+| `app.html` servi | marqueurs v3.8.x tous présents : `cw-root`, `cw-val` (15), `nt-ver`, `setFilter('general')`, `client-workspace.js`, `Notify.init` |
+| `HUB_VERSIONS` | première ligne **`['3.8.2', …]`** |
+| check-run GitHub du commit `677049c` | **[Cloudflare Workers and Pages] Cloudflare Pages : completed/success** (+ les 2 GitHub Actions) |
+| **Functions** (relais) | `/api/auth?op=status` → **200**, `/api/gh?path=/user` → **401** (exécution confirmée, refus sans session), `/u/<pseudo inconnu>` → 404 |
+
+Puis dans l'app : cloche 🔔 → « 📦 Nouvelle version v3.8.2 » (catégorie
 **Générale**).
 
 ## 5. Ce qui reste manuel (inchangé)
