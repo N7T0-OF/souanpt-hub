@@ -72,9 +72,16 @@ La fusion **n'est pas terminée** ; seule sa fondation l'est.
 2. **Portail rendu par le même moteur** — tant que `portal.html` reste une page
    statique lisant `?id=`, l'étape production impose une redirection et
    l'adresse change. C'est la prochaine étape logique.
-3. **Navigation « Clients & Projets »** — les entrées Portails, Demandes &
-   Devis et Clients existent encore séparément. Les fusionner suppose d'abord
-   le point 1, sinon on ne ferait que renommer des onglets.
+3. **Navigation « Clients & Projets »** — ~~les entrées Portails, Demandes &
+   Devis et Clients existent encore séparément~~ → **fait pour la navigation**
+   (v3.6.0) : la page **Clients** est absorbée par la vue *Clients* de
+   `Clients & Projets` (annuaire `hub_clients` + formulaire déplacés dans
+   `CP._clients()`), `showPage('clients')` redirige, l'entrée de menu unique
+   reste. Les sections **Contenu** (Éditeur + Stockage fusionnées) et
+   **Business** ont été resserrées au passage.
+   - reste : absorber aussi **Portails** et **Demandes & Devis** dans un
+     *ClientWorkspace* unique — cela suppose le point 1, sinon on ne ferait que
+     renommer des onglets.
 4. **Conversion prospect → client sans nouveau dossier** (§8), machine d'états
    unifiée (§9), fil de messages commun (§12), déblocage des fichiers au
    paiement (§15).

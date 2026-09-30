@@ -51,23 +51,36 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .logo-text{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);letter-spacing:-.3px}
 .logo-text span{color:var(--accent)}
 
+.nav-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.nav-scroll::-webkit-scrollbar{width:4px}
+.nav-scroll::-webkit-scrollbar-thumb{background:transparent}
+.nav-scroll:hover::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 .nav-section{padding:10px 0;border-bottom:1px solid var(--border)}
-.nav-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:0 18px;margin-bottom:4px}
+.nav-label{
+  display:flex;align-items:center;gap:8px;
+  font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  padding:0 18px;margin-bottom:4px;
+}
+/* filet après l'intitulé : la structure de la barre se lit d'un coup d'œil */
+.nav-label::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
 .ni{
   display:flex;align-items:center;gap:9px;
   padding:9px 18px;font-size:11px;color:var(--muted2);
   cursor:pointer;border:none;background:none;width:100%;text-align:left;
   border-left:2px solid transparent;font-family:inherit;
-  transition:all .15s;position:relative;
+  transition:color .15s ease,background .15s ease,border-color .15s ease;position:relative;
 }
 .ni:hover,.ni.active{color:var(--text);background:rgba(255,255,255,.03)}
-.ni.active{border-left-color:var(--accent);color:var(--accent)}
-.ni svg{width:14px;height:14px;opacity:.7;flex-shrink:0}
-.ni.active svg{opacity:1}
+.ni.active{border-left-color:var(--accent);color:var(--accent);background:rgba(200,255,0,.06)}
+.ni svg{width:14px;height:14px;opacity:.7;flex-shrink:0;transition:opacity .15s ease}
+.ni:hover svg,.ni.active svg{opacity:1}
+.ni:focus-visible{outline:1px solid var(--accent);outline-offset:-2px;border-radius:3px}
 .nbadge{
   margin-left:auto;background:var(--accent);color:#000;
   font-size:8px;font-weight:800;padding:1px 5px;border-radius:10px;
 }
+/* Compteur « à traiter » : plutôt que vert — l'œil repère ce qui réclame une action */
+.nbadge.nb-warn{background:var(--gold-l);color:#000}
 
 /* Profil bubble in sidebar bottom */
 #sp-bubble-trigger{
@@ -252,6 +265,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   display:grid;grid-template-columns:2fr 1fr 80px 80px 70px 24px;
   gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);font-size:10px;
 }
+/* Sous ~760 px, la tableau se replie sur deux colonnes au lieu d'écraser les
+   en-têtes (Prestation / Client / Prix / Date / Statut) */
+@media(max-width:760px){.fac-row{grid-template-columns:1fr auto;gap:4px 12px}
+  .fac-row>div:nth-child(5),.fac-row>div:nth-child(6){justify-self:end}}
 .fac-name{font-weight:600}
 .fac-client{color:var(--muted2)}
 .fac-price{font-family:'Syne',sans-serif;font-weight:700;color:var(--gold-l)}
@@ -929,12 +946,29 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cp-client-projects{display:flex;flex-wrap:wrap;gap:5px}
 .cp-chip{font-size:9px;background:var(--s3);border:1px solid var(--border);border-radius:20px;padding:3px 8px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cp-chip:hover{border-color:var(--accent)}
+/* Annuaire — fusion de l'ancienne page « Clients » (même stockage hub_clients) */
+.cp-roster{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:14px}
+.cp-roster-h{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.cp-roster-h b{font-size:11px;color:var(--text)}
+.cp-roster-sub{font-size:9.5px;color:var(--muted);font-weight:400}
+.cp-roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:640px){.cp-roster-grid{grid-template-columns:1fr}}
 /* Communs */
 .cp-badge{font-size:9px;font-weight:800;border:1px solid;border-radius:20px;padding:2px 8px;white-space:nowrap;flex-shrink:0}
 .cp-a{background:var(--s3);border:1px solid var(--border);border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1;color:var(--text);transition:border-color .15s}
 .cp-a:hover{border-color:var(--accent)}
 @media(max-width:900px){.cp-pipeline{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.cp-pipeline{grid-template-columns:1fr}.cp-row{flex-wrap:wrap}.cp-row-total{order:3}}
+
+/* ═══ BUSINESS — grilles partagées ═══
+   Les pages Business emploient les mêmes grilles : KPI, listes et formulaires
+   se recalculent à la largeur (avant, 4 colonnes fixes étaient écrasées sous
+   ~700 px et les formulaires débordaient). */
+.biz-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.biz-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.biz-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+@media(max-width:820px){.biz-kpis{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.biz-2col{grid-template-columns:1fr}}
 
 /* ═══ ANALYTICS ═══ */
 /* Indicateur « stats en direct » (remplace le bouton Actualiser) */
@@ -1129,6 +1163,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     <div class="logo-text">souanpt<span>.hub</span></div>
   </div>
 
+  <!-- La barre de navigation est scrollable : sur un écran court, les
+       dernières sections restent accessibles (avant, elles étaient coupées). -->
+  <div class="nav-scroll">
   <div class="nav-section">
     <div class="nav-label">Dashboard</div>
     <button class="ni active" data-page="overview" onclick="showPage('overview')">
@@ -1139,45 +1176,39 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
   <div class="nav-section">
     <div class="nav-label">Contenu</div>
-    <button class="ni" data-page="editor" onclick="showPage('editor')">
+    <button class="ni" data-page="editor" onclick="showPage('editor')" title="Construire, éditer et publier ton site">
       <svg viewBox="0 0 16 16" fill="none"><path d="M2 12L6 4l4 8" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 9.5h5" stroke="currentColor" stroke-width="1.2"/><path d="M10 4h4M12 2v4" stroke="currentColor" stroke-width="1.2"/></svg>
       Éditeur de site
+    </button>
+    <!-- Médias : la section « Outils » n'avait que cette entrée → fusionnée
+         dans Contenu (ce que tu produis et que tu publies). -->
+    <button class="ni" data-page="storage" onclick="showPage('storage')" title="Images, couvertures, fichiers publiés">
+      <svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="6" ry="2" stroke="currentColor" stroke-width="1.2"/><path d="M2 4v4c0 1.1 2.7 2 6 2s6-.9 6-2V4" stroke="currentColor" stroke-width="1.2"/><path d="M2 8v4c0 1.1 2.7 2 6 2s6-.9 6-2V8" stroke="currentColor" stroke-width="1.2"/></svg>
+      Stockage
     </button>
   </div>
 
   <div class="nav-section">
     <div class="nav-label">Business</div>
-    <button class="ni" data-page="cp" onclick="showPage('cp')">
+    <button class="ni" data-page="cp" onclick="showPage('cp')" title="Le fil de vie de chaque client : demande → devis → mission → livraison">
       <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="3.5" height="11" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="6.25" y="2.5" width="3.5" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="11" y="2.5" width="3.5" height="9" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
       Clients &amp; Projets <span class="nbadge" id="cp-badge" style="display:none"></span>
     </button>
-    <button class="ni" data-page="devis" onclick="showPage('devis')">
+    <button class="ni" data-page="devis" onclick="showPage('devis')" title="Analyser un message client, chiffrer, envoyer un lien">
       <svg viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.2"/><path d="M9 2v4h4M5 9h6M5 11.5h4" stroke="currentColor" stroke-width="1.2"/></svg>
-      Demandes &amp; Devis <span class="nbadge" id="devis-badge" style="display:none"></span>
+      Demandes &amp; Devis <span class="nbadge nb-warn" id="devis-badge" style="display:none"></span>
     </button>
-    <button class="ni" data-page="clients" onclick="showPage('clients')">
-      <svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M1 14c0-3 2-5 5-5s5 2 5 5" stroke="currentColor" stroke-width="1.2"/><path d="M11 7l2 2 3-3" stroke="currentColor" stroke-width="1.2"/></svg>
-      Clients
-    </button>
-    <button class="ni" data-page="facturation" onclick="showPage('facturation')">
-      <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M5 5h6M5 8h6M5 11h3" stroke="currentColor" stroke-width="1.2"/></svg>
-      Facturation
-    </button>
-    <button class="ni" data-page="avis" onclick="showPage('avis')">
-      <svg viewBox="0 0 16 16" fill="none"><polygon points="8,1 10,6 15,6 11,9 13,14 8,11 3,14 5,9 1,6 6,6" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
-      Avis <span class="nbadge" id="avis-badge" style="display:none"></span>
-    </button>
-    <button class="ni" data-page="portals" onclick="showPage('portals')">
+    <button class="ni" data-page="portals" onclick="showPage('portals')" title="Espace mission privé par client : étapes, livrables, paiement">
       <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="1.5" r="1" fill="currentColor"/></svg>
       Portails <span class="nbadge" id="portals-badge" style="display:none"></span>
     </button>
-  </div>
-
-  <div class="nav-section">
-    <div class="nav-label">Outils</div>
-    <button class="ni" data-page="storage" onclick="showPage('storage')">
-      <svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="6" ry="2" stroke="currentColor" stroke-width="1.2"/><path d="M2 4v4c0 1.1 2.7 2 6 2s6-.9 6-2V4" stroke="currentColor" stroke-width="1.2"/><path d="M2 8v4c0 1.1 2.7 2 6 2s6-.9 6-2V8" stroke="currentColor" stroke-width="1.2"/></svg>
-      Stockage
+    <button class="ni" data-page="facturation" onclick="showPage('facturation')" title="Prestations, tarifs, statuts et export CSV">
+      <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M5 5h6M5 8h6M5 11h3" stroke="currentColor" stroke-width="1.2"/></svg>
+      Facturation <span class="nbadge nb-warn" id="fac-badge" style="display:none"></span>
+    </button>
+    <button class="ni" data-page="avis" onclick="showPage('avis')" title="Les avis laissés sur ton site publié, à modérer">
+      <svg viewBox="0 0 16 16" fill="none"><polygon points="8,1 10,6 15,6 11,9 13,14 8,11 3,14 5,9 1,6 6,6" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      Avis <span class="nbadge nb-warn" id="avis-badge" style="display:none"></span>
     </button>
   </div>
 
@@ -1188,6 +1219,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       Paramètres <span id="set-gh-badge" style="display:none;width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
     </button>
   </div>
+  </div><!-- /nav-scroll -->
 
   <!-- Profil bubble -->
   <div id="sp-bubble-trigger" onclick="BubbleWidget.open()">
@@ -1274,8 +1306,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <!-- Ligne 5 : raccourcis rapides -->
       <div class="ov-actions">
         <button class="ov-act" onclick="showPage('editor');setTimeout(function(){window.edAddProject&&edAddProject()},1000)"><span class="ov-act-ic">➕</span> Créer un projet</button>
-        <button class="ov-act" onclick="showPage('clients');setTimeout(function(){document.getElementById('add-client-form')?.classList.add('visible')},80)"><span class="ov-act-ic">👤</span> Créer un client</button>
-        <button class="ov-act" onclick="showPage('facturation');setTimeout(function(){document.getElementById('add-inv-form')?.classList.add('visible')},80)"><span class="ov-act-ic">📄</span> Créer une facture</button>
+        <button class="ov-act" onclick="openClientForm()"><span class="ov-act-ic">👤</span> Créer un client</button>
+        <button class="ov-act" onclick="showPage('facturation');setTimeout(function(){toggleForm('add-inv-form',true)},80)"><span class="ov-act-ic">📄</span> Créer une facture</button>
         <button class="ov-act" onclick="showPage('editor')"><span class="ov-act-ic">🚀</span> Publier le site</button>
         <button class="ov-act" onclick="showPage('portals')"><span class="ov-act-ic">🔗</span> Portail client</button>
       </div>
@@ -1433,37 +1465,26 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     </div>
 
     <!-- ══ PAGE: ANALYTICS ══ -->
-    <!-- ══ PAGE: CLIENTS ══ -->
-    <div class="page" id="page-clients">
-      <div class="section-header"><div class="section-title">Clients</div><div class="section-line"></div><button class="btn btn-ghost" style="font-size:10px" onclick="document.getElementById('add-client-form').classList.toggle('visible')">+ Client</button></div>
-      <div class="form-box" id="add-client-form">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><div class="prop-label">Nom</div><input class="prop-input" id="cl-name" placeholder="Entreprise"></div>
-          <div><div class="prop-label">Type</div><input class="prop-input" id="cl-type" placeholder="Design, Dev..."></div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-accent" onclick="addClient()">Ajouter</button>
-          <button class="btn btn-ghost" onclick="document.getElementById('add-client-form').classList.remove('visible')">Annuler</button>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="clients-list"></div>
-    </div>
+    <!-- PAGE : CLIENTS — fusionnée dans « Clients & Projets » (vue Clients).
+         Le bloc (annuaire hub_clients + formulaire) vit désormais dans
+         CP._clients() ; showPage('clients') y redirige, donc les anciens
+         raccourcis (vue d'ensemble, liens enregistrés) restent valables. -->
 
     <!-- ══ PAGE: FACTURATION ══ -->
     <div class="page" id="page-facturation">
       <div class="section-header"><div class="section-title">Facturation</div><div class="section-line"></div>
         <input class="prop-input" id="inv-search" placeholder="🔍 Rechercher…" style="width:180px;font-size:10px" oninput="_invPage=1;renderInvoices()">
         <button class="btn btn-ghost" style="font-size:10px" onclick="exportInvoicesCSV()" title="Exporter en CSV (Excel)">⬇ CSV</button>
-        <button class="btn btn-accent" style="font-size:10px" onclick="document.getElementById('add-inv-form').classList.toggle('visible')">+ Prestation</button>
+        <button class="btn btn-accent" style="font-size:10px" onclick="toggleForm('add-inv-form')">+ Prestation</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+      <div class="biz-kpis">
         <div class="kpi-card k3"><div class="kpi-label">Total payé</div><div class="kpi-val" id="fac-total">0 €</div></div>
         <div class="kpi-card k4"><div class="kpi-label">Factures payées</div><div class="kpi-val" id="fac-paid-count">0</div></div>
         <div class="kpi-card" style="--c:var(--gold-l)"><div class="kpi-label">En attente</div><div class="kpi-val" style="color:var(--gold-l)" id="fac-pending-count">0</div></div>
         <div class="kpi-card k2"><div class="kpi-label">Clients</div><div class="kpi-val" id="fac-clients-count">0</div></div>
       </div>
       <div class="form-box" id="add-inv-form">
-        <div style="display:grid;grid-template-columns:2fr 1fr 100px;gap:8px">
+        <div class="biz-form">
           <div><div class="prop-label">Prestation</div><input class="prop-input" id="inv-name" placeholder="Logo design" list="dl-catalog" oninput="invSuggestPrice()"></div>
           <div><div class="prop-label">Client</div><input class="prop-input" id="inv-client" placeholder="Choisir ou créer…" list="dl-clients"></div>
           <div><div class="prop-label">Prix (€)</div><input class="prop-input" id="inv-price" type="number" placeholder="500"><div id="inv-price-hint" style="font-size:8px;color:var(--accent);margin-top:3px;min-height:10px"></div></div>
@@ -1498,11 +1519,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     <div class="page" id="page-avis">
       <div class="section-header"><div class="section-title">Avis clients</div><div class="section-line"></div>
         <button class="btn btn-accent" style="font-size:10px" id="avis-check-btn" onclick="checkAvis()">📥 Relever les avis</button>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="document.getElementById('add-review-form').classList.toggle('visible')">+ Manuel</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="toggleForm('add-review-form')">+ Manuel</button>
       </div>
       <div class="infobox">⭐ <strong>Comment ça marche :</strong> les visiteurs laissent leur avis <strong>directement sur ton site publié</strong> (bouton « ✎ Laisser un avis »). Ils arrivent ici automatiquement — toi tu <strong>approuves ou refuses</strong>, c'est tout. Les avis approuvés s'affichent sur le site au prochain déploiement 🚀. Relève auto toutes les 5 min · <span id="avis-last-check" style="color:var(--muted2)">jamais relevé</span></div>
       <div class="form-box" id="add-review-form">
-        <div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:8px">
+        <div class="biz-form">
           <div><div class="prop-label">Auteur</div><input class="prop-input" id="rv-author" placeholder="Prénom NOM"></div>
           <div><div class="prop-label">Projet</div><input class="prop-input" id="rv-project" placeholder="Nom du projet"></div>
           <div><div class="prop-label">Note /5</div><input class="prop-input" id="rv-rating" type="number" min="1" max="5" value="5"></div>
@@ -1513,7 +1534,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button class="btn btn-ghost" onclick="document.getElementById('add-review-form').classList.remove('visible')">Annuler</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="reviews-list"></div>
+      <div class="biz-2col" id="reviews-list"></div>
     </div>
 
     <!-- ══ PAGE: PORTAILS CLIENTS ══ -->
@@ -1522,7 +1543,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <button class="btn btn-accent" style="font-size:10px" onclick="portalOpenForm()">+ Nouveau portail</button>
       </div>
       <div class="infobox">🔗 <strong>Un espace mission par client, sans qu'il ait de compte.</strong> Connecté avec Google, la publication est <strong>instantanée</strong> (via le cloud, aucun 404, aucune attente) et chaque modification est appliquée en direct. Tu envoies un <strong>lien privé</strong> ; le client y voit l'avancement, le suivi financier et les livrables — à ton image. Lecture seule (messagerie/validation 2 sens = étape suivante).</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+      <div class="biz-kpis">
         <div class="kpi-card k1"><div class="kpi-label">Portails</div><div class="kpi-val" id="pt-count">0</div></div>
         <div class="kpi-card k4"><div class="kpi-label">Actifs</div><div class="kpi-val" id="pt-active">0</div></div>
         <div class="kpi-card k3"><div class="kpi-label">Solde en attente</div><div class="kpi-val" id="pt-due" style="font-size:18px">0 €</div></div>
@@ -1530,18 +1551,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       </div>
 
       <div class="form-box" id="portal-form">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="biz-form">
           <div><div class="prop-label">Nom de la mission</div><input class="prop-input" id="pt-mission" placeholder="Identité visuelle Bloom Studio"></div>
           <div><div class="prop-label">Client</div><input class="prop-input" id="pt-client" placeholder="Choisir ou créer…" list="dl-clients"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 90px 1fr;gap:8px;margin-top:8px">
+        <div class="biz-form" style="margin-top:8px">
           <div><div class="prop-label">Montant total (€)</div><input class="prop-input" id="pt-total" type="number" placeholder="2400"></div>
           <div><div class="prop-label">Acompte %</div><input class="prop-input" id="pt-acompte" type="number" value="50"></div>
           <div><div class="prop-label">Étape actuelle</div><select class="prop-input prop-select" id="pt-step">
             <option value="0">Brief</option><option value="1">Devis</option><option value="2">Acompte</option><option value="3" selected>Production</option><option value="4">Livraison</option><option value="5">Terminé</option>
           </select></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <div class="biz-form" style="margin-top:8px">
           <div><div class="prop-label">Lien de paiement (Stripe, PayPal, SumUp…)</div><input class="prop-input" id="pt-pay" placeholder="https://buy.stripe.com/…"></div>
           <div><div class="prop-label">Mot de passe (optionnel)</div><input class="prop-input" id="pt-pw" placeholder="laisser vide = aucun"></div>
         </div>
@@ -2700,9 +2721,14 @@ function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(J
 function renderClients() {
   const cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');
   const ct=document.getElementById('clients-list'); if(!ct) return;
+  // Compteur de l'annuaire fusionné (CP._clients) : il doit suivre les ajouts.
+  const sub=document.querySelector('.cp-roster-sub');
+  if(sub){ let withP=0; try{ const links=(window.CP&&CP._links)||[];
+    withP=new Set(links.map(l=>(l.clientName||'').trim().toLowerCase()).filter(Boolean)).size; }catch{}
+    sub.textContent=cl.length+' fiche'+(cl.length>1?'s':'')+(withP?' · '+withP+' avec projet':''); }
   const cols=['rgba(201,146,42,.12)','rgba(46,154,99,.1)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
-  if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:span 2"><div class="empty-title">Aucun client</div></div>';return;}
+  if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
   ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${(c.name||'?')[0].toUpperCase()}</div><div><div class="client-name">${c.name}</div><div class="client-sub">${c.type||'Nouveau'}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${c.progress||0}%"></div></div><span>${c.progress||0}%</span></div><button onclick="deleteClient('${c.id}')" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div>`).join('');
 }
 
@@ -2855,7 +2881,7 @@ function renderReviews() {
   const wt=rv.filter(r=>r.status==='pending').length;
   const badge=document.getElementById('avis-badge');
   if(badge){badge.textContent=wt||'';badge.style.display=wt?'':'none';}
-  if(!rv.length){ct.innerHTML='<div class="empty" style="grid-column:span 2"><div class="empty-title">Aucun avis</div></div>';return;}
+  if(!rv.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun avis</div><div class="empty-sub">Relève ceux laissés sur ton site publié, ou ajoute-les à la main</div></div>';return;}
   ct.innerHTML=rv.map(r=>`<div class="gc rcard"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${r.ghIssue?' <span style="font-size:8px;color:var(--accent3)">via le site</span>':''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${esc(r.text)}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
 }
 
@@ -2928,7 +2954,12 @@ function syncKPIs() {
   set('an-clicks',clicks.toLocaleString('fr'));
   set('fac-total',paid.toLocaleString('fr')+' €');
   set('fac-paid-count',inv.filter(i=>i.status==='paid').length);
-  set('fac-pending-count',inv.filter(i=>i.status==='pending'||i.status==='acompte'||!i.status).length);
+  const facPending=inv.filter(i=>i.status==='pending'||i.status==='acompte'||!i.status).length;
+  set('fac-pending-count',facPending);
+  // Compteur dans la barre latérale : les factures à relancer se voient sans
+  // ouvrir la page (les autres sections en ont déjà un).
+  const facBadge=document.getElementById('fac-badge');
+  if(facBadge){facBadge.textContent=facPending||'';facBadge.style.display=facPending?'':'none';}
   set('fac-clients-count',cl.length);
   // Storage
   const used=Object.keys(localStorage).reduce((s,k)=>s+(localStorage.getItem(k)||'').length,0);
@@ -3545,6 +3576,54 @@ function renderLoginLog() {
     log.slice(0,5).map(l => `<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)"><span>${esc(l.ua||'Navigateur')}</span><span>${new Date(l.ts).toLocaleString('fr-FR')}</span></div>`).join('');
 }
 
+/* ═══ RENDU DIFFÉRÉ ═══
+   Au chargement, seuls les blocs visibles (vue d'ensemble) sont peints
+   immédiatement ; les autres pages partent en arrière-plan dès que le
+   navigateur se repose, puis se rafraîchissent à la première visite. */
+const _rendered = {};
+function renderOnce(key, fn) {
+  if (_rendered[key]) return false;
+  _rendered[key] = 1;
+  try { fn && fn(); } catch (e) { console.warn('[render] ' + key, e); }
+  return true;
+}
+function hubIdle(fn) {
+  if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 1500 });
+  else setTimeout(fn, 120);
+}
+function renderBackgroundPages() {
+  renderOnce('projects',    () => { renderProjects(); renderLinks(); renderMedia(); });
+  renderOnce('clients',     () => renderClients());
+  renderOnce('facturation', () => { renderCatalog(); refreshInvDatalists(); renderInvoices(); });
+  renderOnce('avis',        () => { renderReviews(); updateAvisCheckTime(); });
+  renderOnce('portals',     () => { refreshInvDatalists(); renderPortals(); });
+  renderOnce('settings',    () => { renderBehancePage(); renderGoat(); });
+}
+
+/* Ouvre / ferme un formulaire de saisie et l'amène à l'écran : les boutons « + »
+   des pages Business l'utilisent tous (avant, le formulaire pouvait s'ouvrir
+   hors écran sous l'en-tête). */
+function toggleForm(id, force) {
+  const f = document.getElementById(id); if (!f) return;
+  if (force) f.classList.add('visible'); else f.classList.toggle('visible');
+  if (f.classList.contains('visible')) f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* Raccourci « Créer un client » de la vue d'ensemble : ouvre Clients & Projets
+   sur la vue Clients puis le formulaire — même si le rendu asynchrone du
+   registre n'a pas encore eu lieu (on réessaie quelques dizaines de fois). */
+function openClientForm() {
+  window.CP?.setView('clients');
+  showPage('cp');
+  let tries = 0;
+  const wait = () => {
+    const f = document.getElementById('add-client-form');
+    if (f) { f.classList.add('visible'); f.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    if (tries++ < 50) setTimeout(wait, 100);
+  };
+  setTimeout(wait, 60);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // T5 : état du relais (connexion sans token) — sondage déjà lancé par gh-auth.js
   if (typeof GhSession !== 'undefined') { GhSession.onChange = renderGhConnectState; renderGhConnectState(); }
@@ -3567,10 +3646,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (legacy && mount) { while (legacy.firstChild) mount.appendChild(legacy.firstChild); legacy.remove(); }
   renderIntegrations();
   renderLoginLog(); renderGoat(); refreshRealStats(true);
-  renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews(); renderMedia();
-  renderCatalog(); refreshInvDatalists(); renderPortals();
-  renderBehancePage(); updateAvisCheckTime();
+  // Vue d'ensemble d'abord : c'est la page visible au chargement.
   syncKPIs(); renderActivity(); window.Analytics && Analytics.refresh();
+  // Les pages secondières se peignent dès que le navigateur se repose (et, si
+  // l'utilisateur y va avant, à la première visite — cf. renderOnce).
+  hubIdle(renderBackgroundPages);
   if (Auth.ok()) { BubbleWidget.init(); document.getElementById('gh-disconnect-btn') && (document.getElementById('gh-disconnect-btn').style.display=''); }
   else { const p=document.getElementById('gh-connect-prompt'); if(p) p.style.display='block'; }
   // Settings load

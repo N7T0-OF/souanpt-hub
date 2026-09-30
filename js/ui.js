@@ -642,6 +642,10 @@ function showPage(id) {
   if (id === 'portfolio' || id === 'links') { showPage('editor'); return; }
   // Médias a fusionné dans Stockage (mêmes fichiers, filtres Images/GIF/Vidéos).
   if (id === 'media') { showPage('storage'); return; }
+  // Clients a fusionné dans « Clients & Projets » (vue Clients) : même annuaire,
+  // plus les projets regroupés par client. L'adresse d'arrivée est la même
+  // qu'avant pour l'utilisateur, il ne perd aucun raccourci enregistré.
+  if (id === 'clients') { window.CP?.setView('clients'); showPage('cp'); return; }
   // Behance & GitHub ont déménagé dans Paramètres → Intégrations
   if (id === 'github' || id === 'behance') {
     showPage('settings');
@@ -668,6 +672,13 @@ function showPage(id) {
   if(id==='storage')  { window.StorageUI?.init(); window.StorageUI?.render(); }
   if(id==='cp')       { window.CP?.render(); }
   if(id==='devis')    { window.QuoteUI?.init(); }
+  // Pages secondières : rendu à la première visite (elles sont peintes en
+  // arrière-plan au chargement, cf. renderBackgroundPages — si l'utilisateur
+  // arrive avant, c'est ce garde-fou qui s'en charge).
+  if(id==='facturation') window.renderOnce?.('facturation', ()=>{ renderCatalog(); refreshInvDatalists(); renderInvoices(); });
+  if(id==='avis')        window.renderOnce?.('avis',        ()=>{ renderReviews(); updateAvisCheckTime(); });
+  if(id==='portals')     window.renderOnce?.('portals',     ()=>{ refreshInvDatalists(); renderPortals(); });
+  if(id==='settings')    window.renderOnce?.('settings',    ()=>{ renderBehancePage(); renderGoat(); });
 }
 
 async function syncBehance(){

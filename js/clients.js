@@ -5,6 +5,11 @@
    registre `public_links` (voir js/registry.js). Chaque projet = UN jeton
    canonique qui suit son cycle : Demande → Devis → Mission → Terminé.
 
+   La vue Clients absorbe aussi l'**ancienne page « Clients »** (annuaire
+   `hub_clients` + formulaire) : un seul menu, un seul endroit, et l'annuaire
+   partage le même nom de client que les projets regroupés. `showPage('clients')`
+   redirige ici — aucun raccourci enregistré ne casse.
+
    PREMIÈRE TRANCHE. Cette vue unifiée est la « porte d'entrée » : elle recense
    et route. Les outils détaillés existants (analyse de message, grille
    tarifaire, formulaire de portail, acceptations) restent joignables et seront
@@ -38,7 +43,12 @@
       const body = document.getElementById('cp-body'); if (!body) return;
       if (!(window.Cloud && Cloud.enabled && Cloud.user())) {
         this._loading = false; this._links = [];
-        body.innerHTML = this._msg('⚠️ <b>Connecte-toi avec Google ou Discord</b> pour retrouver ici tous tes clients et projets.');
+        // La vue « Clients » (annuaire) ne dépend pas du cloud : elle reste
+        // utilisable avec un simple navigateur, comme l'ancienne page l'était.
+        body.innerHTML = this._view === 'clients'
+          ? this._clients()
+          : this._msg('⚠️ <b>Connecte-toi avec Google ou Discord</b> pour retrouver ici tous tes clients et projets.');
+        this._after();
         this._badge();
         return;
       }
@@ -67,11 +77,21 @@
       const body = document.getElementById('cp-body'); if (!body) return;
       let head = this._creating ? this._createPanel() : '';
       if (this._loading) { body.innerHTML = head + this._msg('Chargement de tes projets…'); return; }
-      if (!this._links.length) { body.innerHTML = head + this._empty(); return; }
+      // Sans projet, la vue Clients montre quand même l'annuaire (sinon on
+      // perdrait l'accès aux fiches en fusionnant l'ancienne page).
+      if (!this._links.length && this._view !== 'clients') { body.innerHTML = head + this._empty(); return; }
       const view = this._view === 'list' ? this._list()
                  : this._view === 'clients' ? this._clients()
                  : this._pipeline();
       body.innerHTML = head + view;
+      this._after();
+    },
+
+    /* Ce qu'il faut peindre après coup : l'annuaire est rendu par renderClients()
+       (app.html) et non par ce module. */
+    _after() {
+      if (this._view !== 'clients') return;
+      try { window.renderClients?.(); } catch {}
     },
 
     _pipeline() {
@@ -109,6 +129,32 @@
     },
 
     _clients() {
+      /* ── Annuaire (hub_clients) — l'ancienne page « Clients » est fusionnée
+             ici : mêmes fiches, même formulaire, plus les projets du client. */
+      let roster = [];
+      try { roster = JSON.parse(localStorage.getItem('hub_clients') || '[]') || []; } catch { roster = []; }
+      const withProject = new Set(this._links
+        .map(l => (l.clientName || '').trim().toLowerCase()).filter(Boolean));
+      const rosterHtml = `<div class="cp-roster">
+        <div class="cp-roster-h">
+          <span><b>📇 Annuaire</b>
+            <span class="cp-roster-sub">${roster.length} fiche${roster.length > 1 ? 's' : ''}${withProject.size ? ' · ' + withProject.size + ' avec projet' : ''}</span></span>
+          <button class="btn btn-ghost" style="font-size:10px;margin-left:auto" onclick="toggleForm('add-client-form')">+ Client</button>
+        </div>
+        <div class="form-box" id="add-client-form">
+          <div class="biz-form">
+            <div><div class="prop-label">Nom</div><input class="prop-input" id="cl-name" placeholder="Entreprise"></div>
+            <div><div class="prop-label">Type</div><input class="prop-input" id="cl-type" placeholder="Design, Dev..."></div>
+          </div>
+          <div class="hintbox" style="margin-top:10px">💡 La fiche est partagée : <strong style="color:var(--text)">Facturation</strong> et <strong style="color:var(--text)">Portails</strong> proposent ce nom automatiquement — et créent la fiche si elle n'existe pas.</div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-accent" onclick="addClient()">Ajouter</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('add-client-form').classList.remove('visible')">Annuler</button>
+          </div>
+        </div>
+        <div class="cp-roster-grid" id="clients-list"></div>
+      </div>`;
+
       const groups = new Map();
       this._links.forEach(l => {
         const key = (l.clientName || '').trim() || '__none';
@@ -128,7 +174,11 @@
           <div class="cp-client-projects">${chips}</div>
         </div>`;
       }).join('');
-      return `<div class="cp-clients">${cards}</div>`;
+      return rosterHtml + (cards
+        ? `<div class="cp-clients">${cards}</div>`
+        : `<div class="cp-empty" style="padding:20px 16px">
+             <div style="font-size:12px;color:var(--muted);max-width:430px;margin:0 auto">Aucun projet rattaché pour l'instant. Crée une demande ou un devis : il viendra se ranger ici sous le nom de son client.</div>
+           </div>`);
     },
 
     _card(l, compact) {
