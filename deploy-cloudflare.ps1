@@ -26,8 +26,9 @@ if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
 New-Item -ItemType Directory $dist | Out-Null
 
 # .claude et scripts sont des outils de developpement : rien a faire en ligne.
+# .freebuff : brouillons locaux non versionnes (idem).
 robocopy $src $dist /E `
-  /XD .git .github .claude cloudflare node_modules docs scripts .wrangler `
+  /XD .git .github .claude .freebuff cloudflare node_modules docs scripts .wrangler `
   /XF deploy-cloudflare.ps1 *.md | Out-Null
 
 Write-Host ""

@@ -188,6 +188,18 @@ déploiement manuelles : `docs/audits/t5-github-auth.md`.
 3. **1 seul commit atomique** (index.html + config + .nojekyll) — évite les builds Pages concurrents
 4. Active GitHub Pages puis **vérifie le build** (retry auto si erreur)
 
+### Les deux cibles du hub (ne pas les confondre)
+
+| Cible | Mise à jour |
+|---|---|
+| `n7t0-of.github.io/souanpt-hub` | **automatique** — `.github/workflows/deploy.yml`, à chaque push sur `main` |
+| `souanptjub.pages.dev/app` | projet Cloudflare Pages **`souanpthub`** — connexion Git, **ou** secret `CLOUDFLARE_API_TOKEN` qui active `.github/workflows/deploy-cloudflare.yml`, **ou** manuel `deploy-cloudflare.ps1` |
+
+⚠ Tant qu'une des deux dernières options n'est pas faite, **seul GitHub Pages
+suit les versions** et `souanptjub.pages.dev` reste bloqué sur son dernier
+upload manuel. Diagnostic, preuves et étapes une-fois : 
+`docs/audits/deploy-cloudflare-v3.8.2.md`.
+
 ## Behance — sans clé API
 
 L'API Behance est fermée (Adobe). La sync passe par le **flux RSS public** :

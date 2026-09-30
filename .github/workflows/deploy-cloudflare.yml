@@ -1,0 +1,68 @@
+name: Deploy hub to Cloudflare Pages
+
+# ── Pourquoi ce workflow existe ──────────────────────────────────────────────
+# souanptjub.pages.dev (projet Pages « souanpthub ») n'était publié QUE par la
+# commande manuelle `deploy-cloudflare.ps1` : un push GitHub ne le mettait pas
+# à jour. Résultat constaté le 30/09/2026 : GitHub Pages servait v3.8.1 alors
+# que le site Cloudflare était resté bloqué AVANT v3.1.0 (`js/hub-data.js` →
+# 404, `js/client-workspace.js` → 404) — tout le travail T1→T5, v3.6, v3.7 et
+# v3.8 y était absent.
+#
+# Ce workflow publie Cloudflare à CHAQUE push, dès que le jeton existe :
+#   Settings → Secrets and variables → Actions → New repository secret
+#     CLOUDFLARE_API_TOKEN  (jeton « Cloudflare Pages / Edit » du compte)
+#
+# Tant que le secret est absent, l'étape de déploiement est IGNORÉE : le
+# workflow reste vert, GitHub Pages continue de se déployer normalement, et le
+# message d'avis rappelle ce qui manque.
+#
+# Alternative SANS jeton : Cloudflare dashboard → Workers & Pages → souanpthub
+# → Settings → Builds & deployments → Connect to Git. Voir
+# docs/audits/deploy-cloudflare-v3.8.2.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Un déploiement à la fois : deux pushs rapprochés s'enchaînent au lieu de se
+# marcher dessus (même règle que le déploiement GitHub Pages).
+concurrency:
+  group: cloudflare-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Exclusions IDENTIQUES à deploy-cloudflare.ps1 (robocopy /XD /XF) :
+      # rien de ce qui n'est pas du site ne part en ligne — mais `functions/`
+      # reste inclus, il porte les relais /u/ et /api/.
+      - name: Préparer la publication
+        run: |
+          rsync -a ./ /tmp/souanpt-hub-dist/ \
+            --exclude '.git' --exclude '.github' --exclude '.claude' \
+            --exclude '.freebuff' --exclude '.wrangler' \
+            --exclude 'cloudflare' --exclude 'node_modules' \
+            --exclude 'docs' --exclude 'scripts' \
+            --exclude 'deploy-cloudflare.ps1' --exclude '*.md'
+
+      - name: Déployer sur Cloudflare Pages
+        if: env.CF_TOKEN != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Compte propriétaire du projet « souanpthub » (identifiant, pas un
+          # secret : c'est celui de .wrangler/cache/pages.json hors repo).
+          accountId: 3812fed3ef304d1dea00c6498d09aa52
+          command: pages deploy /tmp/souanpt-hub-dist --project-name=souanpthub --branch=main
+
+      - name: Jeton absent — déploiement Cloudflare ignoré
+        if: env.CF_TOKEN == ''
+        run: |
+          echo "::notice title=Cloudflare Pages::Secret CLOUDFLARE_API_TOKEN absent — souanptjub.pages.dev n'est pas mis à jour (voir docs/audits/deploy-cloudflare-v3.8.2.md)."

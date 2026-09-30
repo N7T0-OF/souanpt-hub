@@ -1324,6 +1324,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.8.2', "Le site souanptjub.pages.dev est désormais déployé à chaque version (workflow Cloudflare Pages)."],
   ['3.8.1', "Le centre de notification annonce désormais chaque nouvelle version (catégorie Générale)."],
   ['3.8.0', "Observatoire du dossier client : audit des rattachements, réparation additive et rapport copiable."],
   ['3.7.0', "ClientWorkspace : un dossier unique par projet, migration non destructive."],
