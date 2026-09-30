@@ -66,9 +66,21 @@ Le bouton « Créer un lien client » produit désormais un lien `/c/…`.
 
 La fusion **n'est pas terminée** ; seule sa fondation l'est.
 
-1. **Modèle `ClientWorkspace`** — aujourd'hui un devis et un portail restent
+1. **Modèle `ClientWorkspace`** — ~~aujourd'hui un devis et un portail restent
    deux documents distincts. Il faut une entité pivot portant `stage`, et
-   faire pointer les deux collections vers elle.
+   faire pointer les deux collections vers elle.~~ → **fait pour la couche
+   canonique (v3.7.0)** : `hub_workspaces`, un document par jeton qui
+   RÉFÉRENCE les pièces (`refs`) sans les déplacer, migration non destructive,
+   rattachement des factures/portails sans jeton par nom non ambigu (tracé
+   `linkVia`), et dossier unique ouvrable depuis Clients & Projets.
+   Voir `docs/audits/client-workspace-v3.7.md`.
+   - reste : **supprimer les doublons** (`hub_invoices.workspaceId` et
+     `refs` deviennent la seule voie, les lectures par nom partent) — uniquement
+     après migration validée sur données réelles ;
+   - reste : les 7 blocs métier complets (brief, questions, fichiers, messages,
+     échéances) et le **nettoyage physique** en fin de mission (aujourd'hui
+     `closeMission()` est logique : étape `done` + `closedAt`, rien n'est
+     supprimé).
 2. **Portail rendu par le même moteur** — tant que `portal.html` reste une page
    statique lisant `?id=`, l'étape production impose une redirection et
    l'adresse change. C'est la prochaine étape logique.

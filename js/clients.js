@@ -50,6 +50,9 @@
           : this._msg('⚠️ <b>Connecte-toi avec Google ou Discord</b> pour retrouver ici tous tes clients et projets.');
         this._after();
         this._badge();
+        // Hors-ligne aussi : le dossier travaille sur le cache local, la
+        // migration recense ce que les collections locales contiennent.
+        if (window.ClientWorkspace) ClientWorkspace.migrate().catch(() => {});
         return;
       }
       this._loading = true; this._paint();
@@ -64,6 +67,9 @@
       this._loading = false;
       this._paint();
       this._badge();
+      // Recense les projets + rattache factures/portails sans jeton (1×/session,
+      // non destructif) : le dossier n'affiche rien d'autre que ce qui existe.
+      if (window.ClientWorkspace) ClientWorkspace.migrate().catch(() => {});
     },
 
     setView(v) {
@@ -166,7 +172,7 @@
         const total = items.reduce((s, l) => s + (Number(l.total) || 0), 0);
         const cur = (items.find(l => l.currency) || {}).currency || '€';
         const chips = items.map(l => { const s = STAGE[l.stage || 'request'];
-          return `<span class="cp-chip" style="border-color:${s.color}66" title="${this._esc(l.projectName)}" onclick="CP.openLink('${this._esc(l.token)}')">${s.icon} ${this._esc(l.projectName) || s.label}</span>`;
+          return `<span class="cp-chip" style="border-color:${s.color}66" title="Dossier de ${this._esc(l.projectName)}" onclick="${window.ClientWorkspace ? 'ClientWorkspace.open' : 'CP.openLink'}('${this._esc(l.token)}')">${s.icon} ${this._esc(l.projectName) || s.label}</span>`;
         }).join('');
         return `<div class="cp-client-card">
           <div class="cp-client-h"><span class="cp-client-name">👤 ${this._esc(name)}</span>
@@ -209,8 +215,10 @@
         .then(() => window.showToast?.('Lien client copié ✓', '#2e9a63', 2000))
         .catch(() => {});
     },
-    // Route vers l'outil détaillé adapté à l'étape (en attendant l'atelier unifié).
+    // Ouvre le DOSSIER unique du projet (ClientWorkspace). L'ancien routage
+    // vers l'outil détaillé reste le repli si le module n'est pas chargé.
     manage(token) {
+      if (window.ClientWorkspace) { ClientWorkspace.open(token); return; }
       const l = this._links.find(x => x.token === token);
       const stage = l ? (l.stage || 'request') : 'request';
       if (stage === 'mission' || stage === 'done') { window.showPage?.('portals'); }

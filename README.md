@@ -100,8 +100,9 @@ Dépôt `{user}-hub-data` :
 
 ```
 data/manifest.json     table des matières (version, comptes, sha256 de chaque fichier)
-data/projects.json     clients, factures, catalogue, portails, avis, liens, médias,
-…                      fichiers, devis, grille tarifaire, config du site, réglages
+data/projects.json     clients, factures, dossiers clients (ClientWorkspace),
+…                      catalogue, portails, avis, liens, médias, fichiers, devis,
+…                      grille tarifaire, config du site, réglages
 data/*.partN.json      découpé automatiquement au-delà de ~440 Ko (limite API GitHub)
 media/<empreinte>.jpg  couvertures pleine taille (hors data/ → jamais purgées par la sauvegarde)
 backup.json            ancien format : plus écrit, toujours lu (restauration)

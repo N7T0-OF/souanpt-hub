@@ -1031,10 +1031,71 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .an-flag.chip{width:auto;min-width:22px;height:15px;box-shadow:none;background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:3px;align-items:center;justify-content:center;font-size:8px;font-weight:800;letter-spacing:.5px;color:var(--muted);padding:0 4px}
 @media(max-width:1100px){.ov-cards{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:900px){.an-kpis{grid-template-columns:repeat(2,1fr)}.an-2col{grid-template-columns:1fr}.an-bar-row{grid-template-columns:100px 1fr 52px}.ov-cards{grid-template-columns:repeat(2,1fr)}}
+
+/* ── DOSSIER CLIENT (ClientWorkspace) : tiroir « un projet = UN dossier » ── */
+#cw-root{position:fixed;inset:0;z-index:850;visibility:hidden;pointer-events:none}
+#cw-root.on{visibility:visible;pointer-events:auto}
+.cw-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55);opacity:0;transition:opacity .2s}
+#cw-root.on .cw-backdrop{opacity:1}
+.cw-drawer{position:absolute;top:0;right:0;height:100%;width:400px;max-width:94vw;background:var(--s2);
+  border-left:1px solid var(--border2);box-shadow:-18px 0 44px rgba(0,0,0,.5);display:flex;flex-direction:column;
+  overflow-y:auto;transform:translateX(100%);transition:transform .25s ease}
+#cw-root.on .cw-drawer{transform:none}
+.cw-head{position:sticky;top:0;z-index:2;padding:12px 16px 14px;background:var(--s1);
+  border-bottom:1px solid var(--border);border-left:3px solid var(--accent)}
+.cw-head-top{display:flex;align-items:center;justify-content:space-between}
+.cw-stage{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
+.cw-close{background:none;border:1px solid var(--border2);border-radius:6px;width:24px;height:24px;
+  color:var(--muted3);font-size:12px;cursor:pointer;line-height:1}
+.cw-close:hover{color:var(--text);border-color:var(--accent)}
+.cw-title{font-size:16px;font-weight:800;margin-top:6px;line-height:1.25}
+.cw-sub{font-size:11px;color:var(--muted3);margin-top:3px}
+.cw-act{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.cw-btn{flex:1 1 auto;font-size:10px;font-weight:700;padding:7px 9px;border-radius:6px;cursor:pointer;
+  background:var(--s3);border:1px solid var(--border2);color:var(--text)}
+.cw-btn:hover{border-color:var(--accent);color:var(--accent)}
+.cw-btn.go{background:var(--accent);border-color:var(--accent);color:#000}
+.cw-btn.go:hover{filter:brightness(1.08);color:#000}
+.cw-sec{border-bottom:1px solid var(--border)}
+.cw-sec-h{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 16px 7px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted3)}
+.cw-sec-a{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;cursor:pointer;
+  background:transparent;border:1px solid var(--border2);color:var(--muted3);text-transform:none;letter-spacing:0}
+.cw-sec-a:hover{border-color:var(--accent);color:var(--accent)}
+.cw-sec-b{padding:0 16px 13px}
+.cw-kv{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  font-size:11px;padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
+.cw-kv span{color:var(--muted3)}
+.cw-kv b{font-weight:700;text-align:right}
+.cw-none{font-size:11px;color:var(--muted2);padding:7px 9px;border:1px dashed var(--border2);
+  border-radius:6px;background:rgba(255,255,255,.02)}
+.cw-sib{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:9px}
+.cw-sib-l{font-size:9px;color:var(--muted2);width:100%}
+.cw-chip{font-size:10px;padding:4px 8px;border-radius:20px;cursor:pointer;
+  background:var(--s3);border:1px solid var(--border2);color:var(--text)}
+.cw-chip:hover{border-color:var(--accent);color:var(--accent)}
+.cw-inv{display:flex;align-items:center;gap:8px;font-size:11px;padding:5px 0;
+  border-bottom:1px dashed rgba(255,255,255,.05)}
+.cw-inv-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cw-inv-p{font-weight:700}
+.cw-st{font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px}
+.cw-st.ok{background:var(--green-dim);color:var(--green)}
+.cw-st.w{background:var(--gold-dim);color:var(--gold-l)}
+.cw-tot{display:flex;justify-content:space-between;font-size:10px;font-weight:700;color:var(--muted3);margin-top:7px}
+.cw-cand-h{font-size:9px;font-weight:800;color:var(--gold-l);margin:11px 0 3px;text-transform:uppercase;letter-spacing:.4px}
+.cw-mini-btn{font-size:9px;font-weight:700;padding:3px 7px;border-radius:5px;cursor:pointer;
+  background:transparent;border:1px solid var(--gold-border);color:var(--gold-l)}
+.cw-mini-btn:hover{background:var(--gold-dim)}
+.cw-foot{padding:12px 16px 20px;font-size:9px;color:var(--muted2);line-height:1.6}
+.cw-foot code{color:var(--muted3);background:var(--s3);padding:1px 5px;border-radius:4px}
+.cw-via{color:var(--muted2)}
+@media(max-width:560px){.cw-drawer{width:100%;max-width:none}}
 </style>
 </head>
 <body>
 <div id="sm2-toast"></div>
+<!-- Tiroir du DOSSIER CLIENT (js/client-workspace.js) : rempli à la demande -->
+<div id="cw-root" aria-hidden="true"></div>
 
 <!-- ══ PORTE DE CONNEXION (dashboard verrouillé sans login) ══ -->
 <div id="login-gate">
@@ -2076,6 +2137,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/storage-ui.js"></script>
 <script src="js/analytics.js"></script>
 <script src="js/quote.js"></script>
+<script src="js/client-workspace.js"></script>
 <script src="js/clients.js"></script>
 <script>
 /* ═══ SETTINGS ═══ */
@@ -2721,6 +2783,16 @@ function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(J
 function renderClients() {
   const cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');
   const ct=document.getElementById('clients-list'); if(!ct) return;
+  // Accès au DOSSIER client depuis l'annuaire — fonctionne aussi hors-ligne
+  // (le dossier lit le cache local, pas le registre public).
+  const cwBtn=(name)=>{
+    try{
+      const ws=(window.ClientWorkspace?ClientWorkspace.forClient(name):[])||[];
+      if(!ws.length) return '';
+      const t=ws[0].token;
+      return `<button onclick="ClientWorkspace.open('${t}')" title="Ouvrir le dossier client" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted3);font-size:10px;padding:3px 8px;font-family:inherit">📁 Dossier${ws.length>1?' ('+ws.length+')':''}</button>`;
+    }catch{ return ''; }
+  };
   // Compteur de l'annuaire fusionné (CP._clients) : il doit suivre les ajouts.
   const sub=document.querySelector('.cp-roster-sub');
   if(sub){ let withP=0; try{ const links=(window.CP&&CP._links)||[];
@@ -2729,7 +2801,7 @@ function renderClients() {
   const cols=['rgba(201,146,42,.12)','rgba(46,154,99,.1)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
   if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
-  ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${(c.name||'?')[0].toUpperCase()}</div><div><div class="client-name">${c.name}</div><div class="client-sub">${c.type||'Nouveau'}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${c.progress||0}%"></div></div><span>${c.progress||0}%</span></div><button onclick="deleteClient('${c.id}')" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div>`).join('');
+  ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${(c.name||'?')[0].toUpperCase()}</div><div><div class="client-name">${c.name}</div><div class="client-sub">${c.type||'Nouveau'}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${c.progress||0}%"></div></div><span>${c.progress||0}%</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}<button onclick="deleteClient('${c.id}')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`).join('');
 }
 
 /* ═══ FACTURATION V2 — recherche, pagination, catalogue, statuts, CSV ═══ */
@@ -2750,8 +2822,13 @@ function addInvoice() {
   const client=document.getElementById('inv-client')?.value.trim()||'';
   const price=parseFloat(document.getElementById('inv-price')?.value)||0;
   const inv=getInvoices();
-  inv.push({ id:Date.now().toString(), name, client, price, status:'pending', createdAt:Date.now() });
+  const newInv={ id:Date.now().toString(), name, client, price, status:'pending', createdAt:Date.now() };
+  inv.push(newInv);
   localStorage.setItem('hub_invoices', JSON.stringify(inv));
+  // Dossier client : si ce nom n'a qu'UN seul projet, la facture s'y rattache
+  // tout de suite (règle « nom non ambigu », tracée via linkVia — sinon elle
+  // apparaîtra sous « à rattacher » dans le dossier).
+  if (client && window.ClientWorkspace) { try { ClientWorkspace.bindByClient(client, newInv.id, 'invoice'); } catch {} }
   // Catalogue : la prestation est mémorisée (prix conseillé la prochaine fois)
   if (price > 0) {
     const cat=getCatalog();
@@ -3070,11 +3147,13 @@ function portalSave() {
     data.passwordSalt = ''; data.passwordHash = ''; data.hashRounds = 0;
   }
   const portals = getPortals();
+  let newPortal = null;
   if (_ptEditId) {
     const p = portals.find(x=>x.id===_ptEditId);
     if (p) Object.assign(p, data);
   } else {
-    portals.unshift({ id: randomId(16), active:true, createdAt:Date.now(), publishedAt:0, ...data });
+    newPortal = { id: randomId(16), active:true, createdAt:Date.now(), publishedAt:0, ...data };
+    portals.unshift(newPortal);
     // Client inconnu → créé dans Clients
     if (client) {
       const cls=JSON.parse(localStorage.getItem('hub_clients')||'[]');
@@ -3085,6 +3164,9 @@ function portalSave() {
     }
   }
   setPortals(portals);
+  // Dossier client : le portail créé à la main n'a pas de jeton → il se rattache
+  // au seul projet de ce nom (si non ambigu), sinon il reste « à rattacher ».
+  if (newPortal && client && window.ClientWorkspace) { try { ClientWorkspace.bindByClient(client, newPortal.id, 'portal'); } catch {} }
   portalCloseForm(); renderPortals();
   showToast(_ptEditId?'Portail mis à jour ✓ — republie pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
 }

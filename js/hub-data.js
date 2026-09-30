@@ -53,6 +53,9 @@ const HubData = {
     { key: 'links',     ls: 'hub_links',        file: 'links.json',     sync: 'links',     type: 'array' },
     { key: 'clients',   ls: 'hub_clients',      file: 'clients.json',   sync: 'clients',   type: 'array' },
     { key: 'invoices',  ls: 'hub_invoices',     file: 'invoices.json',  sync: 'invoices',  type: 'array' },
+    // Couche canonique « un projet = UN dossier » (js/client-workspace.js) :
+    // un document par jeton, qui RÉFÉRENCE les pièces (refs) sans les copier.
+    { key: 'workspaces', ls: 'hub_workspaces',  file: 'workspaces.json', sync: 'workspaces', type: 'array' },
     { key: 'catalog',   ls: 'hub_catalog',      file: 'catalog.json',   sync: 'catalog',   type: 'array' },
     { key: 'reviews',   ls: 'hub_reviews',      file: 'reviews.json',   sync: 'reviews',   type: 'array' },
     { key: 'portals',   ls: 'hub_portals',      file: 'portals.json',   sync: 'portals',   type: 'array' },
