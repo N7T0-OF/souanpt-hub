@@ -98,9 +98,36 @@ Contrôles effectués depuis la machine de travail :
 Puis dans l'app : cloche 🔔 → « 📦 Nouvelle version v3.8.2 » (catégorie
 **Générale**).
 
-## 5. Ce qui reste manuel (inchangé)
+## 5. Ce qui reste manuel — relevé du 30/09/2026 après la connexion Git
 
-- règles Firestore P0 (Firebase console) ;
-- `GH_CLIENT_ID` + redéploiement des Functions (T5) ;
-- relais `/u/` et `/api/` : ils ne prennent effet qu'après un redéploiement
-  Cloudflare — **l'option A ou B règle aussi ça**.
+### ✅ Réglé par cette connexion (n'est plus manuel)
+
+- **Relais `/u/` et `/api/`** : déployés avec le site. Vérifié sur
+  `souanptjub.pages.dev` → `/api/auth?op=status` → **200**,
+  `/api/gh?path=/user` → **401** (la fonction tourne et refuse sans session),
+  `/u/<pseudo inconnu>` → 404. Les correctifs P0 et T5 de `functions/` sont
+  donc en production — l'ancienne réserve « ils ne prennent effet qu'après un
+  redéploiement Cloudflare » ne s'applique plus.
+
+### ⏳ Toujours manuel
+
+1. **Règles Firestore P0** — la CI ne déploie pas Firebase.
+   Firebase console → Firestore → **Règles** → coller
+   `firebase/firestore.rules` → **Publier** (voir `firebase/FIREBASE.md` § 7).
+   Les correctifs côté client (v3.4.0) sont déjà en ligne ; les règles sont la
+   seconde couche, contre un client obsolète ou une écriture malveignable.
+
+2. **`GH_CLIENT_ID` (T5)** — état **vérifié : non configuré**.
+   `GET https://souanptjub.pages.dev/api/auth?op=status` renvoie
+   `{"relay":true,"configured":false,"user":null}` (`configured` = présence de
+   la variable d'environnement, `functions/api/auth.js:159`).
+   1. GitHub → Settings → Developer settings → **OAuth Apps** → New OAuth App
+      avec **« Enable device flow »** (obligatoire) → copier le *Client ID* ;
+   2. Cloudflare → Workers & Pages → `souanpthub` → **Settings → Environment
+      variables** → Production → `GH_CLIENT_ID` = valeur → Save ;
+   3. **Redéployer** : *Deployments → Retry deployment* (ou tout simple push
+      du dépôt, l'intégration Git reconstruit) ;
+   4. Contrôle : le même appel doit renvoyer `"configured":true`.
+
+Aucun autre point d'exploitation n'est en attente : GitHub Pages et
+`souanptjub.pages.dev` sont tous deux déployés automatiquement à chaque push.
