@@ -146,3 +146,29 @@ fichiers de test sont supprimés avant le commit.
   « suppression des jointures par nom » passe à **v3.10.0**.
 - Posture produit « gratuit » conservée : ni compte, ni service payant, ni
   mention « open source ».
+
+## 11. Livraison
+
+- **Commit** `3dcf30e` poussé sur `origin/main` (6 fichiers, +732 / −57) :
+  `app.html`, `js/core.js`, `js/canvas.js`, `js/ui.js`, `js/quote.js`,
+  `docs/audits/editeur-contenu-v3.9.md`. Les fichiers de test ont été supprimés
+  avant le commit ; `.freebuff/` reste le seul dossier non suivi.
+- **Tag + release** : `v3.9.0` → <https://github.com/N7T0-OF/souanpt-hub/releases/tag/v3.9.0>.
+- **Check-runs sur `3dcf30e`** : `Cloudflare Pages` → `success`,
+  `deploy` (GitHub Pages) → `success` ×2 ; déploiement `github-pages` → `success`.
+- **Sites revérifiés après déploiement** :
+  - `souanptjub.pages.dev/app` : `HUB_VERSION = 3.9.0`, 19 scripts, boutons
+    `🖼 Bannière` et `☰ Sections` présents, **0 erreur console** ;
+  - `n7t0-of.github.io/souanpt-hub/app.html` : mêmes marqueurs v3.9.0 ;
+  - `js/quote.js` des deux origines contient la ligne `['3.9.0', …]` →
+    l'annonce « 📦 Nouvelle version v3.9.0 » (catégorie **Générale**) se pose
+    seule au premier affichage (`Notify.checkVersion`, `js/quote.js:1401`).
+    Vérifié en page : note `sys-v3.9.0 · general`, cloche = 1, `#nt-ver` = `v3.9.0`.
+- **Relais** : `souanptjub.pages.dev/api/gh` répond `401` (fonction déployée,
+  authentification requise) — il n'existe pas d'endpoint `/api/health`
+  (`functions/api/` ne contient que `auth.js` et `gh.js`).
+- **Console locale** (`localhost:8766`) : seuls les messages **préexistants**
+  `api/auth?op=status` (404 / CORS sur `souanpthub.pages.dev`), imputables à T5
+  et hors périmètre de ce chantier.
+- **Toujours en attente** : `GH_CLIENT_ID` (étape manuelle T5) et les règles
+  Firestore P0 (suspendues à la demande).
