@@ -796,6 +796,36 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .edw-sec-rst{background:none;border:none;color:var(--muted2);font-family:inherit;font-size:9px;
   cursor:pointer;text-align:left;padding:2px 0}
 .edw-sec-rst:hover{color:var(--accent)}
+/* ── v3.9 ─────────────────────────────────────────────────────────────
+   Nom de section cliquable dans la colonne « Blocs » : c'est le RACCOURCI
+   vers la configuration de cette section (équivalent du touche S). */
+.ed-sec-go{background:none;border:none;color:inherit;font:inherit;font-weight:600;cursor:pointer;padding:0;
+  text-align:left;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ed-sec-go:hover{color:var(--accent)}
+/* Surbrillance de la section visée après un raccourci. */
+.edw-sec.ed-flash{border-color:var(--accent);box-shadow:0 0 0 2px rgba(200,255,0,.25)}
+/* ☰ Sections — configuration des Chiffres clés (3 sources, une carte). */
+.edw-stats{margin-top:6px;border-top:1px dashed var(--border);padding-top:6px;display:flex;flex-direction:column;gap:6px}
+.edw-kpi{display:flex;align-items:center;gap:7px;background:var(--s1);border:1px solid var(--border);border-radius:7px;padding:5px 8px}
+.edw-kpi b{font-size:12px;color:var(--accent);min-width:44px}
+.edw-kpi span{font-size:10px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.edw-kpi i{font-style:normal;font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted2);
+  border:1px solid var(--border);border-radius:20px;padding:1px 6px;flex-shrink:0}
+.edw-kpi i.api{color:var(--accent);border-color:rgba(200,255,0,.4)}
+.edw-kpi button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 2px}
+.edw-kpi button:hover{color:#c0392b}
+.edw-add{display:flex;gap:6px;align-items:center}
+.edw-add .edw-in{flex:1;min-width:0;width:auto}
+/* 🖼 Bannière principale : aperçu + import + URL. */
+.bn-img{display:flex;flex-direction:column;gap:6px}
+.bn-img img{width:100%;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+.bn-img>span{font-size:9px;color:var(--muted2);border:1px dashed var(--border2);border-radius:8px;padding:10px;text-align:center}
+.bn-img-a{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bn-img-a .edw-in{flex:1;min-width:120px;width:auto}
+/* ── État « non disponible » (v3.9) ── Grisé + interdiction AVANT le clic,
+   la raison est dans l'infobulle. Le texte de l'infobulle est posé par
+   setNa() ; ici on ne fait que le rendu. */
+.na{opacity:.42;filter:grayscale(1);cursor:not-allowed}
 /* Zone de dépôt d'image / GIF */
 .edw-drop{position:relative;border:1.5px dashed var(--border2);border-radius:10px;min-height:86px;display:flex;
   align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:all .15s;background:var(--s2)}
@@ -1337,8 +1367,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div id="nt-list"></div>
       </div>
     </div>
-    <button class="btn btn-ghost" onclick="syncBehance()">↻ Sync Behance</button>
-    <button class="btn btn-accent" onclick="edDeploy()">🚀 Publier</button>
+    <button class="btn btn-ghost" data-na="behance" onclick="syncBehance()" title="Récupérer tes projets Behance">↻ Sync Behance</button>
+    <button class="btn btn-accent" data-na="publish" onclick="edDeploy()" title="Publier ton site">🚀 Publier</button>
   </div>
   <div class="scroll-area">
 
@@ -1417,9 +1447,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         </div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0">
           <span id="ed-canvas-status" style="font-size:9px;color:var(--muted2);min-width:54px;text-align:right"></span>
-          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinTheme(this)" title="Style, couleurs, colonnes">🎨 Thème</button>
-          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinFx(this)" title="Animations & effets">⚡ Effets</button>
-          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinSections(this)" title="Renommer, décrire et réordonner les sections">☰ Sections</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinTheme(this)" title="Style, couleurs, colonnes — raccourci T">🎨 Thème</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinFx(this)" title="Animations & effets — raccourci E">⚡ Effets</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinBanner(this)" title="Image, accroche et action de la bannière principale — raccourci B">🖼 Bannière</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="edWinSections(this)" title="Renommer, réordonner, activer les sections — raccourci S">☰ Sections</button>
           <button class="btn btn-ghost" id="ed-undo" style="font-size:11px;padding:5px 8px" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" disabled>↶</button>
           <button class="btn btn-ghost" id="ed-redo" style="font-size:11px;padding:5px 8px" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" disabled>↷</button>
           <div class="ed-modes">
@@ -1675,7 +1706,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         </div>
         <button class="btn btn-ghost" style="font-size:10px" id="st-backfill" onclick="StorageUI.backfill()"
                 title="Fabriquer les aperçus des fichiers envoyés avant cette version">🖼 Aperçus manquants</button>
-        <button class="btn btn-accent" style="font-size:10px" onclick="StorageUI.pick()">＋ Déposer des fichiers</button>
+        <button class="btn btn-accent" style="font-size:10px" id="st-pick" onclick="StorageUI.pick()">＋ Déposer des fichiers</button>
       </div>
 
       <div class="st-filters" id="st-filters"></div>
@@ -3314,6 +3345,9 @@ function renderPortals() {
       </div>
     </div>`;
   }).join('');
+  // Les boutons 🚀 Publier sont grisés tant qu'aucune source de publication
+  // (cloud ou GitHub) n'est disponible — cf. refreshAvail (v3.9).
+  if (typeof refreshAvail === 'function') refreshAvail();
 }
 
 /* ═══ GOATCOUNTER — statistiques réelles gratuites ═══ */
@@ -3759,6 +3793,9 @@ document.addEventListener('DOMContentLoaded', () => {
   hubIdle(renderBackgroundPages);
   if (Auth.ok()) { BubbleWidget.init(); document.getElementById('gh-disconnect-btn') && (document.getElementById('gh-disconnect-btn').style.display=''); }
   else { const p=document.getElementById('gh-connect-prompt'); if(p) p.style.display='block'; }
+  // État initial des boutons « non disponibles » (v3.9) : grisés dès le chargement
+  // quand une connexion manque, avec la raison dans l'infobulle.
+  if (typeof refreshAvail === 'function') refreshAvail();
   // Settings load
   const cfg=SiteConfig.get();
   ['set-site-name','set-site-bio'].forEach(id=>{

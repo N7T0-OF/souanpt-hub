@@ -958,8 +958,31 @@ const ED_SEC_DEFAULTS = {
   projects: { title: 'Portfolio',   heading: 'Mes projets',          icon: '▦' },
   avis:     { title: 'Témoignages', heading: 'Avis clients',         icon: '★' },
   contact:  { title: 'Contact',     heading: 'Travaillons ensemble', icon: '✉' },
+  stats:    { title: 'Chiffres clés', heading: 'Le hub en chiffres',  icon: '📊' },
+  socials:  { title: 'Réseaux',     heading: 'Retrouve-moi ailleurs', icon: '🔗' },
 };
-const ED_SEC_KEYS = ['about', 'projects', 'avis', 'contact'];
+const ED_SEC_KEYS = ['about', 'projects', 'avis', 'contact', 'stats', 'socials'];
+
+/** Visibilités effectives : Stats & Réseaux sont MASQUÉES par défaut, pour
+    qu'un site publié avant v3.9 ne change pas d'apparence tant qu'on ne les
+    active pas (règle du générateur : jamais de surprise à la publication). */
+function edSecVis() {
+  const c = SiteConfig.get();
+  return { projects: true, avis: true, contact: true, about: true, stats: false, socials: false, ...(c.sections || {}) };
+}
+/** Active Stats avec des chiffres déjà remplis : une section vide serait
+    invisibile, l'utilisateur croirait que le bouton « ne fait rien ». */
+function edEnsureStats() {
+  const c = SiteConfig.get();
+  if (Array.isArray(c.stats?.items) && c.stats.items.length) return;
+  // Écriture silencieuse : l'activation de la section déclenche déjà un
+  // rafraîchissement, un second ne ferait que doubler le travail.
+  SiteConfig.set('stats', { mode: 'auto', items: [
+    { kind: 'auto', id: 'projects' }, { kind: 'auto', id: 'clients' },
+    { kind: 'auto', id: 'files' },    { kind: 'auto', id: 'thumbs' },
+    { kind: 'auto', id: 'reviews' },
+  ] });
+}
 
 /** Métadonnées effectives d'une section : valeurs d'origine + personnalisation. */
 function edSecMeta(k) {
@@ -982,10 +1005,52 @@ function edSecOrder() {
   return o;
 }
 
+/* ── Configuration des Chiffres clés (section Stats) ─────────────────────
+   Trois sources, une seule carte :
+   • auto  → calculées chez toi à la génération (projets, clients, fichiers,
+             miniatures, avis, CA…) : gratuit, instantané, sans compte ;
+   • value → saisies à la main, pour un chiffre que le Hub ne connaît pas ;
+   • api   → un compteur PUBLIC relu à chaque visite (URL JSON + chemin),
+             avec la dernière valeur gravée dans la page comme repli.        */
+function edStatsPanel() {
+  const items = Array.isArray(SiteConfig.get().stats?.items) ? SiteConfig.get().stats.items : [];
+  const disp = it => statItems({ stats: { items: [it] } })[0]
+    || { value: '—', label: String((it && (it.label || it.id)) || '?'), kind: (it && it.kind) || 'auto' };
+  const used = new Set(items.filter(i => i && i.kind === 'auto').map(i => i.id));
+  const srcOpts = Object.entries(STAT_SOURCES).filter(([id]) => !used.has(id))
+    .map(([id, label]) => `<option value="${id}">${_eesc(label)}</option>`).join('');
+  return `
+  <div class="edw-stats">
+    <div class="edw-l">Chiffres affichés</div>
+    ${items.length ? items.map((it, i) => {
+      const d = disp(it);
+      return `<div class="edw-kpi"><b>${_eesc(d.value)}</b><span>${_eesc(d.label)}</span>
+        <i class="${d.kind === 'api' ? 'api' : ''}" title="${d.kind === 'api' ? 'Compteur public — rafraîchi à chaque visite' : d.kind === 'value' ? 'Valeur saisie' : 'Calculée depuis tes données'}">${d.kind === 'api' ? 'API' : d.kind === 'value' ? 'saisi' : 'auto'}</i>
+        <button data-kpi-rm="${i}" title="Retirer ce chiffre">✕</button></div>`;
+    }).join('') : '<div class="edw-hint">Aucun chiffre : active la section puis ajoute-en un.</div>'}
+    <div class="edw-add">
+      <select class="edw-in" id="ed-st-src"${srcOpts ? '' : ' disabled'}>${srcOpts || '<option>— toutes les sources sont ajoutées —</option>'}</select>
+      <button class="edw-sec-rst" id="ed-st-src-add">＋ Source</button>
+    </div>
+    <div class="edw-add">
+      <input class="edw-in" id="ed-st-lbl" placeholder="Libellé (ex. Téléchargements)">
+      <input class="edw-in" id="ed-st-val" placeholder="Valeur (ex. 35 k)">
+      <button class="edw-sec-rst" id="ed-st-val-add">＋ Valeur</button>
+    </div>
+    <div class="edw-l">Compteur public (API)</div>
+    <div class="edw-add">
+      <input class="edw-in" id="ed-st-api-lbl" placeholder="Libellé">
+      <input class="edw-in" id="ed-st-api-url" placeholder="https://…/TOTAL.json">
+      <input class="edw-in" id="ed-st-api-path" placeholder="chemin JSON (views)">
+      <button class="edw-sec-rst" id="ed-st-api-add">＋ API</button>
+    </div>
+  </div>`;
+}
+
 function edWinSections(btn) {
   const draw = () => {
     const c = SiteConfig.get();
-    const vis = { projects: true, avis: true, contact: true, about: true, ...(c.sections || {}) };
+    const vis = edSecVis();
     const ord = edSecOrder();
     return ord.map((k, i) => {
       const m = edSecMeta(k), off = vis[k] === false;
@@ -1003,6 +1068,7 @@ function edWinSections(btn) {
           <textarea class="edw-sec-d" data-k="${k}" data-f="desc" rows="2" placeholder="Description (facultative)">${_eesc(m.desc || '')}</textarea>
           <label class="edw-tog"><input type="checkbox" data-k="${k}" data-f="showTitle"${m.showTitle === false ? '' : ' checked'}> Afficher le titre</label>
           <label class="edw-tog"><input type="checkbox" data-k="${k}" data-f="showDesc"${m.showDesc === false ? '' : ' checked'}> Afficher la description</label>
+          ${k === 'stats' ? edStatsPanel() : ''}
           <button class="edw-sec-rst" data-rst="${k}">↺ Revenir au nom d'origine</button>
         </div>
       </div>`;
@@ -1028,10 +1094,9 @@ function edWinSections(btn) {
         edSet('sectionOrder', o); redraw();
       });
       list.querySelectorAll('[data-eye]').forEach(b => b.onclick = () => {
-        const k = b.dataset.eye, c = SiteConfig.get();
-        const s = { projects: true, avis: true, contact: true, about: true, ...(c.sections || {}) };
-        s[k] = s[k] === false;
-        edSet('sections', s); redraw();
+        const k = b.dataset.eye;
+        edSetSectionVisible(k, edSecVis()[k] === false);   // inverse l'état courant
+        redraw();
       });
       list.querySelectorAll('[data-rst]').forEach(b => b.onclick = () => {
         const k = b.dataset.rst, c = SiteConfig.get();
@@ -1040,10 +1105,130 @@ function edWinSections(btn) {
         edSet('sectionMeta', all); redraw();
         showToast?.('Section « ' + ED_SEC_DEFAULTS[k].title + ' » réinitialisée', '#666', 1800);
       });
+      /* ── Chiffres clés : retrait + 3 façons d'ajouter (v3.9) ── */
+      const stWrite = mut => {
+        const c = SiteConfig.get();
+        const st = { ...(c.stats || {}) };
+        st.items = mut(Array.isArray(st.items) ? st.items.slice() : []);
+        edSet('stats', st); redraw();
+      };
+      list.querySelectorAll('[data-kpi-rm]').forEach(b => b.onclick = () => {
+        const i = Number(b.dataset.kpiRm);
+        stWrite(items => { items.splice(i, 1); return items; });
+      });
+      const stVal = id => String(list.querySelector('#' + id)?.value || '').trim();
+      list.querySelector('#ed-st-src-add')?.addEventListener('click', () => {
+        const id = stVal('ed-st-src'); if (!id) return;
+        stWrite(items => [...items, { kind: 'auto', id }]);
+      });
+      list.querySelector('#ed-st-val-add')?.addEventListener('click', () => {
+        const label = stVal('ed-st-lbl'), value = stVal('ed-st-val');
+        if (!label || !value) return showToast?.('Libellé ET valeur sont nécessaires', '#e4b24a', 2400);
+        stWrite(items => [...items, { kind: 'value', label, value }]);
+      });
+      list.querySelector('#ed-st-api-add')?.addEventListener('click', () => {
+        const label = stVal('ed-st-api-lbl'), url = stVal('ed-st-api-url'), path = stVal('ed-st-api-path');
+        if (!label || !url) return showToast?.('Libellé ET URL JSON sont nécessaires', '#e4b24a', 2400);
+        if (!/^https?:\/\//i.test(url)) return showToast?.('L\'URL doit commencer par http(s)://', '#e4b24a', 2400);
+        stWrite(items => [...items, { kind: 'api', label, url, path: path || 'value' }]);
+      });
     };
     bind();
   }, 'wide');
 }
+
+/* ── 🖼 Bannière principale (nouvelle fenêtre, v3.9) ─────────────────────
+   Avant, l'image et l'action de la bannière n'étaient modifiables QUE via un
+   champ mort (`ep-hero-image`, absent du HTML) et l'action QUE pour le thème
+   Latérale : « le hero est un bouton cassé ». Ici, tout est au même endroit
+   et pour TOUS les thèmes qui ont une bannière (Flottante & Latérale).
+   La carte Profil du thème Bento garde son dégradé : une photo en fond de
+   grille rendrait le texte illisible — le rappel est affiché dans la fenêtre. */
+function edWinBanner(anchor) {
+  const HL_TYPES = [['none', 'Aucune action'], ['url', 'Ouvrir un lien'],
+                    ['section', 'Aller vers une section'], ['project', 'Voir un projet']];
+  const draw = () => {
+    const c = SiteConfig.get();
+    const hl = c.heroLink || { type: 'none' };
+    const t = hl.type || 'none';
+    const blocks = getBlocks(c);
+    const hero = blocks.find(b => b.id === 'b_profile');
+    const shown = !hero || !bHidden(hero);
+    const projOpts = getProjects().map(p =>
+      `<option value="${_eesc(p.id)}"${String(hl.projectId) === String(p.id) ? ' selected' : ''}>${_eesc(p.title || 'Projet')}</option>`).join('');
+    const secOpts = ED_SEC_KEYS.map(k =>
+      `<option value="${k}"${hl.section === k ? ' selected' : ''}>${_eesc(ED_SEC_DEFAULTS[k].title)}</option>`).join('');
+    return `
+    <div class="edw-l">Accroche (le petit texte au-dessus du nom)</div>
+    <input class="edw-in" id="bn-text" value="${_eesc(c.heroText || '')}" placeholder="Créatif · Designer · Motion" live>
+    <div class="edw-l">Image de fond</div>
+    <div class="bn-img">
+      ${c.heroImage ? `<img src="${_eesc(c.heroImage)}" alt="Bannière">` : '<span>🌄 Aucune image — dégradé du thème</span>'}
+      <div class="bn-img-a">
+        <button class="edw-sec-rst" id="bn-pick">📁 Importer une image</button>
+        <input class="edw-in" id="bn-imgurl" value="${c.heroImage && !String(c.heroImage).startsWith('data:') ? _eesc(c.heroImage) : ''}" placeholder="… ou colle l'URL d'une image déjà en ligne">
+        ${c.heroImage ? '<button class="edw-sec-rst" id="bn-clear">✖ Retirer</button>' : ''}
+        <input type="file" id="bn-file" accept="image/*" hidden>
+      </div>
+    </div>
+    <div class="edw-l">Action de la bannière</div>
+    <select class="edw-in" id="bn-type">${HL_TYPES.map(([v, l]) => `<option value="${v}"${t === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
+    ${t === 'url' ? `<input class="edw-in" id="bn-urlv" value="${_eesc(hl.url || '')}" placeholder="https://…">` : ''}
+    ${t === 'section' ? `<select class="edw-in" id="bn-sec">${secOpts}</select>` : ''}
+    ${t === 'project' ? `<select class="edw-in" id="bn-proj">${projOpts || '<option>— aucun projet —</option>'}</select>` : ''}
+    ${t !== 'none' ? `
+    <input class="edw-in" id="bn-label" value="${_eesc(hl.label || '')}" placeholder="Libellé du bouton (ex. Découvrir)">
+    <label class="edw-tog"><input type="checkbox" id="bn-blank"${hl.blank === false ? '' : ' checked'}> Ouvrir dans un nouvel onglet</label>` : ''}
+    <div class="edw-l">Bannière</div>
+    <button class="edw-sec-rst" id="bn-vis">${shown ? '🙈 Masquer la bannière' : '👁 Afficher la bannière'}</button>
+    <p class="edw-hint">${c.layoutStyle === 'bento'
+      ? 'Thème Bento : la bannière n\'y figure pas (la carte Profil garde son dégradé). Passe en <b>Barre flottante</b> ou <b>Latérale</b> pour l\'image.'
+      : 'L\'image reçoit un voile sombre automatique : le titre reste lisible sur n\'importe quelle photo.'}</p>`;
+  };
+  const w = EdWin.open(anchor, '🖼 Bannière principale', `<div id="bn-body">${draw()}</div>`, root => {
+    const body = root.querySelector('#bn-body');
+    const redraw = () => { body.innerHTML = draw(); bind(root); };
+    bind(root);
+    function bind(r) {
+      const q = s => r.querySelector(s);
+      const txt = q('#bn-text');
+      if (txt) txt.oninput = () => edSet('heroText', txt.value, true);
+      const setLink = patch => { const c = SiteConfig.get(); edSet('heroLink', { type: 'none', ...(c.heroLink || {}), ...patch }); redraw(); };
+      const ty = q('#bn-type');
+      if (ty) ty.onchange = () => setLink({ type: ty.value });
+      const u = q('#bn-urlv');   if (u) u.onchange = () => setLink({ url: u.value });
+      const s = q('#bn-sec');    if (s) s.onchange = () => setLink({ section: s.value });
+      const p = q('#bn-proj');   if (p) p.onchange = () => setLink({ projectId: p.value });
+      const l = q('#bn-label');  if (l) l.onchange = () => setLink({ label: l.value });
+      const bl = q('#bn-blank'); if (bl) bl.onchange = () => setLink({ blank: bl.checked });
+      const pick = q('#bn-file');
+      if (q('#bn-pick')) q('#bn-pick').onclick = () => pick && pick.click();
+      if (pick) pick.onchange = e => {
+        const f = e.target.files[0]; if (!f) return;
+        fileToDataURL(f, d => { edSet('heroImage', d); showToast?.('Image de bannière importée ✓', '#2e9a63', 2000); redraw(); });
+        e.target.value = '';
+      };
+      const iu = q('#bn-imgurl');
+      if (iu) iu.onchange = () => {
+        const v = iu.value.trim();
+        if (v === String(SiteConfig.get().heroImage || '')) return;
+        edSet('heroImage', v); redraw();
+      };
+      if (q('#bn-clear')) q('#bn-clear').onclick = () => { edSet('heroImage', ''); redraw(); };
+      if (q('#bn-vis')) q('#bn-vis').onclick = () => {
+        const c = SiteConfig.get();
+        const blocks = getBlocks(c);
+        const i = blocks.findIndex(b => b.id === 'b_profile');
+        if (i < 0) return;
+        blocks[i] = { ...blocks[i], visibility: { ...(blocks[i].visibility || {}), public: bHidden(blocks[i]) } };
+        edSet('blocks', blocks); redraw();
+        showToast?.(bHidden(blocks[i]) ? 'Bannière masquée — absente du site public' : 'Bannière affichée ✓', '#666', 2200);
+      };
+    }
+  }, 'wide');
+  return w;
+}
+window.edWinBanner = edWinBanner;
 
 /* ── ✎ Modifier : contenu du bloc sélectionné (ex-groupes « Contenu » / « Portfolio ») ── */
 function edWinEdit(blockId) {
@@ -1369,14 +1554,48 @@ function edAddBlock() {
     <div class="edw-l">Réseaux & liens</div>
     <div class="edp-grid">${soc}</div>
     <div class="edw-l">Contenu</div>
-    <div class="edp-grid"><button class="edp-b" data-a="text"><span>✍️</span>Texte</button></div>`;
+    <div class="edp-grid"><button class="edp-b" data-a="text"><span>✍️</span>Texte</button></div>
+    <div class="edw-l">Sections (raccourci)</div>
+    <div class="edp-grid">
+      <button class="edp-b" data-sec="stats" title="Activer la section Chiffres clés puis la configurer"><span>📊</span>Chiffres clés</button>
+      <button class="edp-b" data-sec="socials" title="Activer la section Réseaux (tes liens, enfin visibles hors Bento)"><span>🔗</span>Réseaux</button>
+    </div>`;
   EdWin.open(null, '＋ Ajouter un bloc', html, w => {
     w.querySelectorAll('[data-soc]').forEach(b => b.onclick = () => edCreateSocial(b.dataset.soc));
     w.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
       if (b.dataset.a === 'project') { EdWin.close(); edAddProject(); }
       else if (b.dataset.a === 'text') edCreateText();
     });
+    w.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => {
+      edSetSectionVisible(b.dataset.sec, true);   // active + rafraîchit
+      edWinSections(null);                        // et ouvre directement la config
+    });
   });
 }
 window.edAddBlock = edAddBlock;
 window.edWinTheme = edWinTheme; window.edWinFx = edWinFx; window.edWinEdit = edWinEdit;
+
+/* ── RACCOURCIS CLAVIER de l'éditeur (v3.9) ─────────────────────────────
+   Une lettre seule, dans l'éditeur, quand on n'écrit PAS dans un champ :
+   S = ☰ Sections, B = 🖼 Bannière, T = 🎨 Thème, E = ⚡ Effets, ? = aide.
+   Les combinaisons (Ctrl+Z, Ctrl+S…) restent aux raccourcis du navigateur. */
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const page = document.getElementById('page-editor');
+  if (!page || !page.classList.contains('active')) return;
+  const t = e.target;
+  // Un bouton gardant le focus après un clic ne doit PAS bloquer les raccourcis :
+  // les lettres n'y saisissent rien (contrairement à un champ de saisie).
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  const K = {
+    s: () => edWinSections(null),
+    b: () => edWinBanner(null),
+    t: () => edWinTheme(null),
+    e: () => edWinFx(null),
+    '?': () => showToast?.('Raccourcis : S sections · B bannière · T thème · E effets · Échap ferme', '#666', 4200),
+  };
+  const go = K[String(e.key || '').toLowerCase()] || K[e.key];
+  if (!go) return;
+  e.preventDefault();
+  go();
+});

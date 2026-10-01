@@ -1324,6 +1324,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.9.0', "Éditeur : bannière principale avec image, sections Chiffres clés & Réseaux, raccourcis clavier, défilement fluide et boutons indisponibles grises."],
   ['3.8.2', "Le site souanptjub.pages.dev est désormais déployé à chaque version (workflow Cloudflare Pages)."],
   ['3.8.1', "Le centre de notification annonce désormais chaque nouvelle version (catégorie Générale)."],
   ['3.8.0', "Observatoire du dossier client : audit des rattachements, réparation additive et rapport copiable."],

@@ -232,7 +232,10 @@ const GH = {
 const Auth = {
   _K: 'souanpt_auth_v2',
   get()             { try { return JSON.parse(localStorage.getItem(this._K) || '{}'); } catch { return {}; } },
-  save(d)           { localStorage.setItem(this._K, JSON.stringify(d)); },
+  /** Notifie l'UI qu'un état de session a changé (les boutons « non
+      disponible » se revalident — voir refreshAvail dans ui.js). */
+  _ping()           { try { window.dispatchEvent(new Event('hub-auth')); } catch {} },
+  save(d)           { localStorage.setItem(this._K, JSON.stringify(d)); this._ping(); },
   token()           { const d = this.get(); return d.session ? '' : (d.token || ''); },
   user()            { return this.get().user  || null; },
   owner()           { return this.user()?.login || ''; },
@@ -246,6 +249,7 @@ const Auth = {
     localStorage.removeItem(this._K);
     try { localStorage.removeItem('souanpt_relay_base'); } catch {}
     if (relay && typeof GhSession !== 'undefined') { try { GhSession.logout(); } catch {} }
+    this._ping();
   },
 };
 
@@ -883,6 +887,83 @@ const SOCIAL_PLATFORMS = [
 ];
 const socialById = id => SOCIAL_PLATFORMS.find(p => p.id === id) || SOCIAL_PLATFORMS[SOCIAL_PLATFORMS.length - 1];
 
+/** Icône d'une plateforme, déduite de son titre ou de son URL.
+    Fonction unique partagée par la grille Bento et la section « Réseaux » :
+    les deux doivent rendre EXACTEMENT la même icône pour le même lien. */
+const platIconOf = (t, u) => {
+  const s = (String(t || '') + ' ' + String(u || '')).toLowerCase();
+  if (s.includes('discord')) return '🎮';   if (s.includes('instagram')) return '📸';
+  if (s.includes('behance')) return '🎨';   if (s.includes('github')) return '🐙';
+  if (s.includes('linkedin')) return '💼';  if (s.includes('tiktok')) return '🎵';
+  if (s.includes('youtube')) return '▶';    if (s.includes('twitch')) return '🟣';
+  if (s.includes('kofi') || s.includes('ko-fi')) return '☕';
+  if (s.includes('mailto') || s.includes('@')) return '✉';
+  return '🔗';
+};
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHIFFRES CLÉS — les sources « auto » de la section Stats.
+
+   Le site publié est un FICHIER STATIQUE : il ne lit PAS le localStorage du
+   Hub (origin différente). Les valeurs sont donc calculées au moment de la
+   GÉNÉRATION (aperçu ou publication) et figées dans le HTML. Pour un compteur
+   qui continue de bouger après la publication, la section accepte une API
+   publique relue à chaque visite (cf. `kind:'api'`, rendu + script plus bas).
+   Aucun compte, aucun service payant : les chiffres viennent de chez toi.
+══════════════════════════════════════════════════════════════════════ */
+const STAT_SOURCES = {
+  projects: 'Projets', clients: 'Clients', files: 'Fichiers en ligne',
+  videos: 'Vidéos', images: 'Images', thumbs: 'Miniatures créées',
+  reviews: 'Avis reçus', invoices: 'Factures émises', revenue: 'CA encaissé',
+};
+/** Valeurs brutes de toutes les sources, lues à l'instant T. */
+function statValues() {
+  const arr = k => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch { return []; } };
+  const files    = HubFiles.list();
+  const invoices = arr('hub_invoices');
+  const kind = f => HubFiles._kind(String((f && (f.mime || f.type)) || ''), HubFiles._ext((f && f.name) || ''));
+  const n = k => files.filter(f => kind(f) === k).length;
+  let thumbs = 0;
+  try { if (window.HubImages) thumbs = HubImages.stats().offloaded; } catch {}
+  return {
+    projects: getProjects().length,
+    clients:  arr('hub_clients').length,
+    files:    files.length,
+    videos:   n('video'),
+    images:   n('image') + n('gif'),
+    thumbs,                                       // couvertures sorties du navigateur (miniature + fichier)
+    reviews:  getReviews().length,
+    invoices: invoices.length,
+    revenue:  invoices.reduce((s, i) => s + (i && i.status === 'paid' ? Number(i.price) || 0 : 0), 0),
+  };
+}
+/** Formatage d'une source (le CA s'affiche en euros, le reste en nombre). */
+const statFmt = (id, v) => id === 'revenue' ? (Number(v) || 0).toLocaleString('fr-FR') + ' €' : String(Number(v) || 0);
+/** Liste NORMALISÉE des chiffres clés à afficher : sources auto, valeurs saisies, API publiques. */
+function statItems(cfg) {
+  const list = Array.isArray(cfg?.stats?.items) ? cfg.stats.items : [];
+  const vals = statValues();
+  return list.map(it => {
+    if (!it || typeof it !== 'object') return null;
+    if (it.kind === 'api') {
+      const url = String(it.url || '').trim();
+      if (!url) return null;
+      return { kind: 'api', label: String(it.label || 'Compteur'), url, path: String(it.path || '').trim() || 'value',
+               prefix: String(it.prefix || ''), suffix: String(it.suffix || ''),
+               value: String(it.value != null ? it.value : '—') };
+    }
+    if (it.kind === 'value') {
+      const label = String(it.label || '').trim(), value = String(it.value ?? '').trim();
+      if (!label || !value) return null;
+      return { kind: 'value', label, value, prefix: String(it.prefix || ''), suffix: String(it.suffix || '') };
+    }
+    const id = STAT_SOURCES[it.id] ? it.id : null;
+    if (!id) return null;
+    return { kind: 'auto', id, label: String(it.label || STAT_SOURCES[id]),
+             value: statFmt(id, vals[id]), prefix: '', suffix: '' };
+  }).filter(Boolean);
+}
+
 /* ── Modèle V3 (unifié) ────────────────────────────────────────────────
    {
      id, type,
@@ -1084,16 +1165,7 @@ function renderBentoGrid(blocks, ctx) {
   const sTOr = ctx.secTitleOr || ((k, f) => f);
   const P = id => projects.find(p => String(p.id) === String(id));
   const L = id => links.find(l => String(l.id) === String(id));
-  const platIcon = (t, u) => {
-    const s = (t + ' ' + u).toLowerCase();
-    if (s.includes('discord')) return '🎮';   if (s.includes('instagram')) return '📸';
-    if (s.includes('behance')) return '🎨';   if (s.includes('github')) return '🐙';
-    if (s.includes('linkedin')) return '💼';  if (s.includes('tiktok')) return '🎵';
-    if (s.includes('youtube')) return '▶';    if (s.includes('twitch')) return '🟣';
-    if (s.includes('kofi') || s.includes('ko-fi')) return '☕';
-    if (s.includes('mailto') || s.includes('@')) return '✉';
-    return '🔗';
-  };
+  const platIcon = (t, u) => platIconOf(t, u);   // registre unique (voir platIconOf)
   const cell = (b, inner, extra) => {
     const w = Math.min(BLOCK_COLS, bW(b)), h = bH(b), x = bX(b), y = bY(b);
     // Placement absolu quand il existe ; sinon la grille place automatiquement.
@@ -1182,12 +1254,18 @@ function generateSite(cfg, projects, reviews, opts) {
   if (!reviews)  reviews  = getReviews();
   const approved = reviews.filter(r => r.status === 'approved');
   const aboutTxt = String(cfg.about || '').trim();
-  const sec      = { projects: true, avis: true, contact: true, about: true, ...(cfg.sections || {}) };
+  /* Les deux NOUVELLES sections (Chiffres clés, Réseaux) sont Masquées par
+     défaut : un site publié avant cette version garde exactement la même
+     apparence tant que l'utilisateur ne les active pas depuis la colonne
+     « Blocs » ou la fenêtre ☰ Sections. */
+  const sec      = { projects: true, avis: true, contact: true, about: true, stats: false, socials: false, ...(cfg.sections || {}) };
   if (!aboutTxt) sec.about = false; // pas de texte → pas de section
-  const SEC_KEYS = ['about', 'projects', 'avis', 'contact'];
+  const SEC_KEYS = ['about', 'projects', 'avis', 'contact', 'stats', 'socials'];
   const order = (Array.isArray(cfg.sectionOrder) && cfg.sectionOrder.length ? cfg.sectionOrder.slice() : SEC_KEYS.slice())
                 .filter(k => SEC_KEYS.includes(k));
   SEC_KEYS.forEach(k => { if (!order.includes(k)) order.push(k); });
+  const statsItems = statItems(cfg);            // chiffres clés (valeurs figées à la génération)
+  if (!statsItems.length) sec.stats = false;    // activée mais vide → ni section, ni entrée de nav
   const avisMode = cfg.avisMode || 'defile';
   const cols   = parseInt(cfg.layout) || 3;
   const dark   = cfg.theme !== '#f8f8f8';
@@ -1203,6 +1281,31 @@ function generateSite(cfg, projects, reviews, opts) {
   const links       = getLinks();
   const blocks      = getBlocks(cfg, projects, links);   // même modèle pour tous les styles
   const heroImage   = String(cfg.heroImage || '').trim();
+  /* Section « Réseaux » : les blocs Lien VISIBLES, dans l'ordre des blocs —
+     la même source que la grille Bento, donc un lien masqué disparaît aussi
+     d'ici (aucun lien mort ni fuite d'un lien désactivé). */
+  const socItems = blocks.filter(b => b.type === 'link' && (editor || !bHidden(b)))
+    .map(b => links.find(l => String(l.id) === String(bRef(b))) || null)
+    .filter(l => l && String(l.url || '').trim());
+  if (!socItems.length) sec.socials = false;
+
+  /* ── Une section n'est dans la NAVIGATION que si elle existe VRAIMENT ──
+     Avant, la nav listait `sec[k]` seul : masquer le bloc Contact, retirer le
+     bloc À propos ou n'avoir aucun projet laissait un lien d'ancre mort (le
+     clic ne menait nulle part). On teste donc le contenu réellement rendu —
+     et les deux nouvelles sections (Stats, Réseaux) de la même façon.
+     Déclaré ICI, avant heroLinkHref() qui en dépend aussi. */
+  const liveBlock = t => blocks.some(b => b.type === t && (editor || !bHidden(b)));
+  const secLive = k => {
+    if (!sec[k]) return false;
+    if (k === 'about')    return !!aboutTxt;
+    if (k === 'projects') return liveBlock('project');
+    if (k === 'avis')     return liveBlock('reviews');
+    if (k === 'contact')  return liveBlock('contact');
+    if (k === 'stats')    return statsItems.length > 0;
+    if (k === 'socials')  return socItems.length > 0;
+    return true;
+  };
   /* ── Visibilité de la bannière / du hero ──────────────────────────────
      Le hero était écrit EN DUR dans le gabarit, alors qu'il porte
      `data-b="b_profile"`. Résultat : masquer ou supprimer le bloc le
@@ -1231,13 +1334,13 @@ function generateSite(cfg, projects, reviews, opts) {
       // Une URL sans schéma ne doit pas devenir un lien relatif cassé.
       return /^(https?:|mailto:|tel:)/i.test(u) ? u : 'https://' + u;
     }
-    if (t === 'section') return SEC_KEYS.includes(L.section) ? '#' + L.section : null;
+    if (t === 'section') return SEC_KEYS.includes(L.section) && secLive(L.section) ? '#' + L.section : null;
     if (t === 'project') {
       const p = projects.find(x => String(x.id) === String(L.projectId));
       return p && p.url ? String(p.url) : null;
     }
     if (t === 'file')    return String(L.url || '').trim() || null;
-    if (t === 'contact') return cfg.email ? 'mailto:' + cfg.email : '#contact';
+    if (t === 'contact') return cfg.email ? 'mailto:' + cfg.email : (secLive('contact') ? '#contact' : null);
     return null;
   };
   const heroHref = heroLinkHref();
@@ -1289,6 +1392,8 @@ function generateSite(cfg, projects, reviews, opts) {
     projects: { title: 'Portfolio',   heading: 'Mes projets',          icon: '▦' },
     avis:     { title: 'Témoignages', heading: 'Avis clients',         icon: '★' },
     contact:  { title: 'Contact',     heading: 'Travaillons ensemble', icon: '✉' },
+    stats:    { title: 'Chiffres clés', heading: 'Le hub en chiffres',  icon: '📊' },
+    socials:  { title: 'Réseaux',     heading: 'Retrouve-moi ailleurs', icon: '🔗' },
   };
   const meta = k => ({ ...(SEC_DEFAULTS[k] || {}), ...((cfg.sectionMeta || {})[k] || {}) });
   const secTitle = k => String(meta(k).title || SEC_DEFAULTS[k]?.title || k);
@@ -1355,7 +1460,7 @@ function generateSite(cfg, projects, reviews, opts) {
   };
   // Compat : le reste du générateur lit encore ces tables.
   const SEC_LABELS = {}; const SEC_ICONS = {};
-  ['about', 'projects', 'avis', 'contact'].forEach(k => { SEC_LABELS[k] = secTitle(k); SEC_ICONS[k] = secIcon(k); });
+  SEC_KEYS.forEach(k => { SEC_LABELS[k] = secTitle(k); SEC_ICONS[k] = secIcon(k); });
   const tagList = [...new Set(projects.flatMap(p => (p.tags || []).slice(0, 3)).filter(Boolean))].slice(0, 8);
   const secHtml = {
     about: `<section id="about" class="rev" style="max-width:760px">${secHead('about')}<p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
@@ -1378,6 +1483,24 @@ function generateSite(cfg, projects, reviews, opts) {
     contact: `<section id="contact" class="ci rev">${secHead('contact')}${contactHtml()}${
       behanceUser ? `<div class="ctas" style="margin-top:16px"><a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" rel="noopener noreferrer" class="bg">Behance →</a></div>` : ''
     }</section>`,
+    /* ── NOUVEAU (v3.9) : vitrine de chiffres clés ──
+       Trois kinds de source, mêmes cartes : `auto` (calculées chez toi à la
+       génération), `value` (saisies à la main) et `api` (compteur public relu
+       à chaque visite, valeur de repli gravée dans la page). Le tout gratuit,
+       sans compte ni service tiers obligatoire. */
+    stats: `<section id="stats" class="rev">${secHead('stats')}
+  <div class="kpis">${statsItems.map(it => `<div class="kpi"${it.kind === 'api' ? ` data-kpi-url="${esc(it.url)}" data-kpi-path="${esc(it.path)}" data-kpi-pre="${esc(it.prefix || '')}" data-kpi-suf="${esc(it.suffix || '')}"` : ''}><b class="kpi-v">${esc(String(it.prefix || '') + it.value + String(it.suffix || ''))}</b><span class="kpi-l">${esc(it.label)}</span></div>`).join('')}</div>
+</section>`,
+    /* ── NOUVEAU (v3.9) : les liens du profil, enfin visibles hors Bento ──
+       Les thèmes Flottante et Latérale ignoraient les blocs Lien (« les liens
+       restent dans la navigation » — or la navigation n'en contenait aucun).
+       Cette section leur donne une place dédiée, avec l'icône du registre. */
+    socials: `<section id="socials" class="rev">${secHead('socials')}
+  <div class="soc">${socItems.map(l => {
+      const pl = SOCIAL_PLATFORMS.find(p => p.label.toLowerCase() === String(l.title || '').toLowerCase()) || null;
+      return `<a class="soc-i" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" style="--sc:${esc(pl ? pl.color : '#888')}" data-l="${esc(l.title || 'Lien')}"><span class="soc-ic">${esc(platIconOf(l.title, l.url))}</span><span class="soc-l">${esc(l.title || 'Lien')}</span></a>`;
+    }).join('')}</div>
+</section>`,
   };
   /* Corps des styles Flottante & Latérale rendu DEPUIS LES BLOCS (même moteur que
      Bento) : un bloc texte créé via la palette apparaît donc AUSSI ici, dans
@@ -1387,32 +1510,57 @@ function generateSite(cfg, projects, reviews, opts) {
     const pr = bProps(b), t = esc(pr.title || ''), tx = esc(pr.text || '').replace(/\n/g, '<br>');
     return `<section class="rev${bHidden(b) ? ' bl-hidden' : ''}" data-b="${esc(b.id)}" style="max-width:760px">${t ? `<div class="sl">${t}</div><h2>${t}</h2>` : ''}<p class="about-p">${tx}</p></section>`;
   };
+  /* Le corps des thèmes Flottante / Latérale est dérivé DES BLOCS. On le
+     découpe en {k, html} pour pouvoir y INSÉRER les sections qui n'ont pas de
+     bloc (Chiffres clés, Réseaux) à leur place dans l'ordre choisi. */
   const renderFlowBody = () => {
     let projectsShown = false;
     return blocks.filter(b => editor || !bHidden(b)).map(b => {
-      if (b.type === 'profile' || b.type === 'link') return '';        // hero + nav
-      if (b.type === 'project') { if (projectsShown || !sec.projects) return ''; projectsShown = true; return secHtml.projects; }
+      if (b.type === 'profile' || b.type === 'link') return { k: null, html: '' };        // hero + nav
+      if (b.type === 'project') { if (projectsShown || !sec.projects) return { k: null, html: '' }; projectsShown = true; return { k: 'projects', html: secHtml.projects }; }
       // « À propos » est un bloc texte particulier : c'est LA section about.
       // Sans ce cas, son titre viendrait des props du bloc (figées à
       // « À propos ») et la renommer dans ☰ Sections n'aurait aucun effet.
-      if (b.id === 'b_about') return sec.about ? secHtml.about : '';
-      if (b.type === 'text')    return flowText(b);
+      if (b.id === 'b_about') return sec.about ? { k: 'about', html: secHtml.about } : { k: null, html: '' };
+      if (b.type === 'text')    return { k: null, html: flowText(b) };
       if (b.type === 'file') {
-        const p = bProps(b); if (!p.url) return '';
-        return `<section class="rev fdoc${bHidden(b) ? ' bl-hidden' : ''}" data-b="${esc(b.id)}">
+        const p = bProps(b); if (!p.url) return { k: null, html: '' };
+        return { k: null, html: `<section class="rev fdoc${bHidden(b) ? ' bl-hidden' : ''}" data-b="${esc(b.id)}">
           <span class="fdoc-i">${esc(p.icon || '📄')}</span>
           <div class="fdoc-tx"><div class="fdoc-t">${esc(p.title || 'Document')}</div>
             ${p.sub ? `<div class="fdoc-s">${esc(p.sub)}</div>` : ''}</div>
           <a class="bp" href="${esc(p.url)}" target="_blank" rel="noopener" data-l="${esc(p.title || 'Document')}">⬇ Télécharger</a>
-        </section>`;
+        </section>` };
       }
-      if (b.type === 'reviews') return sec.avis ? secHtml.avis : '';
-      if (b.type === 'contact') return sec.contact ? secHtml.contact : '';
-      return '';
-    }).join('\n');
+      if (b.type === 'reviews') return sec.avis ? { k: 'avis', html: secHtml.avis } : { k: null, html: '' };
+      if (b.type === 'contact') return sec.contact ? { k: 'contact', html: secHtml.contact } : { k: null, html: '' };
+      return { k: null, html: '' };
+    });
   };
-  const bodySections = renderFlowBody();
-  const navLinks = order.filter(k => sec[k]).map(k => `<a href="#${k}">${SEC_LABELS[k]}</a>`).join('\n    ');
+  /* Insertion d'une section « sans bloc » : elle se place AVANT la première
+     section connue qui vient après elle dans l'ordre, sinon en fin de page.
+     L'ordre de la colonne « Blocs » / de ☰ Sections est donc respecté. */
+  const placeExtra = (chunks, key) => {
+    const pos = order.indexOf(key);
+    if (pos < 0) return chunks;
+    const at = chunks.findIndex(c => c.k && order.indexOf(c.k) > pos);
+    chunks.splice(at < 0 ? chunks.length : at, 0, { k: key, html: secHtml[key] });
+    return chunks;
+  };
+  /* Sections « sans bloc » (Chiffres clés, Réseaux) : elles n'ont pas de bloc
+     à elles, on les place à leur rang. En thème Bento, la grille reste
+     intacte : elles s'ajoutent entre la grille et le pied de page. */
+  const extraKeys = order.filter(k => (k === 'stats' || k === 'socials') && secLive(k));
+  const flowChunks = renderFlowBody();
+  extraKeys.forEach(k => placeExtra(flowChunks, k));
+  const bodySections = flowChunks.map(c => c.html).join('\n');
+  const extraSections = extraKeys.map(k => secHtml[k]).join('\n');
+  /* La nav du thème Bento pointe vers des ANCREs : la grille n'en a pas, seules
+     ces deux sections en ont une. On ne propose donc que des liens qui mènent
+     quelque part (le reste reste cliquable depuis la grille). */
+  const bentoNav = extraKeys.map(k => `<a href="#${k}">${SEC_LABELS[k]}</a>`).join('\n    ');
+  const navLinks = order.filter(k => secLive(k)).map(k => `<a href="#${k}">${SEC_LABELS[k]}</a>`).join('\n    ');
+  const statsApi = statsItems.filter(i => i.kind === 'api');   // compteurs publics à rafraîchir à la visite
 
   return `<!DOCTYPE html>
 <html lang="fr"><head>
@@ -1423,6 +1571,11 @@ function generateSite(cfg, projects, reviews, opts) {
 <style>
 :root{--a:${cfg.accentColor};--bg:${cfg.theme};--t:${textC};--m:${mutedC};--s:${sfcC};--b:${brdC};--cols:${cols}}
 *{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--t);font-family:'Syne',system-ui,sans-serif}a{color:inherit;text-decoration:none}
+${animLevel === 'none' ? '' : `/* ── DÉFILEMENT FLUIDE (v3.9) ── Les ancres de la navigation glissent au lieu
+   de sauter. La barre est collante : scroll-padding-top évite de finir le
+   titre de section dessous. Respecte prefers-reduced-motion. */
+html{scroll-behavior:smooth;scroll-padding-top:92px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}`}
 /* ── NAVBAR (pilule flottante) ── */
 .navwrap{position:sticky;top:14px;z-index:100;display:flex;justify-content:center;padding:0 16px}
 nav{display:flex;align-items:center;gap:4px;width:100%;max-width:900px;padding:8px 8px 8px 16px;border-radius:999px;background:${navBg};border:1px solid var(--b);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 40px rgba(0,0,0,.3)}
@@ -1436,6 +1589,14 @@ nav{display:flex;align-items:center;gap:4px;width:100%;max-width:900px;padding:8
 .ncta:hover{opacity:.85}
 /* ── HERO ── */
 .hero{padding:88px 32px 56px;text-align:center;max-width:820px;margin:0 auto}
+/* Bannière avec image (v3.9) : voile sombre pour que le texte reste lisible
+   SUR N'IMPORTE QUELLE photo (une bannière claire rendrait un titre illisible),
+   et couches explicites puisque le hero porte maintenant un fond. */
+.hero-img{position:relative;isolation:isolate;border-radius:18px;padding-top:104px;padding-bottom:66px;overflow:hidden}
+.hero-img::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,4,6,.34),rgba(4,4,6,.72));z-index:0}
+.hero-img>*{position:relative;z-index:1}
+.hero-img h1{color:#fff}
+.hero-img .hsub{color:rgba(255,255,255,.86)}
 .htag{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--a);margin-bottom:16px}
 h1{font-size:clamp(40px,7vw,76px);font-weight:800;letter-spacing:-2px;line-height:1.06;margin-bottom:16px}h1 span{color:var(--a)}
 .hsub{font-size:15px;color:var(--m);margin-bottom:28px;line-height:1.7}
@@ -1468,6 +1629,19 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
 .ct-barre{flex-wrap:nowrap;overflow-x:auto;gap:8px;padding-bottom:4px}
 .ct-barre .ct-i{flex:0 0 auto;padding:10px 14px}
 @media(max-width:600px){.ct-cartes{grid-template-columns:1fr}}
+/* ── CHIFFRES CLÉS (v3.9) : vitrine de compteurs, sans compte ni service payant ── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+.kpi{background:var(--s);border:1px solid var(--b);border-radius:16px;padding:22px 16px;text-align:center;transition:.2s}
+.kpi:hover{border-color:var(--a);transform:translateY(-3px)}
+.kpi-v{display:block;font-size:clamp(24px,3.4vw,36px);font-weight:800;letter-spacing:-1.2px;color:var(--a);line-height:1.1;word-break:break-word}
+.kpi-l{display:block;margin-top:7px;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--m)}
+/* ── RÉSEAUX (v3.9) : les liens du profil, enfin rendus hors thème Bento ── */
+.soc{display:flex;flex-wrap:wrap;gap:10px}
+.soc-i{display:inline-flex;align-items:center;gap:9px;padding:13px 17px;background:var(--s);border:1px solid var(--b);border-radius:12px;transition:.2s}
+.soc-i:hover{border-color:var(--sc);color:var(--sc);transform:translateY(-2px)}
+.soc-i:focus-visible{outline:2px solid var(--sc);outline-offset:2px}
+.soc-ic{font-size:17px;line-height:1}
+.soc-l{font-size:13px;font-weight:700}
 .prow h2{margin-bottom:0}
 .prow .ssub{margin:6px 0 0}
 /* ── PROJETS ── */
@@ -1639,20 +1813,21 @@ ${layoutStyle === 'bento' ? `
 <div class="bn-page">
   <div class="navwrap"><nav>
     <a href="#" class="logo"><span class="ic">✳</span>${esc(cfg.siteName)}<span class="d">.</span></a>
-    <div class="nl"></div>
+    <div class="nl">${bentoNav}</div>
     ${cfg.email ? `<a class="ncta" href="mailto:${esc(cfg.email)}">Me contacter</a>` : ''}
   </nav></div>
   ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor, secTitle, secTitleOr, contactList })}
+  ${extraSections}
   <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
 </div>` : layoutStyle === 'sidebar' ? `
 <div class="sb-wrap" id="sbw">
   <aside class="sb-side">
     <a href="#" class="sb-logo"><span class="ic">✳</span>${esc(cfg.siteName)}</a>
     <nav class="sb-nav">
-      ${order.filter(k=>sec[k]).map(k=>`<a href="#${k}"><span class="sbi">${SEC_ICONS[k]||'•'}</span>${SEC_LABELS[k]}</a>`).join('')}
+      ${order.filter(k=>secLive(k)).map(k=>`<a href="#${k}"><span class="sbi">${SEC_ICONS[k]||'•'}</span>${SEC_LABELS[k]}</a>`).join('')}
       ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank"><span class="sbi">↗</span>Behance</a>`:''}
     </nav>
-    ${tagList.length?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(t=>`<a href="#projects" onclick="return filterTag('${esc(t.toLowerCase())}')" data-t="${esc(t.toLowerCase())}">${esc(t)}</a>`).join('')}</div>`:''}
+    ${tagList.length&&secLive('projects')?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(t=>`<a href="#projects" onclick="return filterTag('${esc(t.toLowerCase())}')" data-t="${esc(t.toLowerCase())}">${esc(t)}</a>`).join('')}</div>`:''}
     ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
   </aside>
   <main class="sb-main">
@@ -1671,16 +1846,19 @@ ${layoutStyle === 'bento' ? `
     ${navLinks}
     ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
   </div>
-  <a class="ncta navcta" href="${cfg.email?`mailto:${esc(cfg.email)}`:(sec.contact?'#contact':'#')}">Me contacter</a>
+  ${cfg.email||secLive('contact')?`<a class="ncta navcta" href="${cfg.email?`mailto:${esc(cfg.email)}`:'#contact'}">Me contacter</a>`:''}
   <button class="burger" aria-label="Menu" onclick="var m=document.getElementById('mm');m.classList.toggle('open');this.classList.toggle('open')"><span></span><span></span><span></span></button>
 </nav></div>
 <div class="mobmenu" id="mm" onclick="this.classList.remove('open');document.querySelector('.burger').classList.remove('open')">
-  ${order.filter(k=>sec[k]).map(k=>`<a href="#${k}">${SEC_LABELS[k]}</a>`).join('')}
+  ${order.filter(k=>secLive(k)).map(k=>`<a href="#${k}">${SEC_LABELS[k]}</a>`).join('')}
   ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
   ${cfg.email?`<a href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
 </div>
-${!heroShow ? '' : `<div class="hero${heroCls}" data-b="b_profile" data-no-drag><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
-<div class="ctas">${sec.projects?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div></div>`}
+${!heroShow ? '' : `<${heroHref ? 'a' : 'div'} class="hero${heroCls}${heroImage ? ' hero-img' : ''}"${heroHref ? ` href="${esc(heroHref)}"${heroBlank ? ' target="_blank" rel="noopener noreferrer"' : ''}` : ''} data-b="b_profile" data-no-drag${heroImage ? ` style="background:url('${esc(heroImage)}') center/cover"` : ''}><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
+${heroHref
+  // Bannière cliquable : UN seul app à l'action (jamais d'<a> dans un <a>).
+  ? `<div class="ctas"><span class="bp">${esc(String((cfg.heroLink || {}).label || 'Découvrir →'))} →</span></div>`
+  : `<div class="ctas">${secLive('projects')?'<a href="#projects" class="bp">Voir les projets</a>':''}${cfg.email?`<a href="mailto:${esc(cfg.email)}" class="bg">Me contacter</a>`:''}</div>`}</${heroHref ? 'a' : 'div'}>`}
 ${bodySections}
 <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>`}
 <a class="made" href="${HUB_HOME_URL}" target="_blank" rel="noopener" title="Créé avec Souanpt HUB — clique pour découvrir"><span class="mic">✳</span>Made by <b>Souanpt&nbsp;HUB</b></a>
@@ -1714,6 +1892,20 @@ function filterTag(t){
   });
   return false;
 }
+/* ── Chiffres clés alimentés par une API publique (v3.9) ──
+   La valeur gravée dans la page sert de REPLI : la section reste lisible sans
+   réseau, sans script tiers obligatoire. Essai en direct, puis deux relais CORS
+   gratuits, puis on garde le chiffre d'origine (aucune erreur affichée). */
+${statsApi.length ? `
+(function(){var els=[].slice.call(document.querySelectorAll('.kpi[data-kpi-url]'));if(!els.length)return;
+var PR=['https://api.allorigins.win/raw?url=','https://corsproxy.io/?url='];
+function get(u){var i=0;return new Promise(function(res,rej){(function next(){var t=i?PR[i-1]+encodeURIComponent(u):u;
+fetch(t).then(function(r){if(!r.ok)throw 0;return r.json();}).then(res).catch(function(){if(++i>PR.length)rej();else next();});})();});}
+function pick(o,p){var ks=String(p||'value').split('.');for(var i=0;i<ks.length;i++){if(o==null)return null;o=o[ks[i]];}return o;}
+els.forEach(function(el){get(el.getAttribute('data-kpi-url')).then(function(d){var v=pick(d,el.getAttribute('data-kpi-path'));
+if(v==null||v==='')return;if(typeof v==='number')v=v.toLocaleString('fr-FR');
+var t=el.querySelector('.kpi-v');if(t)t.textContent=(el.getAttribute('data-kpi-pre')||'')+v+(el.getAttribute('data-kpi-suf')||'');}).catch(function(){});});
+})();` : ''}
 /* Apparition au scroll */
 ${animLevel==='none'?`document.querySelectorAll('.rev').forEach(function(el){el.classList.add('in');});`:`
 if ('IntersectionObserver' in window) {

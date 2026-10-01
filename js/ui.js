@@ -276,8 +276,11 @@ function edLoad() {
   set('ep-theme',     cfg.theme);
   const ac=document.getElementById('ep-accent-color'); if(ac)ac.value=cfg.accentColor||'#C8FF00';
   const s=cfg.sections||{};
-  _edVis = { projects: s.projects!==false, avis: s.avis!==false, contact: s.contact!==false, about: s.about!==false };
-  const SK=['about','projects','avis','contact'];
+  // Chiffres clés & Réseaux : MASQUÉS par défaut (v3.9) — un site publié avant
+  // cette version ne change pas d'apparence tant que l'utilisateur ne les active.
+  _edVis = { projects: s.projects!==false, avis: s.avis!==false, contact: s.contact!==false, about: s.about!==false,
+             stats: s.stats===true, socials: s.socials===true };
+  const SK=['about','projects','avis','contact','stats','socials'];
   _edOrder = (Array.isArray(cfg.sectionOrder)&&cfg.sectionOrder.length?cfg.sectionOrder.slice():SK.slice()).filter(k=>SK.includes(k));
   SK.forEach(k=>{ if(!_edOrder.includes(k)) _edOrder.push(k); });
   edRenderBlocks();
@@ -373,7 +376,7 @@ function edPerf() {
   const tips = [];
   if (heavyCovers) tips.push(`🖼 ${heavyCovers} couverture(s) encore dans le navigateur <button onclick="offloadImages();return false">Sortir</button>`);
   if (g.animLevel === 'premium') tips.push('⚡ Animations intenses activées');
-  if (g.layoutStyle === 'sidebar' && !g.heroImage) tips.push('🌄 Hero conseillé pour le thème latéral');
+  if (g.layoutStyle !== 'bento' && !g.heroImage) tips.push('🌄 Bannière sans image — ouvre 🖼 Bannière');
   const box = document.getElementById('ed-tips');
   if (box) box.innerHTML = tips.slice(0, 2).map(t => `<span class="ptip">${t}</span>`).join('');
 }
@@ -381,7 +384,8 @@ function edPerf() {
 /* ══════════════════════════════════════════════════════
    BLOCS — ordre + visibilité des sections du site
 ══════════════════════════════════════════════════════ */
-const ED_SECTIONS = { about:'À propos', projects:'Projets', avis:'Avis clients', contact:'Contact' };
+const ED_SECTIONS = { about:'À propos', projects:'Projets', avis:'Avis clients', contact:'Contact',
+                      stats:'Chiffres clés', socials:'Réseaux' };
 let _edOrder=null, _edVis=null, _edBlockDrag=null;
 
 function edRenderBlocks() {
@@ -392,12 +396,27 @@ function edRenderBlocks() {
     _edOrder.map((k,i)=>`<div class="ed-block-item" draggable="true" style="${_edVis[k]===false?'opacity:.4;':''}border-style:solid"
       ondragstart="edBlockDragStart(event,${i})" ondragover="event.preventDefault();this.style.borderColor='rgba(200,255,0,.5)'"
       ondragleave="this.style.borderColor=''" ondrop="edBlockDrop(event,${i})" ondragend="edRenderBlocks()">
-      <span style="cursor:grab;letter-spacing:-1px" title="Glisser pour réordonner">⋮⋮</span> ${ED_SECTIONS[k]}
+      <span style="cursor:grab;letter-spacing:-1px" title="Glisser pour réordonner">⋮⋮</span> <button class="ed-sec-go" onclick="edOpenSections('${k}')" title="Configurer « ${ED_SECTIONS[k]} » — raccourci S">${ED_SECTIONS[k]}</button>
       <button onclick="edToggleBlock('${k}')" title="${_edVis[k]===false?'Afficher la section':'Masquer la section'}"
         style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:11px;color:${_edVis[k]===false?'var(--muted)':'var(--accent)'}">${_edVis[k]===false?'◌':'👁'}</button>
     </div>`).join('') +
     lockItem('Footer','—');
 }
+/** Raccourci : cliquer le NOM d'une section ouvre ☰ Sections sur elle (v3.9). */
+function edOpenSections(k) {
+  if (typeof edWinSections !== 'function') return;
+  edWinSections(null);
+  const w = window.EdWin && EdWin.el;
+  if (!w) return;
+  setTimeout(() => {
+    const card = [...w.querySelectorAll('.edw-sec')].find(el => el.querySelector('[data-k="' + k + '"]'));
+    if (!card) return;
+    card.scrollIntoView({ block: 'nearest' });
+    card.classList.add('ed-flash');
+    setTimeout(() => card.classList.remove('ed-flash'), 900);
+  }, 30);
+}
+window.edOpenSections = edOpenSections;
 function edBlockDragStart(e,i){ _edBlockDrag=i; e.dataTransfer.effectAllowed='move'; }
 function edBlockDrop(e,i){
   e.preventDefault();
@@ -406,10 +425,23 @@ function edBlockDrop(e,i){
   edRenderBlocks(); edUpdatePreview();
   showToast('Ordre des sections mis à jour ✓','#2e9a63',1500);
 }
-function edToggleBlock(k){
-  _edVis[k] = _edVis[k]===false;
-  edRenderBlocks(); edUpdatePreview();
+function edToggleBlock(k){ edSetSectionVisible(k, _edVis[k] === false); }
+/**
+ * Affiche / masque une section — UNE SEULE voie partagée par la colonne
+ * « Blocs », la palette « ＋ Ajouter » et la fenêtre ☰ Sections (v3.9).
+ * Avant, chacun tenait son propre état et `edGetConfig` laissait la colonne
+ * gagner : l'œil de ☰ Sections pouvait ne rien changer à l'aperçu.
+ */
+function edSetSectionVisible(k, on) {
+  // Une section Stats sans chiffre ne s'affiche pas : on la remplit d'abord.
+  if (on && k === 'stats' && typeof edEnsureStats === 'function') edEnsureStats();
+  if (_edVis) { _edVis[k] = !!on; edRenderBlocks(); }
+  const s = { ...(SiteConfig.get().sections || {}) };
+  s[k] = !!on;
+  SiteConfig.set('sections', s);
+  edUpdatePreview();
 }
+window.edSetSectionVisible = edSetSectionVisible;
 
 function edUpdatePreview() { try{ edPerf(); }catch{} clearTimeout(_edTimer); _edTimer=setTimeout(edRefreshPreview,600); }
 
@@ -636,6 +668,49 @@ const BubbleWidget = {
 /* ══════════════════════════════════════════════════════
    NAVIGATION
 ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   ÉTATS « NON DISPONIBLE » (v3.9)
+
+   Une action qui ne peut PAS fonctionner est grisée AVANT le clic, avec la
+   raison dans l'infobulle — au lieu d'un toast d'erreur après coup. Une seule
+   utilitaire (`setNa`) et un seul rafraîchissement (`refreshAvail`), appelé au
+   chargement, à chaque changement de page et à chaque changement de session.
+═════════════════════════════════════════════════════ */
+function setNa(el, ok, why) {
+  if (!el) return;
+  // L'infobulle d'origine est mémorisée au premier passage : en réactivant le
+  // bouton, on la restaure au lieu de laisser afficher la raison de l'attente.
+  if (el.dataset.naTitle === undefined) el.dataset.naTitle = el.getAttribute('title') || '';
+  const off = !ok;
+  el.classList.toggle('na', off);
+  if ('disabled' in el) el.disabled = off;
+  el.setAttribute('title', off ? (why || el.dataset.naTitle) : el.dataset.naTitle);
+  if (off) el.setAttribute('aria-disabled', 'true'); else el.removeAttribute('aria-disabled');
+}
+function refreshAvail() {
+  if (typeof document === 'undefined') return;
+  const gh  = typeof Auth !== 'undefined' && Auth.ok();
+  const cfg = typeof SiteConfig !== 'undefined' ? SiteConfig.get() : {};
+  const beh = !!(cfg.behance && String(cfg.behance).trim());
+  setNa(document.querySelector('[data-na="publish"]'), gh,   'Connecte GitHub pour publier ton site');
+  setNa(document.querySelector('[data-na="behance"]'), beh,  'Ajoute ton pseudo Behance dans Paramètres → Intégrations');
+  setNa(document.getElementById('st-pick'),            gh,   'Connecte GitHub pour déposer des fichiers');
+  setNa(document.getElementById('st-backfill'),        gh,   'Connecte GitHub pour fabriquer les aperçus manquants');
+  setNa(document.getElementById('offload-btn'),        gh,   'Connecte GitHub pour sortir les images du navigateur');
+  // « Optimiser » n'a de sens que s'il reste des images lourdes à recompresser.
+  let heavy = 0;
+  try { heavy = (window.HubImages ? HubImages.stats() : { heavy: 0 }).heavy; } catch {}
+  setNa(document.getElementById('opt-btn'), heavy > 0, heavy ? '' : 'Aucune image locale à optimiser');
+  // Portails : publiables dès qu'UNE source de publication est disponible.
+  const cloudOk = typeof portalCloud === 'function' ? !!portalCloud() : false;
+  document.querySelectorAll('[id^="pub-"]').forEach(b => {
+    setNa(b, cloudOk || gh, 'Connecte Google (Paramètres) ou GitHub pour publier ce portail');
+  });
+}
+window.refreshAvail = refreshAvail;
+// Session GitHub ouverte / fermée (core.js : Auth.set, Auth.setSession, Auth.clear)
+window.addEventListener('hub-auth', () => refreshAvail());
+
 function showPage(id) {
   // Portfolio ET Profil Links ont fusionné dans l'Éditeur : projets et liens y
   // sont des blocs (les liens s'ajoutent via la palette « + » → Réseaux & liens).
@@ -679,6 +754,9 @@ function showPage(id) {
   if(id==='avis')        window.renderOnce?.('avis',        ()=>{ renderReviews(); updateAvisCheckTime(); });
   if(id==='portals')     window.renderOnce?.('portals',     ()=>{ refreshInvDatalists(); renderPortals(); });
   if(id==='settings')    window.renderOnce?.('settings',    ()=>{ renderBehancePage(); renderGoat(); });
+  // Les boutons « non disponibles » dépendent de la page affichée (Stockage,
+  // Portails, barre du haut) : on les revalide à chaque navigation.
+  if (typeof refreshAvail === 'function') refreshAvail();
 }
 
 async function syncBehance(){
