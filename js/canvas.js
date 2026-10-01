@@ -1012,21 +1012,60 @@ function edSecOrder() {
    • value → saisies à la main, pour un chiffre que le Hub ne connaît pas ;
    • api   → un compteur PUBLIC relu à chaque visite (URL JSON + chemin),
              avec la dernière valeur gravée dans la page comme repli.        */
+/* État d'édition en ligne (v3.10) : index du chiffre déplié, plateforme
+   en cours d'ajout pour les réseaux. Réinitialisé à chaque ouverture. */
+let _edKpiEdit = null, _socAdd = null, _socPrefill = '', _socEdit = null;
+
 function edStatsPanel() {
   const items = Array.isArray(SiteConfig.get().stats?.items) ? SiteConfig.get().stats.items : [];
   const disp = it => statItems({ stats: { items: [it] } })[0]
     || { value: '—', label: String((it && (it.label || it.id)) || '?'), kind: (it && it.kind) || 'auto' };
-  const used = new Set(items.filter(i => i && i.kind === 'auto').map(i => i.id));
+  const used = new Set(items.filter(i => i && i.kind === 'auto' && i.id !== items[_edKpiEdit]?.id).map(i => i.id));
   const srcOpts = Object.entries(STAT_SOURCES).filter(([id]) => !used.has(id))
     .map(([id, label]) => `<option value="${id}">${_eesc(label)}</option>`).join('');
+  const KINDS = [['auto', 'Automatique'], ['value', 'Valeur saisie'], ['api', 'Compteur public (API)']];
+  /* Formulaire d'édition DANS la carte (micro-fenêtre inline) : type, source,
+     libellé, valeur, préfixe, suffixe — exactement ce que l'utilisateur voit. */
+  const form = (it, i) => {
+    const kind = KINDS.some(([v]) => v === it.kind) ? it.kind : 'auto';
+    const field = (f, label, val, ph, type) =>
+      `<div><div class="edw-l">${label}</div>${type === 'area'
+        ? `<textarea class="edw-in" data-kf="${f}" rows="2">${_eesc(val)}</textarea>`
+        : `<input class="edw-in" data-kf="${f}" value="${_eesc(val)}" placeholder="${_eesc(ph || '')}">`}</div>`;
+    return `<div class="edw-kpif">
+      <div><div class="edw-l">Type</div>
+        <select class="edw-in" data-kpi-kind>${KINDS.map(([v, l]) =>
+          `<option value="${v}"${kind === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+      ${kind === 'auto' ? `<div><div class="edw-l">Source</div>
+        <select class="edw-in" data-kf="id">${Object.entries(STAT_SOURCES).map(([id, label]) =>
+          `<option value="${id}"${it.id === id ? ' selected' : ''}>${_eesc(label)}</option>`).join('')}</select></div>` : ''}
+      ${kind === 'value' ? field('value', 'Valeur', it.value ?? '', '35 k') : ''}
+      ${kind === 'api' ? field('url', 'URL JSON', it.url || '', 'https://…/TOTAL.json')
+        + field('path', 'Chemin JSON', it.path || '', 'views')
+        + field('value', 'Valeur affichée jusqu’au premier rafraîchissement', it.value ?? '', '—') : ''}
+      ${field('label', 'Libellé', it.label || '', kind === 'auto' ? 'Nom par défaut de la source' : 'Téléchargements')}
+      <div class="edw-kpi-2">${field('prefix', 'Préfixe', it.prefix || '', '+')}${field('suffix', 'Suffixe', it.suffix || '', 'visites')}</div>
+      <div class="edw-kpi-ok">
+        <button class="edw-sec-rst" data-kpi-cancel>Annuler</button>
+        <button class="edw-ok" data-kpi-save="${i}">Enregistrer</button>
+      </div>
+    </div>`;
+  };
   return `
   <div class="edw-stats">
-    <div class="edw-l">Chiffres affichés</div>
+    <div class="edw-l">Chiffres affichés (dans cet ordre)</div>
     ${items.length ? items.map((it, i) => {
       const d = disp(it);
-      return `<div class="edw-kpi"><b>${_eesc(d.value)}</b><span>${_eesc(d.label)}</span>
+      const editing = _edKpiEdit === i;
+      return `<div class="edw-kpi${editing ? ' on' : ''}"><b>${_eesc(d.value)}</b><span>${_eesc(d.label)}</span>
         <i class="${d.kind === 'api' ? 'api' : ''}" title="${d.kind === 'api' ? 'Compteur public — rafraîchi à chaque visite' : d.kind === 'value' ? 'Valeur saisie' : 'Calculée depuis tes données'}">${d.kind === 'api' ? 'API' : d.kind === 'value' ? 'saisi' : 'auto'}</i>
-        <button data-kpi-rm="${i}" title="Retirer ce chiffre">✕</button></div>`;
+        <em class="edw-kpi-mv">
+          <button data-kpi-up="${i}" title="Monter"${i === 0 ? ' disabled' : ''}>↑</button>
+          <button data-kpi-down="${i}" title="Descendre"${i === items.length - 1 ? ' disabled' : ''}>↓</button>
+        </em>
+        <button data-kpi-ed="${i}" title="Modifier ce chiffre">${editing ? '▾' : '✎'}</button>
+        <button data-kpi-rm="${i}" title="Retirer ce chiffre">✕</button>
+      </div>${editing ? form(it, i) : ''}`;
     }).join('') : '<div class="edw-hint">Aucun chiffre : active la section puis ajoute-en un.</div>'}
     <div class="edw-add">
       <select class="edw-in" id="ed-st-src"${srcOpts ? '' : ' disabled'}>${srcOpts || '<option>— toutes les sources sont ajoutées —</option>'}</select>
@@ -1044,10 +1083,89 @@ function edStatsPanel() {
       <input class="edw-in" id="ed-st-api-path" placeholder="chemin JSON (views)">
       <button class="edw-sec-rst" id="ed-st-api-add">＋ API</button>
     </div>
+    <p class="edw-hint">✎ modifie un chiffre (type, libellé, préfixe/suffixe) · ↑↓ change l'ordre · ✕ le retire.</p>
+  </div>`;
+}
+
+/* ── Gestionnaire de RÉSEAUX (section Réseaux, v3.10) ───────────────────
+   Pas de système parallèle : tout vit dans `hub_links` + les blocs Lien,
+   exactement ce que consomment la grille Bento, la section Réseaux et la
+   zone Contact. Le registre SOCIAL_PLATFORMS fait foi — jamais on ne
+   demande une URL quand on sait la construire. */
+function edSocialsPanel() {
+  const cfg = SiteConfig.get();
+  const links = getLinks();
+  const rows = getBlocks(cfg).filter(b => b.type === 'link')
+    .map(b => ({ b, l: links.find(x => String(x.id) === String(bRef(b))) }))
+    .filter(x => x.l && String(x.l.url || '').trim());   // ordre = ordre des blocs
+  const STYLES = [['ic-texte', 'Icône + texte'], ['ic-seules', 'Icônes seules'],
+                  ['boutons', 'Boutons'], ['cartes', 'Cartes'], ['barre', 'Barre']];
+  const style = ['ic-texte', 'ic-seules', 'boutons', 'cartes', 'barre'].includes(cfg.socialsStyle)
+    ? cfg.socialsStyle : 'ic-texte';
+  const rowsHtml = rows.map(({ b, l }, i) => {
+    const p = socialOfLink(l), icon = p ? p.icon : platIconOf(l.title, l.url), hidden = bHidden(b);
+    if (_socEdit === String(l.id)) return `
+      <div class="edw-soc on">
+        <div class="edw-l">${icon} ${_eesc(p ? p.label : 'Lien')} — ${_eesc(p ? p.placeholder : 'adresse')}</div>
+        <input class="edw-in" id="se-h" value="${_eesc(l.handle || l.url)}" placeholder="${_eesc(p ? p.placeholder : 'https://…')}">
+        <div class="edw-l">Nom affiché</div>
+        <input class="edw-in" id="se-t" value="${_eesc(l.title || '')}" placeholder="${_eesc(p ? p.label : 'Lien')}">
+        <label class="edw-tog"><input type="checkbox" id="se-c"${l.inContact ? ' checked' : ''}> Afficher aussi dans Contact</label>
+        <div class="edw-kpi-ok">
+          <button class="edw-sec-rst" data-soc-cancel>Annuler</button>
+          <button class="edw-ok" data-soc-save="${_eesc(l.id)}">Enregistrer</button>
+        </div>
+      </div>`;
+    return `
+      <div class="edw-soc${hidden ? ' off' : ''}">
+        <span class="edw-soc-ic" style="color:${_eesc(p ? p.color : '#888')}">${icon}</span>
+        <span class="edw-soc-tx"><b>${_eesc(l.title || (p ? p.label : 'Lien'))}</b><i>${_eesc(String(l.handle || l.url).slice(0, 44))}</i></span>
+        <em class="edw-kpi-mv">
+          <button data-soc-up="${_eesc(l.id)}" title="Monter"${i === 0 ? ' disabled' : ''}>↑</button>
+          <button data-soc-down="${_eesc(l.id)}" title="Descendre"${i === rows.length - 1 ? ' disabled' : ''}>↓</button>
+        </em>
+        <button data-soc-eye="${_eesc(l.id)}" title="${hidden ? 'Afficher' : 'Masquer'} ce réseau">${hidden ? '◌' : '👁'}</button>
+        <button data-soc-ed="${_eesc(l.id)}" title="Modifier">✎</button>
+        <button data-soc-dup="${_eesc(l.id)}" title="Dupliquer">⧉</button>
+        <button data-soc-rm="${_eesc(l.id)}" title="Retirer ce réseau">✕</button>
+      </div>`;
+  }).join('');
+  const add = _socAdd ? (() => {
+    const p = socialById(_socAdd);
+    return `<div class="edw-soc on">
+      <div class="edw-l">${p.icon} ${_eesc(p.label)} — ${_eesc(p.placeholder)}</div>
+      <input class="edw-in" id="sa-h" value="${_eesc(_socPrefill || '')}" placeholder="${_eesc(p.placeholder)}">
+      <div class="edw-l">Nom affiché (facultatif)</div>
+      <input class="edw-in" id="sa-t" placeholder="${_eesc(p.label)}">
+      <label class="edw-tog"><input type="checkbox" id="sa-c"> Afficher aussi dans Contact</label>
+      <div class="edw-hint">L'URL est construite automatiquement : <code>${_eesc(p.buildUrl('exemple'))}</code></div>
+      <div class="edw-kpi-ok">
+        <button class="edw-sec-rst" data-soc-cancel>Annuler</button>
+        <button class="edw-ok" id="sa-ok">✓ Ajouter au site</button>
+      </div>
+    </div>`;
+  })() : `
+    <div class="edp-grid edw-soc-grid">${SOCIAL_PLATFORMS.map(p =>
+      `<button class="edp-b" data-soc-add="${p.id}" title="${_eesc(p.label)}"><span style="color:${p.color}">${p.icon}</span>${_eesc(p.label)}</button>`).join('')}</div>
+    <div class="edw-add" style="margin-top:6px">
+      <input class="edw-in" id="sa-url" placeholder="… ou colle une URL : instagram.com/ton-pseudo">
+      <button class="edw-sec-rst" id="sa-detect">Détecter</button>
+    </div>`;
+  return `<div class="edw-socp">
+    <div class="edw-l">Tes réseaux (dans cet ordre)</div>
+    ${rowsHtml || '<div class="edw-hint">Aucun réseau : ajoute-en un ci-dessous — icône, couleur et URL créées automatiquement.</div>'}
+    <div class="edw-l">${_socAdd ? 'Nouveau réseau' : 'Ajouter un réseau'}</div>
+    ${add}
+    <div class="edw-l">Présentation sur le site</div>
+    <div class="edw-row">${STYLES.map(([v, l]) =>
+      `<button class="edw-st${style === v ? ' on' : ''}" data-soc-style="${v}">${l}</button>`).join('')}</div>
+    <p class="edw-hint">◌ masque un réseau partout · ☑ Contact l'ajoute à la zone « Me contacter » · aucun réseau vide n'est publié.</p>
   </div>`;
 }
 
 function edWinSections(btn) {
+  /* Formulaires en ligne d'une session à l'autre : on repart d'un état propre. */
+  _edKpiEdit = null; _socAdd = null; _socEdit = null; _socPrefill = '';
   const draw = () => {
     const c = SiteConfig.get();
     const vis = edSecVis();
@@ -1069,6 +1187,7 @@ function edWinSections(btn) {
           <label class="edw-tog"><input type="checkbox" data-k="${k}" data-f="showTitle"${m.showTitle === false ? '' : ' checked'}> Afficher le titre</label>
           <label class="edw-tog"><input type="checkbox" data-k="${k}" data-f="showDesc"${m.showDesc === false ? '' : ' checked'}> Afficher la description</label>
           ${k === 'stats' ? edStatsPanel() : ''}
+          ${k === 'socials' ? edSocialsPanel() : ''}
           <button class="edw-sec-rst" data-rst="${k}">↺ Revenir au nom d'origine</button>
         </div>
       </div>`;
@@ -1131,6 +1250,163 @@ function edWinSections(btn) {
         if (!label || !url) return showToast?.('Libellé ET URL JSON sont nécessaires', '#e4b24a', 2400);
         if (!/^https?:\/\//i.test(url)) return showToast?.('L\'URL doit commencer par http(s)://', '#e4b24a', 2400);
         stWrite(items => [...items, { kind: 'api', label, url, path: path || 'value' }]);
+      });
+      /* ── Chiffres clés : édition ✎ et réordonnancement ↑↓ (v3.10) ── */
+      list.querySelectorAll('[data-kpi-up]').forEach(b => b.onclick = () => {
+        const i = Number(b.dataset.kpiUp);
+        stWrite(items => { [items[i - 1], items[i]] = [items[i], items[i - 1]]; return items; });
+      });
+      list.querySelectorAll('[data-kpi-down]').forEach(b => b.onclick = () => {
+        const i = Number(b.dataset.kpiDown);
+        stWrite(items => { [items[i + 1], items[i]] = [items[i], items[i + 1]]; return items; });
+      });
+      list.querySelectorAll('[data-kpi-ed]').forEach(b => b.onclick = () => {
+        const i = Number(b.dataset.kpiEd);
+        _edKpiEdit = _edKpiEdit === i ? null : i;
+        redraw();
+        if (_edKpiEdit === i) setTimeout(() => list.querySelector('[data-kpif] input,[data-kpif] select')?.focus(), 20);
+      });
+      list.querySelectorAll('[data-kpi-cancel]').forEach(b => b.onclick = () => { _edKpiEdit = null; redraw(); });
+      // Changer de type réécrit l'item avec des valeurs valides PUIS rouvre le
+      // bon formulaire : on ne peut pas passer de « valeur saisie » à « auto »
+      // sans source, ni à « API » sans URL.
+      list.querySelectorAll('[data-kpi-kind]').forEach(sel => sel.onchange = () => {
+        const v = sel.value;
+        stWrite(items => {
+          const i = _edKpiEdit; if (i == null || !items[i]) return items;
+          const it = { ...items[i], kind: v };
+          if (v === 'auto' && !STAT_SOURCES[it.id]) it.id = Object.keys(STAT_SOURCES)[0];
+          if (v === 'value') { if (!String(it.label || '').trim()) it.label = 'Téléchargements'; if (String(it.value ?? '').trim() === '') it.value = ''; }
+          if (v === 'api')   { if (!String(it.label || '').trim()) it.label = 'Compteur'; if (!it.path) it.path = 'value'; }
+          items[i] = it; return items;
+        });
+      });
+      list.querySelectorAll('[data-kpi-save]').forEach(b => b.onclick = () => {
+        const i = Number(b.dataset.kpiSave);
+        const f = key => { const el = list.querySelector('[data-kf="' + key + '"]'); return el ? String(el.value).trim() : undefined; };
+        const kindSel = list.querySelector('[data-kpi-kind]');
+        const kind = kindSel ? kindSel.value : 'auto';
+        const next = { kind };
+        if (kind === 'auto') {
+          const id = f('id');
+          if (!id || !STAT_SOURCES[id]) return showToast?.('Choisis une source', '#e4b24a', 2200);
+          next.id = id;
+        } else if (kind === 'value') {
+          if (!f('label')) return showToast?.('Le libellé est obligatoire', '#e4b24a', 2200);
+          if (!f('value')) return showToast?.('La valeur est obligatoire', '#e4b24a', 2200);
+          next.label = f('label'); next.value = f('value');
+        } else {
+          if (!f('label')) return showToast?.('Le libellé est obligatoire', '#e4b24a', 2200);
+          if (!/^https?:\/\//i.test(f('url') || '')) return showToast?.('URL JSON : http(s):// attendu', '#e4b24a', 2400);
+          next.label = f('label'); next.url = f('url'); next.path = f('path') || 'value';
+          next.value = f('value') || '—';
+        }
+        if (f('label') !== undefined) next.label = f('label');   // libellé : surcharge pour les sources auto
+        if (f('prefix') !== undefined) next.prefix = f('prefix');
+        if (f('suffix') !== undefined) next.suffix = f('suffix');
+        stWrite(items => { items[i] = { ...items[i], ...next }; return items; });
+        _edKpiEdit = null; redraw();
+        showToast?.('Chiffre mis à jour ✓', '#2e9a63', 1600);
+      });
+
+      /* ── Réseaux : ordre, visibilité, édition, duplication, ajout, style ── */
+      const socLinkBlocks = () => getBlocks(SiteConfig.get());
+      const moveSoc = (id, dir) => {
+        const blocks = socLinkBlocks();
+        const idxs = blocks.map((b, i) => (b.type === 'link' ? i : -1)).filter(i => i >= 0);
+        const at = blocks.findIndex(b => b.type === 'link' && String(bRef(b)) === String(id));
+        const pos = idxs.indexOf(at), to = pos + dir;
+        if (pos < 0 || to < 0 || to >= idxs.length) return;
+        const t = blocks[idxs[pos]]; blocks[idxs[pos]] = blocks[idxs[to]]; blocks[idxs[to]] = t;
+        edSet('blocks', blocks); redraw();
+      };
+      list.querySelectorAll('[data-soc-up]').forEach(b => b.onclick = () => moveSoc(b.dataset.socUp, -1));
+      list.querySelectorAll('[data-soc-down]').forEach(b => b.onclick = () => moveSoc(b.dataset.socDown, 1));
+      list.querySelectorAll('[data-soc-eye]').forEach(b => b.onclick = () => {
+        const id = b.dataset.socEye;
+        const blocks = socLinkBlocks();
+        const i = blocks.findIndex(x => x.type === 'link' && String(bRef(x)) === String(id));
+        if (i < 0) return;
+        const wasHidden = bHidden(blocks[i]);
+        blocks[i] = { ...blocks[i], visibility: { ...(blocks[i].visibility || {}), public: wasHidden } };
+        edSet('blocks', blocks); redraw();
+        showToast?.(wasHidden ? 'Réseau affiché ✓' : 'Réseau masqué — absent du site public', '#666', 1600);
+      });
+      list.querySelectorAll('[data-soc-ed]').forEach(b => b.onclick = () => {
+        _socEdit = _socEdit === b.dataset.socEd ? null : b.dataset.socEd;
+        _socAdd = null; redraw();
+      });
+      list.querySelectorAll('[data-soc-cancel]').forEach(b => b.onclick = () => { _socEdit = null; _socAdd = null; _socPrefill = ''; redraw(); });
+      list.querySelectorAll('[data-soc-save]').forEach(b => b.onclick = () => {
+        const id = b.dataset.socSave;
+        const h  = String(list.querySelector('#se-h')?.value || '').trim();
+        const t  = String(list.querySelector('#se-t')?.value || '').trim();
+        const ck = !!list.querySelector('#se-c')?.checked;
+        if (!h) return showToast?.('Renseigne ton identifiant ou ton lien', '#e4b24a', 2200);
+        const ls = getLinks(), i = ls.findIndex(x => String(x.id) === String(id));
+        if (i < 0) return;
+        const old = ls[i], det = socialDetect(h);
+        // Un lien collé (URL) fait foi sur l'ancienne plateforme ; un simple
+        // pseudo garde la plateforme enregistrée à la création.
+        const p = socialById(det.platform && /^https?:/i.test(h) ? det.platform : (old.platform || det.platform || 'custom'));
+        ls[i] = { ...old, platform: p.id, title: t || old.title || p.label,
+                  url: p.buildUrl(h), handle: det.handle || String(h).replace(/^@/, ''), inContact: ck };
+        localStorage.setItem('hub_links', JSON.stringify(ls));
+        _socEdit = null; redraw();
+        showToast?.('Réseau mis à jour ✓', '#2e9a63', 1600);
+      });
+      list.querySelectorAll('[data-soc-dup]').forEach(b => b.onclick = () => {
+        const ls = getLinks(), i = ls.findIndex(x => String(x.id) === String(b.dataset.socDup));
+        if (i < 0) return;
+        ls.splice(i + 1, 0, { ...ls[i], id: Date.now().toString() + Math.random().toString(36).slice(2, 5) });
+        localStorage.setItem('hub_links', JSON.stringify(ls));
+        edSet('blocks', placeBlocks(getBlocks(SiteConfig.get())));   // réconcilie → bloc du doublon
+        redraw();
+        showToast?.('Réseau dupliqué ✓', '#2e9a63', 1500);
+      });
+      list.querySelectorAll('[data-soc-rm]').forEach(b => b.onclick = () => {
+        const id = String(b.dataset.socRm);
+        localStorage.setItem('hub_links', JSON.stringify(getLinks().filter(x => String(x.id) !== id)));
+        edSet('blocks', getBlocks(SiteConfig.get())
+          .filter(x => !(x.type === 'link' && String(bRef(x)) === id)));   // pas de bloc orphelin
+        if (_socEdit === id) _socEdit = null;
+        redraw();
+        showToast?.('Réseau retiré', '#666', 1500);
+      });
+      list.querySelectorAll('[data-soc-add]').forEach(b => b.onclick = () => {
+        _socAdd = b.dataset.socAdd; _socPrefill = ''; _socEdit = null; redraw();
+        setTimeout(() => list.querySelector('#sa-h')?.focus(), 20);
+      });
+      list.querySelector('#sa-detect')?.addEventListener('click', () => {
+        const v = String(list.querySelector('#sa-url')?.value || '').trim();
+        if (!v) return showToast?.('Colle une adresse (URL ou email)', '#e4b24a', 2200);
+        const d = socialDetect(v);
+        _socAdd = d.platform || 'custom';
+        _socPrefill = d.handle || v;
+        _socEdit = null; redraw();
+        setTimeout(() => list.querySelector('#sa-h')?.focus(), 20);
+        showToast?.(d.platform ? 'Plateforme reconnue : ' + socialById(d.platform).label
+                               : 'Lien personnalisé — vérifie l\'adresse', '#2e9a63', 2400);
+      });
+      const socAddGo = () => {
+        const h = String(list.querySelector('#sa-h')?.value || '').trim();
+        const t = String(list.querySelector('#sa-t')?.value || '').trim();
+        const ck = !!list.querySelector('#sa-c')?.checked;
+        if (!h) return showToast?.('Renseigne ton identifiant', '#e4b24a', 2200);
+        const p = socialById(_socAdd), det = socialDetect(h);
+        const ls = getLinks();
+        ls.push({ id: Date.now().toString(), title: t || p.label, url: p.buildUrl(h), clicks: 0,
+                  platform: p.id, handle: det.handle || String(h).replace(/^@/, ''), inContact: ck });
+        localStorage.setItem('hub_links', JSON.stringify(ls));
+        edSet('blocks', placeBlocks(getBlocks(SiteConfig.get())));       // réconcilie → bloc Lien créé
+        _socAdd = null; _socPrefill = ''; redraw();
+        showToast?.(p.icon + ' ' + p.label + ' ajouté ✓', '#2e9a63', 2000);
+      };
+      list.querySelector('#sa-ok')?.addEventListener('click', socAddGo);
+      const sah = list.querySelector('#sa-h');
+      if (sah) sah.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); socAddGo(); } };
+      list.querySelectorAll('[data-soc-style]').forEach(b => b.onclick = () => {
+        edSet('socialsStyle', b.dataset.socStyle); redraw();
       });
     };
     bind();

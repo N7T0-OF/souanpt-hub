@@ -830,6 +830,9 @@ const SiteConfig = {
     // [{ id:'email'|'discord'|'whatsapp'|'phone'|'telegram', on, value, label?, icon?, color? }]
     contactMethods: null,          // null = retombe sur l'email seul (compat)
     contactVariant: 'boutons',     // boutons · liste · cartes · icones · barre
+    // Section Réseaux (v3.10) : présentation publique. Le défaut reprend
+    // l'ancien rendu (icône + texte) → aucun site publié ne change d'apparence.
+    socialsStyle: 'ic-texte',      // ic-texte · ic-seules · boutons · cartes · barre
     animLevel: 'smooth', fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
@@ -882,10 +885,57 @@ const SOCIAL_PLATFORMS = [
   { id: 'modrinth',  label: 'Modrinth',  icon: '🧩', color: '#1bd96a', placeholder: 'pseudo',             buildUrl: v => _url('https://modrinth.com/user/', v) },
   { id: 'kofi',      label: 'Ko-fi',     icon: '☕', color: '#FF5E5B', placeholder: 'pseudo',             buildUrl: v => _url('https://ko-fi.com/', v) },
   { id: 'x',         label: 'X',         icon: '🐦', color: '#e7e9ea', placeholder: 'pseudo',             buildUrl: v => _url('https://x.com/', v) },
+  { id: 'whatsapp',  label: 'WhatsApp',  icon: '💬', color: '#25D366', placeholder: 'numéro',             buildUrl: v => /^https?:\/\//i.test(v) ? v : 'https://wa.me/' + _h(v).replace(/[^\d]/g, '') },
+  { id: 'telegram',  label: 'Telegram',  icon: '✈',  color: '#2AABEE', placeholder: 'pseudo',             buildUrl: v => _url('https://t.me/', v) },
   { id: 'email',     label: 'Email',     icon: '✉',  color: '#C8FF00', placeholder: 'toi@exemple.fr',     buildUrl: v => /^mailto:/i.test(v) ? v : 'mailto:' + _h(v) },
   { id: 'custom',    label: 'Lien perso', icon: '🔗', color: '#888',   placeholder: 'https://…',          buildUrl: v => /^https?:\/\//i.test(v) ? v : 'https://' + _h(v) },
 ];
 const socialById = id => SOCIAL_PLATFORMS.find(p => p.id === id) || SOCIAL_PLATFORMS[SOCIAL_PLATFORMS.length - 1];
+
+/* ── v3.10 : plateforme → domaine, pour RECONNAÎTRE une URL collée ──────
+   On ne demande jamais l'URL complète quand le registre sait la construire :
+   l'utilisateur colle, on devine d'où il vient, il valide le pseudo. */
+const SOCIAL_HOSTS = {
+  'instagram.com': 'instagram', 'tiktok.com': 'tiktok', 'youtube.com': 'youtube', 'youtu.be': 'youtube',
+  'behance.net': 'behance', 'github.com': 'github', 'linkedin.com': 'linkedin', 'twitch.tv': 'twitch',
+  'modrinth.com': 'modrinth', 'ko-fi.com': 'kofi', 'kofi.com': 'kofi',
+  'x.com': 'x', 'twitter.com': 'x', 'discord.gg': 'discord', 'discord.com': 'discord',
+  'wa.me': 'whatsapp', 'whatsapp.com': 'whatsapp', 't.me': 'telegram', 'telegram.me': 'telegram',
+};
+/** Lit une saisie (URL, `@pseudo`, email) → plateforme + identifiant devinés. */
+function socialDetect(v) {
+  const s = String(v || '').trim();
+  if (!s) return { platform: null, handle: '' };
+  const mail = s.replace(/^mailto:/i, '');
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) return { platform: 'email', handle: mail };
+  const m = s.match(/^(?:https?:\/\/)?([^\/?#\s]+)(?:[\/?#].*)?$/i);
+  if (!m) return { platform: null, handle: s };
+  const host = m[1].replace(/^www\./i, '').toLowerCase();
+  let platform = null;
+  for (const h in SOCIAL_HOSTS) if (host === h || host.endsWith('.' + h)) { platform = SOCIAL_HOSTS[h]; break; }
+  // Identifiant = PREMIER segment après le domaine (`instagram.com/souanpt`) ;
+  // cas particuliers : invitation Discord, chemin LinkedIn `/in/…`.
+  const segs = s.replace(/^[a-z]+:\/\//i, '').replace(/^[^\/?#\s]+[\/]?/, '').split(/[?#]/)[0].split('/').filter(Boolean);
+  let handle = platform === 'discord'
+    ? ((s.match(/discord\.(gg|com)\/([^\/?#\s]+)/i) || [])[2] || '')
+    : platform === 'linkedin'
+      ? (segs.filter(x => String(x).toLowerCase() !== 'in').pop() || '')
+      : (segs[0] || '');
+  if (!handle && platform) handle = host.split('.')[0];
+  return { platform, handle: decodeURIComponent(handle).replace(/^@/, '') };
+}
+/** Plateforme d'un lien enregistré : id conservé à la création, sinon titre,
+    sinon URL. Une SEULE résolution partagée par la section Réseaux, la zone
+    Contact et la grille Bento → même icône, même couleur, partout. */
+function socialOfLink(l) {
+  if (!l) return null;
+  if (l.platform) { const p = SOCIAL_PLATFORMS.find(x => x.id === l.platform); if (p) return p; }
+  const t = String(l.title || '').trim().toLowerCase();
+  const byLabel = SOCIAL_PLATFORMS.find(p => p.label.toLowerCase() === t);
+  if (byLabel) return byLabel;
+  const det = socialDetect(l.url);            // dernier recours : on lit l'URL
+  return det.platform ? SOCIAL_PLATFORMS.find(x => x.id === det.platform) || null : null;
+}
 
 /** Icône d'une plateforme, déduite de son titre ou de son URL.
     Fonction unique partagée par la grille Bento et la section « Réseaux » :
@@ -897,6 +947,9 @@ const platIconOf = (t, u) => {
   if (s.includes('linkedin')) return '💼';  if (s.includes('tiktok')) return '🎵';
   if (s.includes('youtube')) return '▶';    if (s.includes('twitch')) return '🟣';
   if (s.includes('kofi') || s.includes('ko-fi')) return '☕';
+  if (s.includes('modrinth')) return '🧩';  if (s.includes('whatsapp') || s.includes('wa.me')) return '💬';
+  if (s.includes('telegram') || s.includes('t.me')) return '✈';
+  if (s.includes('x.com') || s.includes('twitter')) return '🐦';
   if (s.includes('mailto') || s.includes('@')) return '✉';
   return '🔗';
 };
@@ -959,8 +1012,11 @@ function statItems(cfg) {
     }
     const id = STAT_SOURCES[it.id] ? it.id : null;
     if (!id) return null;
+    // Préfixe/suffixe aussi pour les sources auto (v3.10) : « +5 ans »,
+    // « 35 k »… se configurent partout de la même façon.
     return { kind: 'auto', id, label: String(it.label || STAT_SOURCES[id]),
-             value: statFmt(id, vals[id]), prefix: '', suffix: '' };
+             value: statFmt(id, vals[id]),
+             prefix: String(it.prefix || ''), suffix: String(it.suffix || '') };
   }).filter(Boolean);
 }
 
@@ -1079,9 +1135,34 @@ function normalizeBlock(b) {
     ajouté après coup (bulle « + », import Behance) resterait invisible. */
 function getBlocks(cfg, projects, links) {
   cfg = cfg || SiteConfig.get();
-  const base = (Array.isArray(cfg.blocks) && cfg.blocks.length)
-    ? cfg.blocks.map(normalizeBlock).filter(Boolean)
-    : migrateBlocks(cfg, projects, links);
+  const raw = (Array.isArray(cfg.blocks) && cfg.blocks.length) ? cfg.blocks : null;
+  /* On lit la visibilité AVANT normalisation : un bloc Profil « informe »
+     (visibility posé mais sans layout/content) perdrait ce champ au passage
+     par normalizeBlock, qui reconstruit `visibility` depuis `hidden`. */
+  const legacy = raw ? raw.find(b => b && (b.type === 'profile' || b.id === 'b_profile')) : null;
+  const legacyHidden = !!legacy && (legacy.hidden === true || (legacy.visibility && legacy.visibility.public === false));
+  const base = raw ? raw.map(normalizeBlock).filter(Boolean) : migrateBlocks(cfg, projects, links);
+  /* ── GARANTIE (v3.10) : la bannière EST le bloc Profil ───────────────
+     Avant, un `cfg.blocks` enregistré sans `b_profile` (état ancien,
+     suppression manuelle, bloc tombé hors de la forme V3) laissait les
+     projets/liens en place mais SUPPRIMAIT la bannière — `heroHidden`
+     prenait « absent » pour « masqué », et le bouton « Masquer la
+     bannière » de 🖼 Bannière ne trouvait rien à basculer.
+     On recrée donc TOUJOURS le bloc, en tête, sans toucher aux autres :
+     la visibilité d'une ancienne configuration est conservée.          */
+  const pi = base.findIndex(b => b.type === 'profile');
+  if (pi < 0) {
+    base.unshift(normalizeBlock({
+      id: 'b_profile', type: 'profile', w: 2, h: 2, hidden: legacyHidden,
+    }));
+  } else {
+    if (pi > 0) {
+      const [p] = base.splice(pi, 1);
+      base.unshift(p);                     // la bannière reste toujours en tête
+    }
+    if (legacyHidden && !bHidden(base[0]))
+      base[0] = { ...base[0], visibility: { ...(base[0].visibility || {}), public: false } };
+  }
   const have = new Set(base.filter(b => bRef(b) != null).map(b => b.type + ':' + bRef(b)));
   const add = (type, id, prefix) => normalizeBlock({ id: prefix + id, type, ref: id, w: 1, h: 1 });
   (projects || getProjects()).forEach(p => { if (!have.has('project:' + p.id)) base.push(add('project', p.id, 'b_proj_')); });
@@ -1426,7 +1507,7 @@ function generateSite(cfg, projects, reviews, opts) {
     // Config absente (site d'avant cette version) : on retombe sur l'email
     // seul, exactement ce qui était affiché auparavant.
     const src = conf || (cfg.email ? [{ id: 'email', on: true, value: cfg.email }] : []);
-    return src
+    const out = src
       .filter(m => m && m.on === true && String(m.value || '').trim())
       .map(m => {
         const k = CONTACT_KINDS[m.id]; if (!k) return null;
@@ -1440,6 +1521,28 @@ function generateSite(cfg, projects, reviews, opts) {
         };
       })
       .filter(Boolean);
+    /* ── v3.10 : « ☑ Afficher dans Contact » ───────────────────────────
+       Un RÉSEAU peut rejoindre la zone contact sans changer de système :
+       on le lit depuis les blocs LIEN visibles (un lien masqué ne fuite
+       donc jamais ici), et sans doublonner un moyen déjà configuré. */
+    const seen = new Set(out.map(i => i.href));
+    blocks.filter(b => b.type === 'link' && !bHidden(b))
+      .map(b => links.find(l => String(l.id) === String(bRef(b))) || null)
+      .filter(l => l && l.inContact && String(l.url || '').trim())
+      .forEach(l => {
+        const href = String(l.url).trim();
+        if (seen.has(href)) return;
+        seen.add(href);
+        const pl = socialOfLink(l);
+        out.push({
+          href, label: String(l.title || (pl ? pl.label : 'Réseau')),
+          icon: String(pl ? pl.icon : platIconOf(l.title, l.url)),
+          color: String(pl ? pl.color : '#888'),
+          value: String(l.handle || '').slice(0, 48),
+          blank: !/^mailto:/i.test(href),
+        });
+      });
+    return out;
   };
   const contactHtml = () => {
     const items = contactList();
@@ -1495,12 +1598,28 @@ function generateSite(cfg, projects, reviews, opts) {
        Les thèmes Flottante et Latérale ignoraient les blocs Lien (« les liens
        restent dans la navigation » — or la navigation n'en contenait aucun).
        Cette section leur donne une place dédiée, avec l'icône du registre. */
-    socials: `<section id="socials" class="rev">${secHead('socials')}
-  <div class="soc">${socItems.map(l => {
-      const pl = SOCIAL_PLATFORMS.find(p => p.label.toLowerCase() === String(l.title || '').toLowerCase()) || null;
-      return `<a class="soc-i" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" style="--sc:${esc(pl ? pl.color : '#888')}" data-l="${esc(l.title || 'Lien')}"><span class="soc-ic">${esc(platIconOf(l.title, l.url))}</span><span class="soc-l">${esc(l.title || 'Lien')}</span></a>`;
-    }).join('')}</div>
-</section>`,
+    /* ── v3.10 : présentation au choix + icône issue du registre ──────
+       Le registre (`SOCIAL_PLATFORMS`) fait foi : id enregistré à la
+       création, sinon titre, sinon URL. La même couleur/le même symbole
+       s'affiche ici, dans la zone Contact et dans la grille Bento. */
+    socials: (() => {
+      const variant = ['ic-texte', 'ic-seules', 'boutons', 'cartes', 'barre'].includes(cfg.socialsStyle)
+        ? cfg.socialsStyle : 'ic-texte';
+      const one = l => {
+        const pl = socialOfLink(l);
+        const ic = pl ? pl.icon : platIconOf(l.title, l.url);
+        const label = String(l.title || (pl ? pl.label : 'Lien'));
+        const handle = String(l.handle || '');
+        const a = `class="soc-i" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" style="--sc:${esc(pl ? pl.color : '#888')}" data-l="${esc(label)}"`;
+        const icon = `<span class="soc-ic">${esc(ic)}</span>`;
+        if (variant === 'ic-seules') return `<a ${a} title="${esc(label)}" aria-label="${esc(label)}">${icon}</a>`;
+        if (variant === 'cartes')    return `<a ${a}>${icon}<span class="soc-l">${esc(label)}</span>${handle ? `<span class="soc-h">${esc(handle)}</span>` : ''}</a>`;
+        return `<a ${a}>${icon}<span class="soc-l">${esc(label)}</span></a>`;   // ic-texte · boutons · barre
+      };
+      return `<section id="socials" class="rev">${secHead('socials')}
+  <div class="soc soc-${variant}">${socItems.map(one).join('')}</div>
+</section>`;
+    })(),
   };
   /* Corps des styles Flottante & Latérale rendu DEPUIS LES BLOCS (même moteur que
      Bento) : un bloc texte créé via la palette apparaît donc AUSSI ici, dans
@@ -1642,6 +1761,18 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
 .soc-i:focus-visible{outline:2px solid var(--sc);outline-offset:2px}
 .soc-ic{font-size:17px;line-height:1}
 .soc-l{font-size:13px;font-weight:700}
+/* ── v3.10 : présentations de la section Réseaux ──────────────────────
+   Le défaut (icône + texte) est EXACTEMENT l'ancien rendu : un site déjà
+   publié ne change pas d'apparence. */
+.soc-h{display:block;font-size:11px;color:var(--m);opacity:.75;word-break:break-all}
+.soc-cartes .soc-i{flex-direction:column;align-items:flex-start;gap:5px;min-width:150px}
+.soc-ic-seules .soc-i{padding:12px;min-width:48px;justify-content:center}
+.soc-ic-seules .soc-ic{font-size:20px}
+.soc-boutons .soc-i{background:var(--a);border-color:var(--a);color:#060606;border-radius:999px;padding:11px 20px}
+.soc-boutons .soc-i:hover{color:#060606;filter:brightness(1.1);transform:translateY(-2px)}
+.soc-barre{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+.soc-barre .soc-i{flex:0 0 auto}
+@media(max-width:600px){.soc-cartes .soc-i{min-width:0;width:100%}}
 .prow h2{margin-bottom:0}
 .prow .ssub{margin:6px 0 0}
 /* ── PROJETS ── */
