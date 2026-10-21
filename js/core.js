@@ -757,7 +757,7 @@ const SITE_REPO_NAME   = 'souanpt-folio'; // repo par défaut du site public
    Cloudflare Pages expose /api/… sur SA propre origine (candidat n°1), GitHub
    Pages y accède depuis une autre origine (candidat n°2). Vide = même origine.
    Surcharge possible : window.GH_RELAY = 'https://mon-relais.pages.dev'. */
-const GH_RELAY_DEFAULT = 'https://souanpt-hub.pages.dev';
+const GH_RELAY_DEFAULT = 'https://souanptjub.pages.dev';
 
 /** Routine commune à TOUTES les connexions GitHub (token OU relais). */
 async function afterGithubConnect(user) {

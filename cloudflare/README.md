@@ -14,7 +14,7 @@ Si le secret manque, le workflow échoue explicitement; aucune publication n'est
 annoncée. Voir `docs/migration/02-delivery-and-security.md` avant d'activer
 Analytics : son Worker doit être protégé et déployé séparément du script Pages manuel.
 
-> ⚠ Après le déploiement, ajoute `souanpt-hub.pages.dev` (et ton domaine perso plus tard)
+> ⚠ Après le déploiement, ajoute `souanptjub.pages.dev` (et ton domaine perso plus tard)
 > dans **Firebase → Authentication → Settings → Authorized domains**, sinon la connexion
 > Google/Discord sera refusée sur ce domaine.
 
@@ -119,15 +119,16 @@ variables** → *Add variable* :
 Puis **Save** puis redéployer (une variable d'environnement ne s'applique qu'au
 prochain build).
 
-Les origines déjà admises : `https://souanpt-hub.pages.dev`,
-`https://souanpt-hub.fr`, `https://n7t0-of.github.io`.
+Les origines déjà admises : `https://souanptjub.pages.dev`,
+`https://souanpt-hub.pages.dev`, `https://souanpt-hub.fr` et
+`https://n7t0-of.github.io`.
 
 ### d) Vérifier
 
 ```bash
-curl -s "https://souanpt-hub.pages.dev/api/auth?op=status"
+curl -s "https://souanptjub.pages.dev/api/auth?op=status"
 # → {"relay":true,"configured":true,"user":null}
-curl -si "https://souanpt-hub.pages.dev/api/gh?path=/user" | head -1
+curl -si "https://souanptjub.pages.dev/api/gh?path=/user" | head -1
 # → HTTP/2 401  {"error":"session"}      (normal : pas de cookie)
 ```
 

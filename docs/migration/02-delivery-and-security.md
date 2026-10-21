@@ -1,7 +1,7 @@
 # Livraison corrective Souanpt Hub — 3.10.1
 
 Date : 21 octobre 2026
-État : changements préparés pour revue; aucun merge, tag ni déploiement de production effectué.
+État : PR #1 ouverte, CI et aperçu de branche validés; aucun merge, tag ni déploiement de production effectué.
 
 ## Correctifs de cette livraison
 
@@ -9,6 +9,7 @@ Date : 21 octobre 2026
 - L'ingestion est fermée tant que le flag explicite, le rate-limit binding Cloudflare, le Durable Object, le sel IP et les secrets Firebase ne sont pas configurés.
 - Les requêtes sont bornées (4 Kio, champs et tailles autorisés), limitées par IP et UID, dédupliquées, et protégées par des quotas journaliers au niveau Durable Object. Un plafond global de 3 000 tentatives par jour est réservé avant toute lecture Firestore.
 - Les événements par projet ne peuvent cibler que les IDs d'un manifeste de 40 projets maximum enregistré par le propriétaire lors de la publication. Les anciens sites doivent être republiés pour compter les projets; leurs pages vues restent possibles.
+- L'activation Analytics attend que GitHub Pages ait construit le commit exact du site publié et que le manifeste soit enregistré avant d'activer le consentement.
 - OAuth Discord relie le `state` à un nonce cryptographique en cookie `HttpOnly`, expire après dix minutes, et efface le cookie sur annulation, réponse incomplète et succès. Les erreurs internes ne sont pas renvoyées au navigateur.
 - Les artefacts de site proviennent d'une liste autorisée; chaque build contient `build-info.json` (version, SHA, date et canal). Les chemins `docs`, `scripts`, `tests` et `.freebuff` sont exclus.
 - La CI vérifie la syntaxe JavaScript, les tests et les artefacts Pages/Cloudflare. Les workflows de production attendent la CI et valident le SHA servi après publication.
@@ -38,4 +39,4 @@ Le compte de service Firebase doit être limité au projet cible. Avant producti
 
 ## État de production et critères de clôture
 
-À ce stade, le code et les workflows sont prêts à être soumis en PR, mais aucun correctif n'est effectif en production. Le workflow de production n'est déclenché que par `main`; la branche de revue ne publie rien. La clôture opérationnelle nécessite ensuite : PR et CI verte, revue/merge, configuration du secret Cloudflare, déploiement du Worker et des Pages, vérification du marqueur de commit servi et contrôles smoke non destructifs. La release taguée vient après le merge validé.
+À ce stade, le code et les workflows sont proposés dans la [PR #1](https://github.com/N7T0-OF/souanpt-hub/pull/1), et la CI de la branche de revue est verte. Aucun correctif n'est effectif en production. Le workflow de production n'est déclenché que par `main`; la branche de revue fournit un aperçu Cloudflare. La clôture opérationnelle nécessite ensuite : revue humaine/merge, configuration du secret Cloudflare, déploiement du Worker et des Pages, vérification du marqueur de commit servi et contrôles smoke non destructifs. La release taguée vient après le merge validé.
