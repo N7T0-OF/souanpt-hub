@@ -54,28 +54,34 @@ jobs:
                   per_page: 20,
                 });
                 run = data.workflow_runs.find(item => ['push', 'workflow_dispatch'].includes(item.event) && item.head_branch === 'main');
-                if (run?.status === 'completed') break;
+                if (run?.status === 'completed') {
+                  if (run.conclusion !== 'success') {
+                    core.setFailed(workflow_id + ' did not successfully deploy commit ' + context.sha);
+                    return;
+                  }
+                  core.info(workflow_id + ' succeeded for ' + context.sha);
+                  break;
+                }
                 await new Promise(resolve => setTimeout(resolve, 15000));
               }
               if (!run || run.status !== 'completed' || run.conclusion !== 'success') {
                 core.setFailed(workflow_id + ' did not successfully deploy commit ' + context.sha);
                 return;
               }
-              core.info(workflow_id + ' succeeded for ' + context.sha);
             }
       - name: Build release archives and checksums
         env:
           GITHUB_SHA: ${{ github.sha }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          pages="$RUNNER_TEMP/$RELEASE_TAG-pages"
-          cloudflare="$RUNNER_TEMP/$RELEASE_TAG-cloudflare"
+          pages="$RUNNER_TEMP/${RELEASE_TAG}-pages"
+          cloudflare="$RUNNER_TEMP/${RELEASE_TAG}-cloudflare"
           node scripts/prepare-deploy.mjs --channel=release-pages --output="$pages"
           node scripts/prepare-deploy.mjs --channel=release-cloudflare --output="$cloudflare"
-          (cd "$pages" && zip -qr "$RUNNER_TEMP/$RELEASE_TAG-pages.zip" .)
-          (cd "$cloudflare" && zip -qr "$RUNNER_TEMP/$RELEASE_TAG-cloudflare.zip" .)
+          (cd "$pages" && zip -qr "$RUNNER_TEMP/${RELEASE_TAG}-pages.zip" .)
+          (cd "$cloudflare" && zip -qr "$RUNNER_TEMP/${RELEASE_TAG}-cloudflare.zip" .)
           cd "$RUNNER_TEMP"
-          sha256sum "$RELEASE_TAG-pages.zip" "$RELEASE_TAG-cloudflare.zip" > SHA256SUMS.txt
+          sha256sum "${RELEASE_TAG}-pages.zip" "${RELEASE_TAG}-cloudflare.zip" > SHA256SUMS.txt
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -83,7 +89,7 @@ jobs:
           name: Souanpt Hub ${{ github.ref_name }}
           generate_release_notes: true
           body: |
-            Validated corrective release. Public deployment archives include a build-info.json marker with the source commit SHA.
+            Validated corrective release. Public deployment archives include a `build-info.json` marker with the source commit SHA.
 
             Analytics ingestion stays closed until its Cloudflare rate-limit binding, secrets, and explicit profile opt-in are configured.
           files: |
