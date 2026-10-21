@@ -10,6 +10,11 @@ Cloudflare Pages est plus fiable que GitHub Pages (fini le « Deployment failed 
    publication nécessaires sur le compte Cloudflare et le projet.
 4. Le workflow `.github/workflows/deploy-cloudflare.yml` vérifie le réglage via l'API Cloudflare, déploie le Worker Analytics et attend que son `/status` public confirme le SHA du commit et une ingestion fermée, puis publie le bundle allowlisté et contrôle le `build-info.json` servi. Si le Worker reste ancien ou inaccessible, Pages n'est pas publié.
 
+Les aperçus de PR issus de la connexion Git Cloudflare sont actuellement visuels :
+leur `build-info.json` renvoie `404`. La CI prépare et valide séparément l'artefact
+à liste autorisée; seul le workflow de production direct le publie et contrôle
+son SHA servi.
+
 Si le secret manque, le workflow échoue explicitement; aucune publication n'est
 annoncée. Voir `docs/migration/02-delivery-and-security.md` avant d'activer
 Analytics : son Worker doit être protégé et déployé séparément du script Pages manuel.

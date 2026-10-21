@@ -1,7 +1,7 @@
 # Livraison corrective Souanpt Hub — 3.10.1
 
 Date : 21 octobre 2026
-État : PR #1 ouverte, CI et aperçu de branche validés; aucun merge, tag ni déploiement de production effectué.
+État : PR #1 ouverte, CI et aperçu visuel de branche validés; aucun merge, tag ni déploiement de production effectué.
 
 ## Correctifs de cette livraison
 
@@ -31,6 +31,7 @@ Le compte de service Firebase doit être limité au projet cible. Avant producti
 ## Publication et release
 
 - Le workflow GitHub Actions est le mécanisme automatisé principal pour Pages; le workflow Cloudflare inscrit le SHA du commit dans la configuration du Worker Analytics, le déploie, puis attend que son `/status` public rende ce SHA et le JSON de protection (`enabled: false`, `reason: security_setup_required`) avant de déployer Pages. Il échoue si `CLOUDFLARE_API_TOKEN` manque ou si l'ancien Worker reste servi.
+- L'aperçu automatique Cloudflare de la PR affiche le site, mais son `/build-info.json` renvoie actuellement `404` : ce build Git de branche ne sert pas encore l'artefact à liste autorisée préparé par la CI. Il fournit donc un aperçu visuel, pas une preuve de provenance de l'artefact. Le workflow de production direct reste chargé de publier cet artefact et de vérifier son SHA servi.
 - Donner au secret un token Cloudflare limité au compte et aux ressources nécessaires (déploiement Worker/Pages). Ne jamais le placer dans un fichier ou une variable publique.
 - Le projet Cloudflare Pages est connecté à Git. Avant d'ajouter le secret ou de fusionner, désactiver **Enable automatic production branch deployments** dans Cloudflare Workers & Pages → `souanpthub` → Build → Branch control. Le workflow vérifie ce réglage via l'API Cloudflare avant de déployer le Worker ou les Pages; il échoue si le réglage ne peut pas être confirmé.
 - La publication Cloudflare ne peut pas réussir sans le secret GitHub ci-dessus. `deploy-cloudflare.ps1` reste un outil de téléversement Pages manuel; il ne déploie pas le Worker Analytics et n'est pas le canal de release vérifié.
