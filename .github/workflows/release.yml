@@ -53,7 +53,7 @@ jobs:
                   head_sha: context.sha,
                   per_page: 20,
                 });
-                run = data.workflow_runs.find(item => item.event === 'push' && item.head_branch === 'main');
+                run = data.workflow_runs.find(item => ['push', 'workflow_dispatch'].includes(item.event) && item.head_branch === 'main');
                 if (run?.status === 'completed') break;
                 await new Promise(resolve => setTimeout(resolve, 15000));
               }
