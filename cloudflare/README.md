@@ -4,14 +4,17 @@
 
 Cloudflare Pages est plus fiable que GitHub Pages (fini le « Deployment failed »).
 
-1. Va sur https://dash.cloudflare.com → **Workers & Pages → Create → Pages → Connect to Git**.
-2. Autorise GitHub, choisis le repo **N7T0-OF/souanpt-hub**.
-3. Réglages de build :
-   - **Framework preset** : *None*
-   - **Build command** : *(laisser vide)*
-   - **Build output directory** : `/`
-4. **Save and Deploy**. Ton hub sera en ligne sur `https://souanpt-hub.pages.dev`
-   (chaque `git push` redéploie automatiquement).
+1. Utilise le projet Pages existant `souanpthub` en mode Direct Upload.
+2. Configure le secret GitHub `CLOUDFLARE_API_TOKEN`, limité aux droits de
+   publication nécessaires sur le compte Cloudflare et le projet.
+3. Le workflow `.github/workflows/deploy-cloudflare.yml` publie le bundle
+   allowlisté après validation CI et contrôle le `build-info.json` servi.
+4. Ne configure pas simultanément un build Git natif Cloudflare pour le même
+   projet : le workflow GitHub Actions est le déclencheur de publication choisi.
+
+Si le secret manque, le workflow échoue explicitement; aucune publication n'est
+annoncée. Voir `docs/migration/02-delivery-and-security.md` avant d'activer
+Analytics : son Worker doit être protégé et déployé séparément du script Pages manuel.
 
 > ⚠ Après le déploiement, ajoute `souanpt-hub.pages.dev` (et ton domaine perso plus tard)
 > dans **Firebase → Authentication → Settings → Authorized domains**, sinon la connexion

@@ -1,0 +1,65 @@
+name: Create corrective release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  package-and-release:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require a validated main commit and matching version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          version="$(node -e 'const fs=require("fs");const s=fs.readFileSync("js/quote.js","utf8");process.stdout.write(s.match(/const\s+HUB_VERSIONS\s*=\s*\[\s*\[["\x27](\d+\.\d+\.\d+)/)[1])')"
+          test "$RELEASE_TAG" = "v$version" || { echo "Tag $RELEASE_TAG does not match v$version"; exit 1; }
+      - name: Build release archives and checksums
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          pages="$RUNNER_TEMP/${RELEASE_TAG}-pages"
+          cloudflare="$RUNNER_TEMP/${RELEASE_TAG}-cloudflare"
+          node scripts/prepare-deploy.mjs --channel=release-pages --output="$pages"
+          node scripts/prepare-deploy.mjs --channel=release-cloudflare --output="$cloudflare"
+          (cd "$pages" && zip -qr "$RUNNER_TEMP/${RELEASE_TAG}-pages.zip" .)
+          (cd "$cloudflare" && zip -qr "$RUNNER_TEMP/${RELEASE_TAG}-cloudflare.zip" .)
+          cd "$RUNNER_TEMP"
+          sha256sum "${RELEASE_TAG}-pages.zip" "${RELEASE_TAG}-cloudflare.zip" > SHA256SUMS.txt
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Souanpt Hub ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            Validated corrective release. Public deployment archives include a `build-info.json` marker with the source commit SHA.
+
+            Analytics ingestion stays closed until its Cloudflare rate-limit binding, secrets, and explicit profile opt-in are configured.
+          files: |
+            ${{ runner.temp }}/${{ github.ref_name }}-pages.zip
+            ${{ runner.temp }}/${{ github.ref_name }}-cloudflare.zip
+            ${{ runner.temp }}/SHA256SUMS.txt

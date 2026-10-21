@@ -1324,6 +1324,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.10.1', "Sécurité OAuth et Analytics renforcée, artefacts de publication allowlistés, CI et vérification de commit déployé."],
   ['3.10.0', "Éditeur plus clair : configuration des sections en « Blocs ✏️ », barre compacte, chiffres clés modifiables, et réseaux gérés en un endroit (URL et icônes automatiques)."],
   ['3.9.0', "Éditeur : bannière principale avec image, sections Chiffres clés & Réseaux, raccourcis clavier, défilement fluide et boutons indisponibles grises."],
   ['3.8.2', "Le site souanptjub.pages.dev est désormais déployé à chaque version (workflow Cloudflare Pages)."],

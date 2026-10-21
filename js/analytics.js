@@ -163,7 +163,13 @@ const Analytics = {
     if (!(window.Cloud && Cloud.enabled && Cloud.user())) { showToast('Connecte-toi d\'abord (Google ou Discord)', '#e4b24a', 3500); return; }
     // `Auth` vient d'un const → jamais présent sur window (voir core.js access())
     if (typeof Auth === 'undefined' || !Auth.ok()) { showToast('Connecte GitHub (Paramètres → Intégrations) pour publier', '#e4b24a', 4000); showPage('settings'); return; }
-    try { SiteConfig.set('ownerUid', Cloud.user().uid); } catch (e) {}
+    try {
+      SiteConfig.set('ownerUid', Cloud.user().uid);
+      await Cloud.saveProfile(Cloud.user().uid, { analyticsEnabled: true });
+    } catch (e) {
+      showToast('✗ Impossible d’activer les statistiques pour ce compte', '#c0392b', 4000);
+      return;
+    }
     showToast('⚡ Installation du compteur — publication en cours…', '#666', 3000);
     try { await edDeploy(); showToast('✓ Statistiques activées — les visites vont remonter ici', '#2e9a63', 4000); }
     catch (e) { showToast('✗ ' + (e.message || 'Publication impossible'), '#c0392b', 4000); }
@@ -179,6 +185,11 @@ const Analytics = {
     const has = d && d.summary && (Number(d.summary.views) || 0) > 0;
     const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
     const html = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
+    const ingestStatus = document.getElementById('an-ingest-status');
+    if (ingestStatus) {
+      ingestStatus.style.display = d && d.ingestEnabled === true ? 'none' : 'block';
+      ingestStatus.textContent = 'La collecte de nouvelles visites est suspendue pendant la configuration de ses protections. Les statistiques historiques restent consultables.';
+    }
     const empty = document.getElementById('an-empty');
     const live = document.getElementById('an-live');
 

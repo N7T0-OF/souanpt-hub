@@ -27,17 +27,22 @@ GitHub  (optionnel)
 ## Déployer le hub — 2 modes
 
 **Mode A — Déploiement direct Cloudflare (officiel, sans GitHub)**
-Double-clique sur `deploy-cloudflare.ps1` → le site part directement sur Cloudflare Pages.
+`deploy-cloudflare.ps1` téléverse une archive publique allowlistée vers Cloudflare Pages et contrôle `build-info.json` après publication. Ce script direct ne déploie pas le Worker Analytics.
 Prérequis une seule fois : installer Node.js LTS (nodejs.org) + autoriser l'outil au
 premier lancement. ⚠ Nécessite un projet Pages en mode **Direct Upload** (un projet
 Pages « connecté à Git » n'accepte pas l'upload direct — crée un nouveau projet
 « Upload assets » si besoin, l'URL .pages.dev change alors).
 
-**Mode B — Via GitHub (automatique si le projet Pages est connecté au repo)**
-`git push` → Cloudflare détecte le commit → rebuild automatique. Simple et sans
-installation ; GitHub sert alors de déclencheur, pas d'hébergeur.
+**Mode B — Via GitHub Actions (publication automatisée principale)**
+Après fusion sur `main`, la CI valide tests et artefacts avant le déploiement. Le
+workflow Cloudflare publie le Worker Analytics puis Pages et vérifie le commit
+servi. Il échoue explicitement si `CLOUDFLARE_API_TOKEN` manque. N'active pas en
+même temps un build Git natif Cloudflare pour ce projet, afin d'éviter deux
+déploiements concurrents.
 
-Dans les deux cas, garder GitHub à jour reste recommandé : c'est la sauvegarde du code.
+Le mode direct sert au téléversement manuel de Pages uniquement; pour le Worker,
+utilise le workflow contrôlé et configure ses secrets selon
+[la procédure de livraison](docs/migration/02-delivery-and-security.md).
 
 ## Architecture (2 repos)
 

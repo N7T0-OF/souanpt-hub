@@ -1,40 +1,59 @@
 name: Deploy hub to GitHub Pages
 
-# Déploiement fiable : un seul déploiement à la fois (anti-collision),
-# ce qui règle l'erreur récurrente "Deployment failed, try again later".
-# Prérequis : Settings → Pages → Source = "GitHub Actions".
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Sérialise les déploiements : les pushs rapprochés s'enchaînent
-# au lieu de se marcher dessus et d'échouer.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare allowlisted public site
+        id: package
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          out="$RUNNER_TEMP/souanpt-pages-${GITHUB_SHA}"
+          node scripts/prepare-deploy.mjs --channel=github-pages --output="$out"
+          echo "directory=$out" >> "$GITHUB_OUTPUT"
       - name: Configure Pages
         uses: actions/configure-pages@v5
-      - name: Upload site
+      - name: Upload public site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "."
+          path: ${{ steps.package.outputs.directory }}
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify deployed commit marker
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          actual="$(curl --fail --silent --show-error "${PAGE_URL%/}/build-info.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).commit))')"
+          test "$actual" = "$EXPECTED_SHA" || { echo "Expected $EXPECTED_SHA, got $actual"; exit 1; }
