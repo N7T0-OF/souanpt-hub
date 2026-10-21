@@ -160,19 +160,24 @@ const Analytics = {
      Sûr même hors éditeur (edGetConfig renvoie SiteConfig tant que le formulaire
      n'a pas été chargé) → aucun risque de publier un site vide. */
   async activate() {
+    if (this._activationPending) return;
     if (!(window.Cloud && Cloud.enabled && Cloud.user())) { showToast('Connecte-toi d\'abord (Google ou Discord)', '#e4b24a', 3500); return; }
     // `Auth` vient d'un const → jamais présent sur window (voir core.js access())
     if (typeof Auth === 'undefined' || !Auth.ok()) { showToast('Connecte GitHub (Paramètres → Intégrations) pour publier', '#e4b24a', 4000); showPage('settings'); return; }
+    this._activationPending = true;
+    const uid = Cloud.user().uid;
     try {
-      SiteConfig.set('ownerUid', Cloud.user().uid);
-      await Cloud.saveProfile(Cloud.user().uid, { analyticsEnabled: true });
-    } catch (e) {
-      showToast('✗ Impossible d’activer les statistiques pour ce compte', '#c0392b', 4000);
-      return;
-    }
-    showToast('⚡ Installation du compteur — publication en cours…', '#666', 3000);
-    try { await edDeploy(); showToast('✓ Statistiques activées — les visites vont remonter ici', '#2e9a63', 4000); }
-    catch (e) { showToast('✗ ' + (e.message || 'Publication impossible'), '#c0392b', 4000); }
+      SiteConfig.set('ownerUid', uid);
+      if (typeof edSaveConfig === 'function') edSaveConfig(true);
+      showToast('⚡ Installation du compteur — publication en cours…', '#666', 3000);
+      // edDeploy() absorbe les échecs. L'activation a besoin du résultat réel
+      // et d'un manifeste Firestore enregistré avant d'ouvrir la collecte.
+      await deployPortfolio(null, null, { requireAnalyticsManifest: true, expectedOwnerUid: uid });
+      if (!Cloud.user() || Cloud.user().uid !== uid) throw new Error('Session Firebase modifiée pendant la publication.');
+      await Cloud.saveProfile(uid, { analyticsEnabled: true });
+      showToast('✓ Compteur installé — collecte soumise à la configuration serveur', '#2e9a63', 5000);
+    } catch (e) { showToast('✗ ' + (e.message || 'Activation impossible'), '#c0392b', 5000); }
+    finally { this._activationPending = false; }
     setTimeout(() => this.refresh(), 1500);
   },
 

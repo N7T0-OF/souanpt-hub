@@ -198,12 +198,12 @@ déploiement manuelles : `docs/audits/t5-github-auth.md`.
 | Cible | Mise à jour |
 |---|---|
 | `n7t0-of.github.io/souanpt-hub` | **automatique** — `.github/workflows/deploy.yml`, à chaque push sur `main` |
-| `souanptjub.pages.dev/app` | projet Cloudflare Pages **`souanpthub`** — connexion Git, **ou** secret `CLOUDFLARE_API_TOKEN` qui active `.github/workflows/deploy-cloudflare.yml`, **ou** manuel `deploy-cloudflare.ps1` |
+| `souanptjub.pages.dev/app` | projet Cloudflare Pages **`souanpthub`** — connexion Git conservée pour les aperçus de PR; production publiée par `.github/workflows/deploy-cloudflare.yml` après désactivation des builds Git de production et configuration de `CLOUDFLARE_API_TOKEN` |
 
-⚠ Tant qu'une des deux dernières options n'est pas faite, **seul GitHub Pages
-suit les versions** et `souanptjub.pages.dev` reste bloqué sur son dernier
-upload manuel. Diagnostic, preuves et étapes une-fois : 
-`docs/audits/deploy-cloudflare-v3.8.2.md`.
+Le workflow Cloudflare vérifie le réglage de déploiement Git via l'API avant
+toute publication. La procédure de bascule et les critères de release sont dans
+`docs/migration/02-delivery-and-security.md`. L'historique du déploiement Git
+initial est conservé dans `docs/audits/deploy-cloudflare-v3.8.2.md`.
 
 ## Behance — sans clé API
 

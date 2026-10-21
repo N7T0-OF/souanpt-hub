@@ -82,6 +82,53 @@ jobs:
           (cd "$cloudflare" && zip -qr "$RUNNER_TEMP/${RELEASE_TAG}-cloudflare.zip" .)
           cd "$RUNNER_TEMP"
           sha256sum "${RELEASE_TAG}-pages.zip" "${RELEASE_TAG}-cloudflare.zip" > SHA256SUMS.txt
+      - name: Verify current production deployments
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          const expected = process.env.EXPECTED_SHA;
+          if (!process.env.CF_TOKEN) throw new Error('CLOUDFLARE_API_TOKEN is required to verify the current production deployment');
+          const projectUrl = 'https://api.cloudflare.com/client/v4/accounts/3812fed3ef304d1dea00c6498d09aa52/pages/projects/souanpthub';
+          const sites = [
+            ['GitHub Pages', 'https://n7t0-of.github.io/souanpt-hub/build-info.json', 'github-pages'],
+            ['Cloudflare Pages', 'https://souanptjub.pages.dev/build-info.json', 'cloudflare'],
+          ];
+          const deadline = Date.now() + 120000;
+          while (true) {
+            try {
+              const projectResponse = await fetch(projectUrl, {
+                headers: { Authorization: `Bearer ${process.env.CF_TOKEN}` }, signal: AbortSignal.timeout(15000),
+              });
+              if (!projectResponse.ok) throw new Error(`Cloudflare Pages project lookup failed (${projectResponse.status})`);
+              const data = await projectResponse.json();
+              const project = data.result;
+              if (!data.success || project?.subdomain !== 'souanptjub.pages.dev'
+                || project.source?.config?.production_deployments_enabled !== false
+                || project.canonical_deployment?.environment !== 'production'
+                || project.canonical_deployment?.deployment_trigger?.metadata?.commit_hash !== expected) {
+                throw new Error('Cloudflare canonical production deployment does not match this release commit');
+              }
+              for (const [name, url, channel] of sites) {
+                const response = await fetch(`${url}?release-check=${expected}-${Date.now()}`, {
+                  headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(15000),
+                });
+                if (!response.ok) throw new Error(`${name} marker lookup failed (${response.status})`);
+                const marker = await response.json();
+                if (marker.commit !== expected || marker.channel !== channel) {
+                  throw new Error(`${name} currently serves ${marker.commit || 'no commit'}, expected ${expected}`);
+                }
+                console.log(`${name} currently serves ${expected}.`);
+              }
+              break;
+            } catch (error) {
+              if (Date.now() >= deadline) throw error;
+              console.warn(`Production verification pending: ${error.message}`);
+              await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+          }
+          NODE
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:

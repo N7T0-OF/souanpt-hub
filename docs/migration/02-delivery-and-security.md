@@ -7,7 +7,8 @@ Date : 21 octobre 2026
 
 - Analytics valide l'existence du profil Firestore, son association au propriétaire, sa publication HTTPS et le consentement `analyticsEnabled` avant toute écriture.
 - L'ingestion est fermée tant que le flag explicite, le rate-limit binding Cloudflare, le Durable Object, le sel IP et les secrets Firebase ne sont pas configurés.
-- Les requêtes sont bornées (4 Kio, champs et tailles autorisés), limitées par IP et UID, dédupliquées, et protégées par des quotas journaliers au niveau Durable Object.
+- Les requêtes sont bornées (4 Kio, champs et tailles autorisés), limitées par IP et UID, dédupliquées, et protégées par des quotas journaliers au niveau Durable Object. Un plafond global de 3 000 tentatives par jour est réservé avant toute lecture Firestore.
+- Les événements par projet ne peuvent cibler que les IDs d'un manifeste de 40 projets maximum enregistré par le propriétaire lors de la publication. Les anciens sites doivent être republiés pour compter les projets; leurs pages vues restent possibles.
 - OAuth Discord relie le `state` à un nonce cryptographique en cookie `HttpOnly`, expire après dix minutes, et efface le cookie sur annulation, réponse incomplète et succès. Les erreurs internes ne sont pas renvoyées au navigateur.
 - Les artefacts de site proviennent d'une liste autorisée; chaque build contient `build-info.json` (version, SHA, date et canal). Les chemins `docs`, `scripts`, `tests` et `.freebuff` sont exclus.
 - La CI vérifie la syntaxe JavaScript, les tests et les artefacts Pages/Cloudflare. Les workflows de production attendent la CI et valident le SHA servi après publication.
@@ -20,18 +21,19 @@ Le fichier `cloudflare/wrangler.analytics.toml` est volontairement désactivé. 
 2. Ajouter les secrets `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` et un `ANALYTICS_IP_SALT` aléatoire propre à cette fonction. Ne pas réutiliser ni versionner la valeur du sel.
 3. Dans Cloudflare, choisir un `namespace_id` positif unique et libre pour le binding Rate Limiting `ANALYTICS_RATE_LIMITER`. Le fichier suggère une limite de 100 requêtes par clé par minute; les clés IP et UID partagent ce binding.
 4. Configurer le Durable Object `ANALYTICS_GUARD` tel que défini par le fichier Wrangler; vérifier la migration SQLite avant d'activer les écritures.
-5. Remplacer la variable `ANALYTICS_INGEST_ENABLED` par `"true"`, redéployer, puis vérifier `GET /status` (`enabled: true`). Tester avec un profil synthétique ayant `analyticsEnabled: true`; tester ensuite un profil sans consentement et confirmer qu'aucune écriture n'est créée.
-6. Si une étape échoue, conserver le flag à `false`. Les pages publiques doivent rester consultables même lorsque l'ingestion renvoie `503`.
+5. Republier le site des profils qui veulent les compteurs par projet : l'activation attend une publication confirmée et l'enregistrement du manifeste `analyticsProjects`. Elle refuse les portfolios de plus de 40 projets publiés ou des IDs de projet invalides/dupliqués.
+6. Remplacer la variable `ANALYTICS_INGEST_ENABLED` par `"true"`, redéployer, puis vérifier `GET /status` (`enabled: true`). Tester avec un profil synthétique ayant `analyticsEnabled: true`; tester ensuite un profil sans consentement et confirmer qu'aucune écriture n'est créée.
+7. Si une étape échoue, conserver le flag à `false`. Les pages publiques doivent rester consultables même lorsque l'ingestion renvoie `503`.
 
-Le compte de service Firebase doit être limité au projet cible. Avant production, vérifier les rôles IAM accordés à ce compte et ne lui accorder que l'accès Datastore/Firestore requis. Les événements consomment une place dans les quotas et leur réservation est faite avant le commit Firestore; un échec temporaire de Firestore peut donc perdre cet événement, sans exposer de données ni permettre un dépassement de quota.
+Le compte de service Firebase doit être limité au projet cible. Avant production, vérifier les rôles IAM accordés à ce compte et ne lui accorder que l'accès Datastore/Firestore requis. Les tentatives consomment les quotas avant la lecture du profil et le commit Firestore; un échec temporaire de Firestore peut donc perdre cet événement, sans exposer de données ni permettre un dépassement de quota. Le plafond global protège les coûts mais peut suspendre les statistiques pour tous jusqu'au lendemain s'il est épuisé; surveiller les réponses `429` lors de l'activation.
 
 ## Publication et release
 
 - Le workflow GitHub Actions est le mécanisme automatisé principal pour Pages; le workflow Cloudflare déploie le Worker Analytics puis les Pages, et échoue explicitement si `CLOUDFLARE_API_TOKEN` manque.
 - Donner au secret un token Cloudflare limité au compte et aux ressources nécessaires (déploiement Worker/Pages). Ne jamais le placer dans un fichier ou une variable publique.
-- Ne pas activer en parallèle l'intégration Git native Cloudflare qui publierait le même projet; cela créerait deux déclencheurs concurrents.
+- Le projet Cloudflare Pages est connecté à Git. Avant d'ajouter le secret ou de fusionner, désactiver **Enable automatic production branch deployments** dans Cloudflare Workers & Pages → `souanpthub` → Build → Branch control. Le workflow vérifie ce réglage via l'API Cloudflare avant de déployer le Worker ou les Pages; il échoue si le réglage ne peut pas être confirmé.
 - La publication Cloudflare ne peut pas réussir sans le secret GitHub ci-dessus. `deploy-cloudflare.ps1` reste un outil de téléversement Pages manuel; il ne déploie pas le Worker Analytics et n'est pas le canal de release vérifié.
-- La procédure `.github/workflows/release.yml` attend un tag `v*` correspondant à la version `HUB_VERSIONS`, exige que son commit soit déjà dans `main`, puis génère les archives Pages/Cloudflare et `SHA256SUMS.txt`. Créer le tag `v3.10.1` uniquement après revue/merge et CI verte.
+- La procédure `.github/workflows/release.yml` attend un tag `v*` correspondant à la version `HUB_VERSIONS`, exige que son commit soit déjà dans `main`, puis génère les archives Pages/Cloudflare et `SHA256SUMS.txt`. Juste avant publication, elle exige aussi que les deux sites servent ce SHA et que le déploiement canonique Cloudflare corresponde au même commit. Créer le tag `v3.10.1` uniquement après revue/merge et CI verte.
 - Retour arrière : redéployer un artefact d'une release antérieure vérifiée et contrôler son `build-info.json`. Garder Analytics désactivé jusqu'à ce que l'ancien Worker soit remplacé par la version protégée.
 
 ## État de production et critères de clôture

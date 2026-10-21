@@ -4,13 +4,11 @@
 
 Cloudflare Pages est plus fiable que GitHub Pages (fini le « Deployment failed »).
 
-1. Utilise le projet Pages existant `souanpthub` en mode Direct Upload.
-2. Configure le secret GitHub `CLOUDFLARE_API_TOKEN`, limité aux droits de
+1. Utilise le projet Pages existant `souanpthub`, connecté à Git pour les aperçus de PR.
+2. Dans **Build → Branch control**, désactive **Enable automatic production branch deployments** pour éviter deux publications concurrentes sur `main`.
+3. Configure le secret GitHub `CLOUDFLARE_API_TOKEN`, limité aux droits de
    publication nécessaires sur le compte Cloudflare et le projet.
-3. Le workflow `.github/workflows/deploy-cloudflare.yml` publie le bundle
-   allowlisté après validation CI et contrôle le `build-info.json` servi.
-4. Ne configure pas simultanément un build Git natif Cloudflare pour le même
-   projet : le workflow GitHub Actions est le déclencheur de publication choisi.
+4. Le workflow `.github/workflows/deploy-cloudflare.yml` vérifie le réglage via l'API Cloudflare, publie le bundle allowlisté après validation CI et contrôle le `build-info.json` servi.
 
 Si le secret manque, le workflow échoue explicitement; aucune publication n'est
 annoncée. Voir `docs/migration/02-delivery-and-security.md` avant d'activer
@@ -90,10 +88,9 @@ Quand tout est en place, préviens-moi : on teste le flux ensemble et je corrige
 
 ### a) Déployer les Functions
 
-Deux cas, comme au §1 :
-
-- **Connect to Git** → chaque `git push` redéploie `functions/` automatiquement ;
-- **Direct Upload** → relancer `deploy-cloudflare.ps1`.
+Le workflow de production publie `functions/` avec le bundle Pages sur `main`.
+La connexion Git Cloudflare continue à fournir les aperçus des branches et PR.
+`deploy-cloudflare.ps1` reste un outil manuel de secours pour Pages seulement.
 
 Vérifier que `_routes.json` contient `"/api/*"` (déjà versionné) : sans ça,
 Cloudflare ne facture pas… et n'exécute pas les Functions.

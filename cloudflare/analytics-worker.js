@@ -7,8 +7,12 @@ const API = 'https://firestore.googleapis.com/v1';
 const MAX_BODY_BYTES = 4096;
 const MAX_PROJECTS_PER_EVENT = 20;
 const MAX_PROJECT_NAME = 80;
+const MAX_PUBLISHED_PROJECTS = 40;
+const PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const MAX_DAILY_PROFILE_EVENTS = 5000;
 const MAX_DAILY_PROFILE_IP_EVENTS = 120;
+const MAX_DAILY_GLOBAL_READ_ATTEMPTS = 3000;
+const GLOBAL_GUARD_NAME = '__global/read-budget__'; // '/' cannot occur in an accepted UID.
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -54,28 +58,47 @@ export default {
       const uidLimit = await env.ANALYTICS_RATE_LIMITER.limit({ key: 'profile:' + event.uid });
       if (!uidLimit.success) return json({ error: 'rate_limited' }, 429);
 
+      // Count every parsed request before any Google token or Firestore read.
+      // Forged project IDs and nonexistent profiles consume the same daily
+      // budget, so the public endpoint cannot create unbounded profile reads.
+      const ipHash = await hash(env.ANALYTICS_IP_SALT + ':' + ip);
+      const day = new Date().toISOString().slice(0, 10);
+      // Reserve the shared budget first: after exhaustion, random UIDs cannot
+      // create additional per-profile Durable Object calls.
+      const globalGuard = env.ANALYTICS_GUARD.get(env.ANALYTICS_GUARD.idFromName(GLOBAL_GUARD_NAME));
+      const globalReserved = await globalGuard.fetch('https://analytics-guard/reserve-global', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ day }),
+      });
+      if (!globalReserved.ok) return json({ error: globalReserved.status === 429 ? 'quota_exceeded' : 'analytics_temporarily_unavailable' }, globalReserved.status);
+      const guardId = env.ANALYTICS_GUARD.idFromName(event.uid);
+      const guard = env.ANALYTICS_GUARD.get(guardId);
+      const reserved = await guard.fetch('https://analytics-guard/reserve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ipHash, day }),
+      });
+      if (!reserved.ok) return json({ error: reserved.status === 429 ? 'quota_exceeded' : 'analytics_temporarily_unavailable' }, reserved.status);
+
       const token = await getAccessToken(env);
       const profile = await readPublicProfile(env, token, event.uid);
       if (!profile) return json({ error: 'profile_not_eligible' }, 403);
+      if (!publishedProjectsContain(profile.projects, event)) return json({ error: 'project_not_published' }, 403);
 
-      const ipHash = await hash(env.ANALYTICS_IP_SALT + ':' + ip);
-      const guardId = env.ANALYTICS_GUARD.idFromName(event.uid);
-      const guard = env.ANALYTICS_GUARD.get(guardId);
       const guarded = await guard.fetch('https://analytics-guard/consume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventId: event.eid,
-          ipHash,
-          day: new Date().toISOString().slice(0, 10),
-          projects: event.t === 'pj' ? event.projects : event.t === 'click' && event.project ? [event.project] : [],
+          day,
         }),
       });
       if (!guarded.ok) return json({ error: guarded.status === 429 ? 'quota_exceeded' : 'analytics_temporarily_unavailable' }, guarded.status);
       const verdict = await guarded.json();
       if (verdict.duplicate) return noContent();
 
-      await commit(env, token, event.uid, toTransforms(event, request));
+      await commit(env, token, event.uid, toTransforms(event, request, profile.projects));
       return noContent();
     } catch (error) {
       // Never return Google/Firebase response bodies or secrets to a public caller.
@@ -130,11 +153,39 @@ function parseEvent(raw) {
   if (body.t === 'pj') {
     if (!Array.isArray(body.projects) || body.projects.length < 1 || body.projects.length > MAX_PROJECTS_PER_EVENT) return null;
     const projects = [...new Set(body.projects)];
-    if (projects.length !== body.projects.length || projects.some(p => typeof p !== 'string' || p.length < 1 || p.length > MAX_PROJECT_NAME)) return null;
+    if (projects.length !== body.projects.length || projects.some(p => typeof p !== 'string' || !PROJECT_ID.test(p))) return null;
     return { uid, eid: body.eid, t: 'pj', projects };
   }
-  if (body.project !== undefined && (typeof body.project !== 'string' || body.project.length < 1 || body.project.length > MAX_PROJECT_NAME)) return null;
+  if (body.project !== undefined && (typeof body.project !== 'string' || !PROJECT_ID.test(body.project))) return null;
   return { uid, eid: body.eid, t: 'click', project: body.project || '' };
+}
+
+function readPublishedProjects(field) {
+  // An older published site has no manifest. Its page views remain eligible,
+  // but project events must fail closed until the owner republishes it.
+  if (!field || !field.arrayValue) return null;
+  const values = field.arrayValue.values || [];
+  if (!Array.isArray(values) || values.length > MAX_PUBLISHED_PROJECTS) return null;
+  const projects = new Map();
+  for (const value of values) {
+    const fields = value?.mapValue?.fields;
+    const id = fields?.id?.stringValue;
+    const title = fields?.title?.stringValue;
+    if (typeof id !== 'string' || !PROJECT_ID.test(id) || projects.has(id)
+      || typeof title !== 'string' || !title || title.length > MAX_PROJECT_NAME
+      || /[\u0000-\u001f\u007f]/.test(title)
+      || /^__.*__$/.test(title)) return null;
+    projects.set(id, title);
+  }
+  return projects;
+}
+
+function publishedProjectsContain(projects, event) {
+  if (event.t === 'pv' || (event.t === 'click' && !event.project)) return true;
+  if (!projects) return false;
+  return event.t === 'pj'
+    ? event.projects.every(id => projects.has(id))
+    : projects.has(event.project);
 }
 
 async function readPublicProfile(env, token, uid) {
@@ -153,10 +204,10 @@ async function readPublicProfile(env, token, uid) {
     && (f.uid?.stringValue === uid || f.owner?.stringValue === uid)
     && typeof pseudo === 'string' && /^[a-z0-9_-]{2,20}$/.test(pseudo)
     && publicUrl && publicUrl.protocol === 'https:' && !publicUrl.username && !publicUrl.password
-    ? { pseudo, siteUrl: publicUrl.href } : null;
+    ? { pseudo, siteUrl: publicUrl.href, projects: readPublishedProjects(f.analyticsProjects) } : null;
 }
 
-function toTransforms(event, request) {
+function toTransforms(event, request, projects) {
   const country = ((request.cf && request.cf.country) || 'XX').replace(/[^A-Z]/gi, '').slice(0, 2).toUpperCase() || 'XX';
   const type = device(event.ua || request.headers.get('user-agent') || '');
   if (event.t === 'pv') {
@@ -170,10 +221,10 @@ function toTransforms(event, request) {
       { name: 'countries', fields: [increment('map.' + country)] },
     ];
   }
-  if (event.t === 'pj') return [{ name: 'projects', fields: event.projects.map(p => increment('map.' + field(p) + '.views')) }];
+  if (event.t === 'pj') return [{ name: 'projects', fields: [...new Set(event.projects.map(id => projects.get(id)))].map(title => increment('map.' + field(title) + '.views')) }];
   const fields = [increment('clicks')];
   const writes = [{ name: 'summary', fields }];
-  if (event.project) writes.push({ name: 'projects', fields: [increment('map.' + field(event.project) + '.clicks')] });
+  if (event.project) writes.push({ name: 'projects', fields: [increment('map.' + field(projects.get(event.project)) + '.clicks')] });
   return writes;
 }
 
@@ -249,40 +300,46 @@ export class AnalyticsGuard {
       CREATE TABLE IF NOT EXISTS events (day TEXT NOT NULL, event_id TEXT NOT NULL, PRIMARY KEY(day,event_id));
       CREATE TABLE IF NOT EXISTS profile_counts (day TEXT PRIMARY KEY, count INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS ip_counts (day TEXT NOT NULL, ip_hash TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(day,ip_hash));
-      CREATE TABLE IF NOT EXISTS project_names (name TEXT PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS global_counts (day TEXT PRIMARY KEY, count INTEGER NOT NULL);
     `);
   }
 
   async fetch(request) {
-    if (request.method !== 'POST' || new URL(request.url).pathname !== '/consume') return json({ error: 'not_found' }, 404);
+    const path = new URL(request.url).pathname;
+    if (request.method !== 'POST' || !['/reserve', '/reserve-global', '/consume'].includes(path)) return json({ error: 'not_found' }, 404);
     let input;
     try { input = await request.json(); } catch { return json({ error: 'invalid_event' }, 400); }
     if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input.day || '')
-      || !/^[A-Za-z0-9_-]{16,64}$/.test(input.eventId || '')
-      || !/^[a-f0-9]{64}$/.test(input.ipHash || '')
-      || !Array.isArray(input.projects) || input.projects.length > MAX_PROJECTS_PER_EVENT) return json({ error: 'invalid_event' }, 400);
+      || (path === '/reserve' && !/^[a-f0-9]{64}$/.test(input.ipHash || ''))
+      || (path === '/consume' && !/^[A-Za-z0-9_-]{16,64}$/.test(input.eventId || ''))) return json({ error: 'invalid_event' }, 400);
 
     try {
       const result = this.ctx.storage.transactionSync(() => {
         const sql = this.ctx.storage.sql;
-        // Keep only a short dedup window; retain per-profile daily project names.
+        if (path === '/reserve-global') {
+          sql.exec('DELETE FROM global_counts WHERE day < ?', input.day);
+          const global = sql.exec('SELECT count FROM global_counts WHERE day = ?', input.day).toArray()[0];
+          if ((global?.count || 0) >= MAX_DAILY_GLOBAL_READ_ATTEMPTS) return { status: 429, body: { error: 'quota_exceeded' } };
+          sql.exec('INSERT INTO global_counts(day,count) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET count=count+1', input.day);
+          return { status: 200, body: { reserved: true } };
+        }
+        if (path === '/reserve') {
+          sql.exec('DELETE FROM profile_counts WHERE day < ?', input.day);
+          sql.exec('DELETE FROM ip_counts WHERE day < ?', input.day);
+          const profile = sql.exec('SELECT count FROM profile_counts WHERE day = ?', input.day).toArray()[0];
+          if ((profile?.count || 0) >= MAX_DAILY_PROFILE_EVENTS) return { status: 429, body: { error: 'quota_exceeded' } };
+          const ip = sql.exec('SELECT count FROM ip_counts WHERE day = ? AND ip_hash = ?', input.day, input.ipHash).toArray()[0];
+          if ((ip?.count || 0) >= MAX_DAILY_PROFILE_IP_EVENTS) return { status: 429, body: { error: 'quota_exceeded' } };
+          sql.exec('INSERT INTO profile_counts(day,count) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET count=count+1', input.day);
+          sql.exec('INSERT INTO ip_counts(day,ip_hash,count) VALUES(?,?,1) ON CONFLICT(day,ip_hash) DO UPDATE SET count=count+1', input.day, input.ipHash);
+          return { status: 200, body: { reserved: true } };
+        }
+        // The reservation already counted this request. Consume only records
+        // the event ID, so idempotency cannot double-count the daily budget.
         sql.exec('DELETE FROM events WHERE day < ?', input.day);
-        sql.exec('DELETE FROM profile_counts WHERE day < ?', input.day);
-        sql.exec('DELETE FROM ip_counts WHERE day < ?', input.day);
         const prior = sql.exec('SELECT 1 AS found FROM events WHERE day = ? AND event_id = ?', input.day, input.eventId).toArray();
         if (prior.length) return { status: 200, body: { duplicate: true } };
-        const profile = sql.exec('SELECT count FROM profile_counts WHERE day = ?', input.day).toArray()[0];
-        if ((profile?.count || 0) >= MAX_DAILY_PROFILE_EVENTS) return { status: 429, body: { error: 'quota_exceeded' } };
-        const ip = sql.exec('SELECT count FROM ip_counts WHERE day = ? AND ip_hash = ?', input.day, input.ipHash).toArray()[0];
-        if ((ip?.count || 0) >= MAX_DAILY_PROFILE_IP_EVENTS) return { status: 429, body: { error: 'quota_exceeded' } };
-        const names = [...new Set(input.projects)];
-        const known = sql.exec('SELECT name FROM project_names').toArray().map(row => row.name);
-        if (names.some(name => typeof name !== 'string' || name.length < 1 || name.length > MAX_PROJECT_NAME)
-          || known.length + names.filter(name => !known.includes(name)).length > 40) return { status: 400, body: { error: 'invalid_event' } };
         sql.exec('INSERT INTO events(day,event_id) VALUES(?,?)', input.day, input.eventId);
-        sql.exec('INSERT INTO profile_counts(day,count) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET count=count+1', input.day);
-        sql.exec('INSERT INTO ip_counts(day,ip_hash,count) VALUES(?,?,1) ON CONFLICT(day,ip_hash) DO UPDATE SET count=count+1', input.day, input.ipHash);
-        for (const name of names) sql.exec('INSERT OR IGNORE INTO project_names(name) VALUES(?)', name);
         return { status: 200, body: { duplicate: false } };
       });
       return json(result.body, result.status);
