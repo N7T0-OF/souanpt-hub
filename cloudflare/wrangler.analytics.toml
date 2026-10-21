@@ -13,6 +13,7 @@ compatibility_date = "2026-07-01"
 # setting the required Worker secrets in Cloudflare.
 [vars]
 ANALYTICS_INGEST_ENABLED = "false"
+ANALYTICS_BUILD_SHA = "local"
 
 [[durable_objects.bindings]]
 name = "ANALYTICS_GUARD"

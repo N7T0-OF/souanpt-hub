@@ -8,7 +8,7 @@ Cloudflare Pages est plus fiable que GitHub Pages (fini le « Deployment failed 
 2. Dans **Build → Branch control**, désactive **Enable automatic production branch deployments** pour éviter deux publications concurrentes sur `main`.
 3. Configure le secret GitHub `CLOUDFLARE_API_TOKEN`, limité aux droits de
    publication nécessaires sur le compte Cloudflare et le projet.
-4. Le workflow `.github/workflows/deploy-cloudflare.yml` vérifie le réglage via l'API Cloudflare, publie le bundle allowlisté après validation CI et contrôle le `build-info.json` servi.
+4. Le workflow `.github/workflows/deploy-cloudflare.yml` vérifie le réglage via l'API Cloudflare, déploie le Worker Analytics et attend que son `/status` public confirme le SHA du commit et une ingestion fermée, puis publie le bundle allowlisté et contrôle le `build-info.json` servi. Si le Worker reste ancien ou inaccessible, Pages n'est pas publié.
 
 Si le secret manque, le workflow échoue explicitement; aucune publication n'est
 annoncée. Voir `docs/migration/02-delivery-and-security.md` avant d'activer

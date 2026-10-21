@@ -89,9 +89,11 @@ const event = (overrides = {}) => ({ uid: 'user-1', eid: '0123456789abcdef', t: 
 const projectEvent = (t, fields, eid = '0123456789abcdef') => ({ uid: 'user-1', eid, t, ...fields });
 
 test('status and hit fail closed when security infrastructure is missing', async () => {
-  const status = await worker.fetch(new Request('https://analytics.example/status'), {});
+  const status = await worker.fetch(new Request('https://analytics.example/status'), { ANALYTICS_BUILD_SHA: 'a'.repeat(40) });
   assert.equal(status.status, 200);
-  assert.equal((await status.json()).enabled, false);
+  const body = await status.json();
+  assert.equal(body.enabled, false);
+  assert.equal(body.commit, 'a'.repeat(40));
   const hit = await worker.fetch(request(event()), {});
   assert.equal(hit.status, 503);
 });

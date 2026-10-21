@@ -65,12 +65,20 @@ jobs:
           out="$RUNNER_TEMP/souanpt-cloudflare-${GITHUB_SHA}"
           node scripts/prepare-deploy.mjs --channel=cloudflare --output="$out"
           echo "directory=$out" >> "$GITHUB_OUTPUT"
+      - name: Stamp Analytics Worker source commit
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: node scripts/stamp-analytics-config.mjs
       - name: Deploy protected Analytics Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 3812fed3ef304d1dea00c6498d09aa52
           command: deploy --config cloudflare/wrangler.analytics.toml
+      - name: Verify protected Analytics Worker is public and closed
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: node scripts/verify-analytics-deploy.mjs
       - name: Deploy Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

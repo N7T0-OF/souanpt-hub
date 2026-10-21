@@ -39,7 +39,8 @@ export default {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (url.pathname === '/status' && request.method === 'GET') {
-      return json({ enabled: ready(env), reason: ready(env) ? null : 'security_setup_required' });
+      const enabled = ready(env);
+      return json({ enabled, reason: enabled ? null : 'security_setup_required', commit: env.ANALYTICS_BUILD_SHA || null });
     }
     if (url.pathname !== '/hit') return json({ error: 'not_found' }, 404);
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
