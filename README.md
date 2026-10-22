@@ -26,12 +26,13 @@ GitHub  (optionnel)
 
 ## Déployer le hub — 2 modes
 
-**Mode A — Déploiement direct Cloudflare (officiel, sans GitHub)**
+**Mode A — Déploiement direct Cloudflare (manuel)**
 `deploy-cloudflare.ps1` téléverse une archive publique allowlistée vers Cloudflare Pages et contrôle `build-info.json` après publication. Ce script direct ne déploie pas le Worker Analytics.
 Prérequis une seule fois : installer Node.js LTS (nodejs.org) + autoriser l'outil au
-premier lancement. ⚠ Nécessite un projet Pages en mode **Direct Upload** (un projet
-Pages « connecté à Git » n'accepte pas l'upload direct — crée un nouveau projet
-« Upload assets » si besoin, l'URL .pages.dev change alors).
+premier lancement. Le projet Pages existant peut rester connecté à Git : désactive
+les déploiements automatiques de `main` dans **Branch control** avant tout
+téléversement direct pour éviter une publication concurrente. Garde les aperçus
+des branches activés si tu souhaites voir les PR.
 
 **Mode B — Via GitHub Actions (publication automatisée principale)**
 Après fusion sur `main`, la CI valide tests et artefacts avant le déploiement. Le

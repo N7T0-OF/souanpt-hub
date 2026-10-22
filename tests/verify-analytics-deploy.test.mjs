@@ -48,3 +48,12 @@ test('deployment verification rejects a stale Worker, malformed status and inval
   }), /protected status did not match/);
   await assert.rejects(verifyAnalyticsWorker({ sha: 'short' }), /full Git commit SHA/);
 });
+
+test('release rechecks the protected Worker after production markers and before publication', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
+  const production = workflow.indexOf('- name: Verify current production deployments');
+  const worker = workflow.indexOf('- name: Verify current protected Analytics Worker');
+  const release = workflow.indexOf('- name: Publish GitHub Release');
+  assert.ok(production >= 0 && worker > production && release > worker);
+  assert.match(workflow.slice(worker, release), /run: node scripts\/verify-analytics-deploy\.mjs/);
+});

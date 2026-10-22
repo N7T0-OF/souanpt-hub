@@ -41,6 +41,39 @@ function val(v) {
   return undefined;
 }
 
+// Firestore Rules ne filtrent pas les résultats d'une liste : la requête doit
+// prouver que chaque question retournée est destinée au client.
+export async function loadPublicQuestions(token, fetchImpl = fetch) {
+  const query = {
+    structuredQuery: {
+      from: [{ collectionId: 'questions' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'internal' },
+          op: 'EQUAL',
+          value: { booleanValue: false },
+        },
+      },
+      limit: 40,
+    },
+  };
+  const response = await fetchImpl(`${DOCS}/requests/${encodeURIComponent(token)}:runQuery?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(query),
+  });
+  if (!response.ok) throw new Error(`Public questions query failed (${response.status})`);
+  const rows = await response.json();
+  if (!Array.isArray(rows)) throw new Error('Invalid public questions response');
+  return rows.filter(row => row.document).map(row => {
+    const doc = row.document;
+    const question = { id: String(doc.name || '').split('/').pop() };
+    for (const key in (doc.fields || {})) question[key] = val(doc.fields[key]);
+    return question;
+  }).filter(question => question.internal === false && question.status !== 'cancelled')
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+
 /* ── Registre du questionnaire : UNE source, pas dupliquée par service. ── */
 const SERVICES = [
   ['miniature_youtube', 'Miniature YouTube'], ['logo', 'Logo'], ['banniere', 'Bannière'],
@@ -380,16 +413,7 @@ export async function onRequestGet(ctx) {
   // ── Questions complémentaires (jamais les notes internes du créateur) ──
   let questions = [];
   try {
-    const qr = await fetch(`${DOCS}/requests/${encodeURIComponent(token)}/questions?key=${API_KEY}&pageSize=40`);
-    if (qr.ok) {
-      const j = await qr.json();
-      questions = (j.documents || []).map(doc => {
-        const o = { id: String(doc.name || '').split('/').pop() };
-        for (const k in (doc.fields || {})) o[k] = val(doc.fields[k]);
-        return o;
-      }).filter(q => !q.internal && q.status !== 'cancelled')
-        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-    }
+    questions = await loadPublicQuestions(token);
   } catch (e) {}
   const nowTs = Date.now();
   const pendingQ = questions.filter(q => q.status === 'pending' && !(q.expiresAt && nowTs > Number(q.expiresAt)));

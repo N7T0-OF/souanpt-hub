@@ -2,9 +2,9 @@ rules_version = '2';
 
 // Règles de sécurité Firestore — souanpt.hub V2
 // Principe : chaque document appartient à un UID. Personne ne peut lire/écrire
-// les données d'un autre. Les profils, portails et avis publiés sont lisibles
-// publiquement (pour /@pseudo et les liens de portail sans compte), mais seuls
-// leurs propriétaires peuvent les modifier.
+// les données d'un autre. Les profils et avis publiés sont lisibles
+// publiquement. Les dossiers partagés par lien autorisent seulement `get`
+// sans compte : un visiteur ne peut pas énumérer leurs collections.
 //
 // P0 — un document public doit rester VIDE de secrets. Ces règles ne font que
 // verrouiller ce que le client écrit déjà : l'e-mail du profil et le mot de
@@ -17,6 +17,10 @@ service cloud.firestore {
     function owns(uid)  { return signedIn() && request.auth.uid == uid; }
     function isOwner()  { return signedIn() && request.auth.uid == resource.data.owner; }
     function creatingSelf() { return signedIn() && request.resource.data.owner == request.auth.uid; }
+    function ownsRequest(token) {
+      return signedIn()
+        && get(/databases/$(database)/documents/requests/$(token)).data.owner == request.auth.uid;
+    }
 
     // ── P0 : interdiction d'écrire un secret dans un document public ──
     // `users/{uid}` et `portals/{id}` sont en lecture ouverte (annuaire,
@@ -58,9 +62,9 @@ service cloud.firestore {
       }
     }
 
-    // Portails clients — lisibles par tous (lien privé sans compte), écrits par le propriétaire
+    // Portails clients — lecture par ID de lien, liste réservée au propriétaire
     match /portals/{id} {
-      allow read: if true;
+      allow get: if true;
       allow create: if creatingSelf() && passwordAllowed(request.resource.data);
       allow update: if isOwner() && passwordAllowedUpdate(resource.data, request.resource.data);
       allow delete: if isOwner();
@@ -75,12 +79,12 @@ service cloud.firestore {
     }
 
     // ── Estimations partagées par lien, consultées SANS compte ──
-    // ⚠ Ce document est PUBLIC en lecture : il ne doit contenir que ce que le
+    // ⚠ Ce document est PUBLIC par `get` sur son code : il ne doit contenir que ce que le
     // client a le droit de voir (lignes, total, délai, expiration). Le prix
     // plancher, le taux horaire et la marge restent dans users/{uid}/data,
     // qui n'est lisible que par son propriétaire.
     match /estimates/{code} {
-      allow read: if true;
+      allow get: if true;
       allow create: if creatingSelf();
       allow update, delete: if isOwner();
 
@@ -123,7 +127,7 @@ service cloud.firestore {
     // il ne peut ni changer le propriétaire, ni rouvrir une demande traitée,
     // ni écrire un prix ou un statut interne (ces champs vivent ailleurs).
     match /requests/{token} {
-      allow read: if true;
+      allow get: if true;
       allow create: if creatingSelf();
       allow delete: if isOwner();
       // Le créateur (connecté, propriétaire) : tout.
@@ -143,21 +147,28 @@ service cloud.firestore {
       // SON token, et seulement les champs de réponse. Il ne peut ni modifier
       // la question, ni son type, ni la rouvrir, ni toucher un autre dossier.
       match /questions/{qid} {
-        allow read: if true;
-        allow create, delete: if signedIn()
-          && get(/databases/$(database)/documents/requests/$(token)).data.owner == request.auth.uid;
-        allow update: if
+        // Les notes internes restent visibles au seul créateur. La liste
+        // publique doit filtrer `internal == false` dans sa requête Firestore.
+        // Sans champ `internal`, le document reste privé jusqu'à classement.
+        allow get: if ownsRequest(token) || resource.data.get('internal', true) == false;
+        allow list: if ownsRequest(token) || resource.data.internal == false;
+        allow create: if ownsRequest(token) && request.resource.data.internal is bool;
+        allow delete: if ownsRequest(token);
+        allow update: if request.resource.data.internal is bool && (
              // Le créateur : tout (relance, annulation, verrouillage…).
-             (signedIn() && get(/databases/$(database)/documents/requests/$(token)).data.owner == request.auth.uid)
+             ownsRequest(token)
              // Le client : répondre à une question en attente et non verrouillée.
           || (
-               resource.data.status == 'pending'
+               resource.data.get('internal', true) == false
+            && resource.data.status == 'pending'
             && resource.data.locked != true
             && request.resource.data.status == 'answered'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answer','answeredAt','status'])
              )
              // Le client : signaler qu'il a vu la question (accusé de lecture).
-          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenAt']));
+          || (resource.data.get('internal', true) == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenAt']))
+        );
       }
     }
 
@@ -179,12 +190,12 @@ service cloud.firestore {
     }
 
     // ── Registre central des liens publics (jeton canonique par projet) ──
-    // Lisible par tous : le résolveur /c/<token> (sans compte) doit pouvoir y
+    // Lisible par `get` : le résolveur /c/<token> (sans compte) doit pouvoir y
     // lire l'étape et le statut du dossier. Il ne contient QUE des champs déjà
     // publics ailleurs (nom du projet, du client, total) — jamais de prix
     // plancher ni de note interne. Écrit uniquement par le propriétaire.
     match /public_links/{token} {
-      allow read: if true;
+      allow get: if true;
       allow create: if creatingSelf();
       allow update, delete: if isOwner();
     }

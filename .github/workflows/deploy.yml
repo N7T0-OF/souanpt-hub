@@ -53,7 +53,6 @@ jobs:
       - name: Verify deployed commit marker
         env:
           EXPECTED_SHA: ${{ github.sha }}
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-        run: |
-          actual="$(curl --fail --silent --show-error "${PAGE_URL%/}/build-info.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).commit))')"
-          test "$actual" = "$EXPECTED_SHA" || { echo "Expected $EXPECTED_SHA, got $actual"; exit 1; }
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+          SITE_CHANNEL: github-pages
+        run: node scripts/verify-site-deploy.mjs

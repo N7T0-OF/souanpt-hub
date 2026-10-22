@@ -89,6 +89,5 @@ jobs:
         env:
           EXPECTED_SHA: ${{ github.sha }}
           SITE_URL: https://souanptjub.pages.dev
-        run: |
-          actual="$(curl --fail --silent --show-error "$SITE_URL/build-info.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).commit))')"
-          test "$actual" = "$EXPECTED_SHA" || { echo "Expected $EXPECTED_SHA, got $actual"; exit 1; }
+          SITE_CHANNEL: cloudflare
+        run: node scripts/verify-site-deploy.mjs

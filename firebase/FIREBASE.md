@@ -38,6 +38,16 @@ que souanpt.hub.
    règles depuis le dépôt (pas de `firebase.json`, pas de CI Firebase). Tant que
    tu ne re-colles pas le fichier, l'ancien texte reste actif en production.
 
+   Pour les liens de portail, devis, demande et registre, vérifier après
+   publication qu'un `get` par jeton fonctionne et qu'une requête anonyme de
+   liste sur `portals`, `estimates`, `requests` ou `public_links` est refusée.
+   Les requêtes du propriétaire doivent rester filtrées sur `owner == uid`.
+   Vérifier aussi qu'une question `internal:true` est illisible et impossible
+   à modifier sans être le propriétaire de la demande. La page client interroge
+   seulement les questions `internal:false` ; les anciennes questions sans ce
+   champ restent privées jusqu'à leur classement et devront être complétées au
+   cas par cas pour réapparaître sur le lien client.
+
 ### Deux champs interdits dans les documents publics (P0)
 
 `users/{uid}` (annuaire, `/u/<pseudo>`) et `portals/{id}` (lien du client, sans
