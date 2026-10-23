@@ -65,6 +65,7 @@ service cloud.firestore {
     // Portails clients — lecture par ID de lien, liste réservée au propriétaire
     match /portals/{id} {
       allow get: if true;
+      allow list: if isOwner();
       allow create: if creatingSelf() && passwordAllowed(request.resource.data);
       allow update: if isOwner() && passwordAllowedUpdate(resource.data, request.resource.data);
       allow delete: if isOwner();
@@ -85,6 +86,7 @@ service cloud.firestore {
     // qui n'est lisible que par son propriétaire.
     match /estimates/{code} {
       allow get: if true;
+      allow list: if isOwner();
       allow create: if creatingSelf();
       allow update, delete: if isOwner();
 
@@ -128,6 +130,7 @@ service cloud.firestore {
     // ni écrire un prix ou un statut interne (ces champs vivent ailleurs).
     match /requests/{token} {
       allow get: if true;
+      allow list: if isOwner();
       allow create: if creatingSelf();
       allow delete: if isOwner();
       // Le créateur (connecté, propriétaire) : tout.
@@ -196,13 +199,7 @@ service cloud.firestore {
     // plancher ni de note interne. Écrit uniquement par le propriétaire.
     match /public_links/{token} {
       allow get: if true;
-      allow create: if creatingSelf();
-      allow update, delete: if isOwner();
-    }
-
-    // Collections privées scopées par owner
-    match /{col}/{id} {
-      allow read:   if isOwner();
+      allow list: if isOwner();
       allow create: if creatingSelf();
       allow update, delete: if isOwner();
     }

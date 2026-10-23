@@ -18,9 +18,18 @@ test('shared links allow direct lookup without public root collection enumeratio
     assert.ok(firstWrite > at, `${collection} has a create rule`);
     const access = rules.slice(at + start.length, firstWrite);
     assert.match(access, /allow get: if true;/, `${collection} keeps token lookup`);
+    assert.match(access, /allow list: if isOwner\(\);/, `${collection} keeps owner-filtered queries`);
     assert.doesNotMatch(access, /allow read: if true;|allow list: if true;/, `${collection} must not allow public enumeration`);
   }
-  assert.match(rules, /match \/\{col\}\/\{id\} \{\s*allow read:\s*if isOwner\(\);/, 'owner queries remain available');
+  assert.doesNotMatch(rules, /match \/\{col\}\/\{id\} \{/, 'a generic root match must not override collection-specific write restrictions');
+});
+
+test('sensitive root collections rely only on their explicit write rules', () => {
+  assert.match(rules, /match \/users\/\{uid\} \{[\s\S]*?allow create: if owns\(uid\) && emailAllowed\(request\.resource\.data\);/);
+  assert.match(rules, /match \/portals\/\{id\} \{[\s\S]*?allow create: if creatingSelf\(\) && passwordAllowed\(request\.resource\.data\);/);
+  assert.match(rules, /match \/notifications\/\{id\} \{[\s\S]*?allow create, delete: if false;/);
+  assert.match(rules, /match \/notification_jobs\/\{id\} \{[\s\S]*?allow write: if false;/);
+  assert.doesNotMatch(rules, /match \/\{col\}\/\{id\} \{/, 'a wildcard root writer would bypass these checks through OR semantics');
 });
 
 test('internal request notes require owner access and anonymous updates stay public-only', () => {

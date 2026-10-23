@@ -26,6 +26,15 @@ jobs:
           while IFS= read -r -d '' file; do node --check "$file"; done < <(find js functions cloudflare scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0)
       - name: Run tests
         run: node --test tests/*.test.mjs
+      - name: Install Java 21 for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify Firestore security rules
+        run: |
+          npm install --prefix tests/firestore-emulator --no-save --package-lock=false --no-audit --no-fund
+          ./tests/firestore-emulator/node_modules/.bin/firebase emulators:exec --only firestore --project demo-souanpt-rules 'node --test tests/firestore-emulator/rules.test.mjs'
       - name: Build and validate public artifacts
         env:
           GITHUB_SHA: ${{ github.sha }}
