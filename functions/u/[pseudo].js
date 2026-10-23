@@ -24,7 +24,8 @@
  * restent pleinement fonctionnels.
  */
 
-const FIRESTORE = 'https://firestore.googleapis.com/v1/projects/souanpt-hub/databases/(default)/documents:runQuery';
+const DOCS      = 'https://firestore.googleapis.com/v1/projects/souanpt-hub/databases/(default)/documents';
+const FIRESTORE = DOCS + ':runQuery';
 const API_KEY   = 'AIzaSyCBe6IUWsTBJ0H29KNxw5qU3YiC32Nenvk';   // clé Web publique par conception
 
 // `sandbox` seul : aucune restriction de ressource (pas de default-src), donc
@@ -101,6 +102,50 @@ text-decoration:none}</style></head><body><div>
     { status: code, headers: { 'content-type': 'text/html; charset=utf-8' } });
 }
 
+/**
+ * Pseudo → profil. P0 : un pseudo public appartient à UN compte.
+ *   1. handles/{pseudo} (réservation unique, règles Firestore) → users/{uid} ;
+ *   2. sinon, profils antérieurs aux réservations : recherche par champ, mais
+ *      deux profils portant le même pseudo rendent l'adresse AMBIGUË plutôt
+ *      que de servir l'un des deux au hasard (usurpation du lien public).
+ * → { user } (fields Firestore ou null) | { ambiguous: true }. Lève en cas
+ *   d'annuaire injoignable.
+ */
+export async function findCreator(pseudo, fetchImpl = fetch) {
+  const cache = { cf: { cacheTtl: 300, cacheEverything: true } };
+  const handle = pseudo.toLowerCase();
+  if (/^[a-z0-9_-]{2,40}$/.test(handle)) {
+    const h = await fetchImpl(`${DOCS}/handles/${handle}?key=${API_KEY}`, cache);
+    if (h.ok) {
+      const uid = val(((await h.json()).fields || {}).uid);
+      if (!uid || !/^[\w-]{1,128}$/.test(uid)) return { user: null };
+      const u = await fetchImpl(`${DOCS}/users/${uid}?key=${API_KEY}`, cache);
+      if (u.status === 404) return { user: null };
+      if (!u.ok) throw new Error('annuaire ' + u.status);
+      const fields = (await u.json()).fields || null;
+      // Le profil doit encore désigner ce pseudo (sinon la réservation est périmée).
+      return { user: fields && String(val(fields.pseudo) || '').toLowerCase() === handle ? fields : null };
+    }
+    if (h.status !== 404) throw new Error('annuaire ' + h.status);
+  }
+  const res = await fetchImpl(`${FIRESTORE}?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'users' }],
+        where: { fieldFilter: { field: { fieldPath: 'pseudo' }, op: 'EQUAL', value: { stringValue: pseudo } } },
+        limit: 2,
+      },
+    }),
+    ...cache,
+  });
+  const rows = await res.json();
+  const docs = Array.isArray(rows) ? rows.filter(r => r && r.document) : [];
+  if (docs.length > 1) return { ambiguous: true };
+  return { user: docs.length ? docs[0].document.fields || null : null };
+}
+
 export async function onRequestGet({ params }) {
   // Un pseudo ne contient que des caractères simples : on refuse le reste avant
   // toute requête, plutôt que de laisser une entrée libre atteindre Firestore.
@@ -109,28 +154,17 @@ export async function onRequestGet({ params }) {
     return page('Adresse invalide', 'Ce lien ne correspond à aucun créateur.', 404);
   }
 
-  let user = null;
-  try {
-    const res = await fetch(`${FIRESTORE}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: 'users' }],
-          where: { fieldFilter: { field: { fieldPath: 'pseudo' }, op: 'EQUAL', value: { stringValue: pseudo } } },
-          limit: 1,
-        },
-      }),
-      // Le couple pseudo → site bouge très rarement : on met en cache au bord
-      // pour ne pas relancer une requête Firestore à chaque visite.
-      cf: { cacheTtl: 300, cacheEverything: true },
-    });
-    const rows = await res.json();
-    const doc = Array.isArray(rows) ? rows.find(r => r && r.document) : null;
-    if (doc) user = doc.document.fields || null;
-  } catch (e) {
+  // Le couple pseudo → site bouge très rarement : les lectures sont mises en
+  // cache au bord (voir findCreator) pour ne pas interroger Firestore à chaque visite.
+  let found;
+  try { found = await findCreator(pseudo); }
+  catch (e) {
     return page('Service indisponible', 'Impossible de joindre l’annuaire des créateurs. Réessaie dans un instant.', 502);
   }
+  if (found.ambiguous) {
+    return page('Adresse ambiguë', `Plusieurs créateurs portent le pseudo « ${pseudo} » et aucun ne l’a encore réservé.`, 409);
+  }
+  const user = found.user;
 
   if (!user) return page('Créateur introuvable', `Aucun créateur ne porte le pseudo « ${pseudo} ».`, 404);
   // Un profil retiré du public ne doit pas être atteignable par cette adresse.

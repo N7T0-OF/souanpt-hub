@@ -2355,7 +2355,8 @@ async function accSavePseudo() {
   say('Vérification…');
   try {
     if (!(await Cloud.pseudoAvailable(pseudo))) { say('✗ « ' + pseudo + ' » est déjà pris', '#c0392b'); return; }
-    await Cloud.saveProfile(Cloud.user().uid, { pseudo });
+    // Réservation + profil en un lot : l'ancien pseudo est libéré au passage.
+    await Cloud.claimPseudo(pseudo);
     _myProfile = { ...(_myProfile || {}), pseudo };
     localStorage.setItem('souanpt_pseudo', pseudo);
     renderCompte(); say('✓ Pseudo mis à jour', '#2e9a63');
@@ -3516,6 +3517,13 @@ async function afterGoogleLogin(user) {
         '⚠️ ' + s.stale + ' portail(s) publié(s) avant la mise à jour : republie-les pour retirer l’ancien mot de passe de la page en ligne.',
         '#e4b24a', 7000), 1500);
     }).catch(e => console.warn('[sécurité] purge impossible', e));
+    // Profil antérieur aux réservations de pseudo : réserve le sien s'il est
+    // libre. S'il est détenu par un autre compte, /u/<pseudo> ne mène plus ici.
+    Cloud.ensureHandle().then(r => {
+      if (r === 'taken') setTimeout(() => showToast(
+        '⚠️ Ton pseudo « ' + (prof.pseudo || '') + ' » est réservé par un autre compte : choisis-en un nouveau dans Compte pour garder ton lien public.',
+        '#e4b24a', 8000), 2500);
+    }).catch(e => console.warn('[pseudo] réservation impossible', e));
   }
   if (prof && prof.pseudo) finishLogin(prof.pseudo);
   else if (!loadErr) pseudoShow(user);     // pas encore de profil → 1re connexion
@@ -3593,8 +3601,10 @@ async function pseudoClaim() {
     const free = await Cloud.pseudoAvailable(pseudo);
     if (!free) { msg.style.color = '#c0392b'; msg.textContent = '✗ « ' + pseudo + ' » est déjà pris'; if (btn) btn.disabled = false; return; }
     const u = _googleUser;
-    await Cloud.saveProfile(u.uid, {
-      uid: u.uid, owner: u.uid, pseudo,
+    // Réservation du pseudo + création du profil en UN lot (règles Firestore) :
+    // deux comptes ne peuvent plus porter le même pseudo public.
+    await Cloud.claimPseudo(pseudo, {
+      uid: u.uid, owner: u.uid,
       // P0 #1 : PAS d'e-mail ici. Ce profil est en lecture publique (annuaire,
       // API REST sans auth) — l'e-mail reste côté Auth Google et la page Compte
       // le lit sur Cloud.user().email.

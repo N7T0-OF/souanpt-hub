@@ -46,14 +46,72 @@ service cloud.firestore {
           || prev.get('password','') == next.get('password','');
     }
 
+    // ── P0 : intégrité des profils publics ──
+    // · `verified` et les compteurs du classement ne sont écrits que par un
+    //   compte de service (qui contourne ces règles) : un créateur ne peut ni
+    //   s'attribuer le badge « Vérifié » ni gonfler son rang. À la création,
+    //   seules les valeurs neutres (false / 0) sont admises.
+    // · un pseudo public est RÉSERVÉ dans handles/{pseudo} : users/{uid}.pseudo
+    //   ne peut désigner qu'un pseudo que ce compte détient. Sans cela, deux
+    //   comptes pouvaient porter le même pseudo et /u/<pseudo> servir l'un ou
+    //   l'autre (usurpation du lien public).
+    function protectedKeys() {
+      return ['verified', 'views', 'visitors', 'projects', 'clicks', 'reviewsCount', 'reviewsAvg', 'uid', 'owner'];
+    }
+    function neutralProfile(d, uid) {
+      return d.get('verified', false) == false
+        && d.get('views', 0) == 0 && d.get('visitors', 0) == 0 && d.get('projects', 0) == 0
+        && d.get('clicks', 0) == 0 && d.get('reviewsCount', 0) == 0 && d.get('reviewsAvg', 0) == 0
+        && d.get('uid', uid) == uid && d.get('owner', uid) == uid;
+    }
+    function handlePath(h) { return /databases/$(database)/documents/handles/$(h); }
+    // Le pseudo est réservé par ce compte à l'issue de l'écriture (lot compris).
+    function holdsHandle(h) {
+      return h is string && h.matches('^[a-z0-9_-]{2,40}$')
+        && existsAfter(handlePath(h)) && getAfter(handlePath(h)).data.uid == request.auth.uid;
+    }
+    function pseudoOnCreate(d) { return !('pseudo' in d) || holdsHandle(d.pseudo); }
+    // Changer de pseudo : réserver le nouveau ET libérer l'ancien dans le même
+    // lot (un compte ne garde pas une collection de pseudos). Un pseudo hérité
+    // jamais réservé, ou détenu par un autre compte, n'a rien à libérer.
+    function pseudoOnUpdate(prev, next) {
+      return !next.diff(prev).affectedKeys().hasAny(['pseudo'])
+        || (holdsHandle(next.get('pseudo', null))
+            && !(prev.get('pseudo', '') is string && prev.get('pseudo', '') != ''
+                 && holdsHandle(prev.get('pseudo', ''))));
+    }
+
+    match /handles/{handle} {
+      allow get: if true;
+      allow list: if false;
+      // Réservation unique : un document existant ne se recrée pas (update
+      // interdit). Le profil doit désigner ce pseudo à l'issue de l'écriture,
+      // ce qui empêche de réserver des pseudos inutilisés.
+      allow create: if signedIn()
+        && handle.matches('^[a-z0-9_-]{2,40}$')
+        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('pseudo', '') == handle;
+      allow update: if false;
+      // Libération : seulement par son détenteur, une fois que son profil ne
+      // le désigne plus (changement de pseudo ou suppression du compte).
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid
+        && (!existsAfter(/databases/$(database)/documents/users/$(request.auth.uid))
+            || getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('pseudo', '') != handle);
+    }
+
     // Profil public (portfolio /@pseudo) — lecture ouverte, écriture propriétaire
     match /users/{uid} {
       allow read: if true;
       // Une déclaration par opération : `resource.data` n'est jamais évalué
       // sur une création (il n'existe pas encore), `request.resource` sur une
       // suppression — sinon la condition ferait erreur et nierait l'accès.
-      allow create: if owns(uid) && emailAllowed(request.resource.data);
-      allow update: if owns(uid) && emailAllowedUpdate(resource.data, request.resource.data);
+      allow create: if owns(uid) && emailAllowed(request.resource.data)
+        && neutralProfile(request.resource.data, uid)
+        && pseudoOnCreate(request.resource.data);
+      allow update: if owns(uid) && emailAllowedUpdate(resource.data, request.resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedKeys())
+        && pseudoOnUpdate(resource.data, request.resource.data);
       allow delete: if owns(uid);
 
       // Sous-collections privées de l'utilisateur

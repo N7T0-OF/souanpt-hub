@@ -25,7 +25,7 @@ test('shared links allow direct lookup without public root collection enumeratio
 });
 
 test('sensitive root collections rely only on their explicit write rules', () => {
-  assert.match(rules, /match \/users\/\{uid\} \{[\s\S]*?allow create: if owns\(uid\) && emailAllowed\(request\.resource\.data\);/);
+  assert.match(rules, /match \/users\/\{uid\} \{[\s\S]*?allow create: if owns\(uid\) && emailAllowed\(request\.resource\.data\)/);
   assert.match(rules, /match \/portals\/\{id\} \{[\s\S]*?allow create: if creatingSelf\(\) && passwordAllowed\(request\.resource\.data\);/);
   assert.match(rules, /match \/notifications\/\{id\} \{[\s\S]*?allow create, delete: if false;/);
   assert.match(rules, /match \/notification_jobs\/\{id\} \{[\s\S]*?allow write: if false;/);

@@ -79,10 +79,73 @@ const Cloud = {
   async saveProfile(uid, data) {
     await this._db.collection('users').doc(uid).set(data, { merge: true });
   },
-  /** true si le pseudo est libre (lecture publique de la collection users) */
+  /** true si le pseudo est libre : ni réservé (handles/), ni porté par un
+      profil plus ancien que la réservation (lecture publique de users). */
   async pseudoAvailable(pseudo) {
-    const q = await this._db.collection('users').where('pseudo', '==', pseudo).limit(1).get();
-    return q.empty;
+    const h = String(pseudo || '').toLowerCase();
+    const held = await this._handlesSupported() ? await this._db.collection('handles').doc(h).get() : null;
+    if (held && held.exists) return held.data().uid === (this._user && this._user.uid);
+    const q = await this._db.collection('users').where('pseudo', '==', h).limit(2).get();
+    return q.empty || (q.size === 1 && q.docs[0].id === (this._user && this._user.uid));
+  },
+  /**
+   * Réserve `pseudo` et l'écrit sur le profil en UN lot (exigé par les règles :
+   * users/{uid}.pseudo ne peut désigner qu'un pseudo détenu). L'ancien pseudo
+   * de ce compte est libéré dans le même lot. `extra` = autres champs du profil
+   * (création de compte). Échoue si le pseudo est déjà réservé par un autre.
+   */
+  async claimPseudo(pseudo, extra) {
+    if (!this._user) throw new Error('Non connecté');
+    const uid = this._user.uid, db = this._db;
+    const h = String(pseudo || '').toLowerCase();
+    if (!/^[a-z0-9_-]{2,40}$/.test(h)) throw new Error('Pseudo invalide (a-z, 0-9, - et _)');
+    const prof = await this.loadProfile(uid).catch(() => null);
+    const prev = String((prof && prof.pseudo) || '').toLowerCase();
+    const batch = db.batch();
+    if (prev !== h) batch.set(db.collection('handles').doc(h), { uid, createdAt: Date.now() });
+    batch.set(db.collection('users').doc(uid), { ...(extra || {}), pseudo: h }, { merge: true });
+    if (prev && prev !== h && /^[a-z0-9_-]{2,40}$/.test(prev)) {
+      const old = await db.collection('handles').doc(prev).get().catch(() => null);
+      if (old && old.exists && old.data().uid === uid) batch.delete(old.ref);
+    }
+    try { await batch.commit(); }
+    catch (e) {
+      if (!(e && e.code === 'permission-denied')) throw e;
+      // Règles publiées AVANT les réservations : écriture d'origine (le client
+      // peut donc être déployé avant les règles, sans casser l'inscription).
+      if (!(await this._handlesSupported(true))) {
+        await this.saveProfile(uid, { ...(extra || {}), pseudo: h });
+        return h;
+      }
+      throw new Error('« ' + h + ' » est déjà pris');
+    }
+    return h;
+  },
+  /** Les règles en ligne connaissent-elles handles/ ? (lecture refusée = non) */
+  async _handlesSupported(force) {
+    if (this._handlesOk !== undefined && !force) return this._handlesOk;
+    // Identifiant ordinaire : Firestore réserve les noms en __x__ (erreur
+    // invalid-argument, qui se confondrait avec des règles à jour).
+    try { await this._db.collection('handles').doc('probe-rules').get(); this._handlesOk = true; }
+    catch (e) { this._handlesOk = !(e && e.code === 'permission-denied'); }
+    return this._handlesOk;
+  },
+  /**
+   * Comptes antérieurs aux réservations : réserve le pseudo actuel s'il est
+   * libre (le premier compte connecté l'emporte). → 'claimed' | 'held' |
+   * 'taken' (un autre compte le détient : il faut en choisir un nouveau) | 'skip'.
+   */
+  async ensureHandle() {
+    if (!this.enabled || !this._user) return 'skip';
+    const uid = this._user.uid;
+    const prof = await this.loadProfile(uid).catch(() => null);
+    const p = String((prof && prof.pseudo) || '');
+    if (!/^[a-z0-9_-]{2,40}$/.test(p) || !(await this._handlesSupported())) return 'skip';
+    const ref = this._db.collection('handles').doc(p);
+    const snap = await ref.get();
+    if (snap.exists) return snap.data().uid === uid ? 'held' : 'taken';
+    try { await ref.set({ uid, createdAt: Date.now() }); return 'claimed'; }
+    catch (e) { return 'taken'; }
   },
 
   /* ══════════════════════════════════════════════════════
