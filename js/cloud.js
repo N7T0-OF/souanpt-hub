@@ -182,9 +182,18 @@ const Cloud = {
       const snaps = await Promise.all(names.map(n => col.doc(n).get().catch(() => null)));
       const g = s => (s && s.exists ? s.data() : {}) || {};
       const [sum, daily, dev, co, pr] = snaps.map(g);
+      let ingestEnabled = false;
+      try {
+        const statusUrl = window.HUB_ANALYTICS_STATUS_URL;
+        if (statusUrl) {
+          const status = await fetch(statusUrl, { cache: 'no-store' });
+          if (status.ok) ingestEnabled = (await status.json()).enabled === true;
+        }
+      } catch {}
       return {
         summary: sum || {}, days: daily.days || {},
         devices: dev.map || {}, countries: co.map || {}, projects: pr.map || {},
+        ingestEnabled,
       };
     } catch (e) { console.warn('[cloud] loadAnalytics', e); return null; }
   },
