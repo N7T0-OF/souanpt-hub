@@ -1327,6 +1327,25 @@ function renderBentoGrid(blocks, ctx) {
   return `<div class="bn-grid">${parts.join('')}</div>`;
 }
 
+/* Polices proposées par 🎨 Thème. 'syne' = rendu historique : un site publié
+   avant cette version, sans `cfg.font`, ne change pas. 'system' ne charge rien. */
+const SITE_FONTS = {
+  syne:    { label: 'Syne',             family: "'Syne',system-ui,sans-serif",              css: 'Syne:wght@400;700;800' },
+  inter:   { label: 'Inter',            family: "'Inter',system-ui,sans-serif",             css: 'Inter:wght@400;600;800' },
+  grotesk: { label: 'Space Grotesk',    family: "'Space Grotesk',system-ui,sans-serif",     css: 'Space+Grotesk:wght@400;600;700' },
+  serif:   { label: 'Playfair Display', family: "'Playfair Display',Georgia,serif",         css: 'Playfair+Display:wght@400;700;800' },
+  mono:    { label: 'JetBrains Mono',   family: "'JetBrains Mono',ui-monospace,monospace",  css: 'JetBrains+Mono:wght@400;600;800' },
+  system:  { label: 'Système (rapide)', family: "system-ui,-apple-system,'Segoe UI',sans-serif", css: '' },
+};
+/* Arrondis des cartes et boutons. Absent/'default' = rendu historique (aucune règle émise). */
+const SITE_RADII = { sharp: 2, soft: 8, round: 22 };
+function siteRadiusCss(r) {
+  const px = SITE_RADII[r];
+  if (px === undefined) return '';
+  return `.pc,.rc,.kpi,.soc-i,.sb-hero,.hero-img,.sb-side,#revform,.ct-i,.tgbar button{border-radius:${px}px}
+.bp,.bg,.sb-cta{border-radius:${Math.min(px, 14)}px}`;
+}
+
 /** opts.editor = true → rend AUSSI les blocs masqués (grisés par la couche d'édition).
     La publication ne passe jamais cette option : les blocs masqués y sont donc absents. */
 function generateSite(cfg, projects, reviews, opts) {
@@ -1334,7 +1353,10 @@ function generateSite(cfg, projects, reviews, opts) {
   if (!cfg)      cfg      = SiteConfig.get();
   if (!projects) projects = getProjects();
   if (!reviews)  reviews  = getReviews();
-  const approved = reviews.filter(r => r.status === 'approved');
+  // Avis « mis en avant » d'abord ; le tri est stable, l'ordre des autres ne bouge pas.
+  const approved = reviews.filter(r => r.status === 'approved')
+    .sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+  const font = SITE_FONTS[cfg.font] || SITE_FONTS.syne;
   const aboutTxt = String(cfg.about || '').trim();
   /* Les deux NOUVELLES sections (Chiffres clés, Réseaux) sont Masquées par
      défaut : un site publié avant cette version garde exactement la même
@@ -1363,6 +1385,8 @@ function generateSite(cfg, projects, reviews, opts) {
   const links       = getLinks();
   const blocks      = getBlocks(cfg, projects, links);   // même modèle pour tous les styles
   const heroImage   = String(cfg.heroImage || '').trim();
+  // Image figée d'une bannière GIF, servie aux visiteurs « moins d'animations ».
+  const heroPoster  = heroImage ? String(cfg.heroPoster || '').trim() : '';
   /* Section « Réseaux » : les blocs Lien VISIBLES, dans l'ordre des blocs —
      la même source que la grille Bento, donc un lien masqué disparaît aussi
      d'ici (aucun lien mort ni fuite d'un lien désactivé). */
@@ -1439,7 +1463,7 @@ function generateSite(cfg, projects, reviews, opts) {
   const blkOf = p => blocks.find(b => b.type === 'project' && String(bRef(b)) === String(p.id)) || null;
   const pHid  = p => { const b = blkOf(p); return b ? bHidden(b) : false; };
   const cards = projects.filter(p => editor || !pHid(p)).map((p, i) => `
-    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(String(p.id ?? ''))}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
+    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${esc((p.tags||[]).join('|').toLowerCase())}" data-p="${esc(String(p.id ?? ''))}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(blkOf(p)))}/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
@@ -1455,6 +1479,7 @@ function generateSite(cfg, projects, reviews, opts) {
       </div>
       <p class="rt">${esc(r.text)}</p>
       ${r.project?`<div class="rp">· ${esc(r.project)}</div>`:''}
+      ${r.reply?`<div class="rr"><b>Réponse :</b> ${esc(r.reply)}</div>`:''}
     </div>`;
   const reviewCards = approved.length ? approved.map(rvCard).join('')
     : `<div style="grid-column:1/-1;text-align:center;color:${mutedC};padding:24px;font-size:13px">Sois le premier à laisser un avis ✨</div>`;
@@ -1565,10 +1590,24 @@ function generateSite(cfg, projects, reviews, opts) {
   // Compat : le reste du générateur lit encore ces tables.
   const SEC_LABELS = {}; const SEC_ICONS = {};
   SEC_KEYS.forEach(k => { SEC_LABELS[k] = secTitle(k); SEC_ICONS[k] = secIcon(k); });
-  const tagList = [...new Set(projects.flatMap(p => (p.tags || []).slice(0, 3)).filter(Boolean))].slice(0, 8);
+  // Dédoublonnage insensible à la casse (« Branding » = « branding ») : le
+  // filtre compare en minuscules, deux boutons identiques n'auraient pas de sens.
+  const tagSeen = new Set();
+  const tagList = projects.flatMap(p => (p.tags || []).slice(0, 3)).filter(t => {
+    const k = String(t || '').trim().toLowerCase();
+    if (!k || tagSeen.has(k)) return false;
+    tagSeen.add(k); return true;
+  }).slice(0, 8);
+  // Le tag passe par data-t (jamais dans le code de l'onclick) : un tag avec
+  // une apostrophe ne casse ni le script ni la page.
+  const tagLink = t => `<a href="#projects" onclick="return filterTag(this.getAttribute('data-t'))" data-t="${esc(t.toLowerCase())}">${esc(t)}</a>`;
+  const tagBar = (cfg.tagFilter && layoutStyle !== 'sidebar' && tagList.length >= 2)
+    ? `<div class="tgbar" role="group" aria-label="Filtrer les projets"><button type="button" class="on" data-t="" onclick="filterTag('')">Tous</button>${
+        tagList.map(t => `<button type="button" data-t="${esc(t.toLowerCase())}" onclick="filterTag(this.getAttribute('data-t'))">${esc(t)}</button>`).join('')}</div>`
+    : '';
   const secHtml = {
     about: `<section id="about" class="rev" style="max-width:760px">${secHead('about')}<p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
-    projects: `<section id="projects" class="rev"><div class="prow"><div>${secHead('projects')}</div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div><div class="pg" style="margin-top:20px">${cards}</div></section>`,
+    projects: `<section id="projects" class="rev"><div class="prow"><div>${secHead('projects')}</div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div>${tagBar}<div class="pg" style="margin-top:20px">${cards}</div></section>`,
     avis: `<section id="avis" class="rev">${secHead('avis')}
   ${avisDisplay}
   <div class="leave">
@@ -1687,10 +1726,10 @@ function generateSite(cfg, projects, reviews, opts) {
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="description" content="${esc(cfg.bio)}">
 <title>${esc(cfg.siteName)} — Portfolio</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+${font.css ? `<link href="https://fonts.googleapis.com/css2?family=${font.css}&display=swap" rel="stylesheet">` : ''}
 <style>
 :root{--a:${cfg.accentColor};--bg:${cfg.theme};--t:${textC};--m:${mutedC};--s:${sfcC};--b:${brdC};--cols:${cols}}
-*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--t);font-family:'Syne',system-ui,sans-serif}a{color:inherit;text-decoration:none}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--t);font-family:${font.family}}a{color:inherit;text-decoration:none}
 ${animLevel === 'none' ? '' : `/* ── DÉFILEMENT FLUIDE (v3.9) ── Les ancres de la navigation glissent au lieu
    de sauter. La barre est collante : scroll-padding-top évite de finir le
    titre de section dessous. Respecte prefers-reduced-motion. */
@@ -1940,6 +1979,14 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .sb-hero-in .hsub{color:rgba(255,255,255,.8);margin-bottom:0}
 @media(max-width:820px){.sb-side{position:fixed;left:-260px;top:14px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{left:14px}.sb-main{padding:0}}
 @media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}.navcta{display:none}.burger{display:flex}}
+/* ── Filtre par tag (option 🏷 Tags) & réponse du créateur sous un avis ── */
+.tgbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+.tgbar button{font:inherit;font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--b);background:transparent;color:var(--m);cursor:pointer;transition:.15s;text-transform:capitalize}
+.tgbar button:hover,.tgbar button.on{background:var(--a);border-color:var(--a);color:#060606}
+.rr{margin-top:10px;padding:9px 11px;border-left:2px solid var(--a);font-size:12px;color:var(--m);line-height:1.5}.rr b{color:var(--t)}
+${font.family.includes('Syne') ? '' : '.bn-av{font-family:inherit}'}
+${siteRadiusCss(cfg.radius)}
+${heroPoster ? `@media(prefers-reduced-motion:reduce){.hero-img,.sb-hero{background-image:url('${esc(heroPoster)}')!important}}` : ''}
 </style></head><body>
 ${layoutStyle === 'bento' ? `
 <div class="bn-page">
@@ -1959,7 +2006,7 @@ ${layoutStyle === 'bento' ? `
       ${order.filter(k=>secLive(k)).map(k=>`<a href="#${k}"><span class="sbi">${SEC_ICONS[k]||'•'}</span>${SEC_LABELS[k]}</a>`).join('')}
       ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank"><span class="sbi">↗</span>Behance</a>`:''}
     </nav>
-    ${tagList.length&&secLive('projects')?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(t=>`<a href="#projects" onclick="return filterTag('${esc(t.toLowerCase())}')" data-t="${esc(t.toLowerCase())}">${esc(t)}</a>`).join('')}</div>`:''}
+    ${tagList.length&&secLive('projects')?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(tagLink).join('')}</div>`:''}
     ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
   </aside>
   <main class="sb-main">
@@ -2015,7 +2062,8 @@ function revMail(){
   return false;
 }
 function filterTag(t){
-  document.querySelectorAll('.sb-tags a').forEach(function(a){a.classList.toggle('on',(a.getAttribute('data-t')||'')===t);});
+  t=t||'';
+  document.querySelectorAll('.sb-tags a,.tgbar button').forEach(function(a){a.classList.toggle('on',(a.getAttribute('data-t')||'')===t);});
   document.querySelectorAll('.pc').forEach(function(c){
     var tags=(c.getAttribute('data-tags')||'');
     var show = !t || tags.split('|').indexOf(t)>-1;

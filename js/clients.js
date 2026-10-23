@@ -37,10 +37,13 @@
     _links: [],
     _loading: false,
     _creating: false,
+    // Recherche : texte (projet, client, jeton), étape et statut de cycle de vie.
+    _q: '', _stage: 'all', _status: 'all',
 
     /* ── Chargement ──────────────────────────────────────────────────────── */
     async render() {
       const body = document.getElementById('cp-body'); if (!body) return;
+      this._toolsInit();
       if (!(window.Cloud && Cloud.enabled && Cloud.user())) {
         this._loading = false; this._links = [];
         // La vue « Clients » (annuaire) ne dépend pas du cloud : elle reste
@@ -78,14 +81,63 @@
       this._paint();
     },
 
+    /* ── Recherche ───────────────────────────────────────────────────────── */
+    /** Barre de recherche, rendue UNE fois hors de #cp-body : taper ne la
+        repeint jamais, le champ garde donc le focus et la sélection. */
+    _toolsInit() {
+      const t = document.getElementById('cp-tools'); if (!t || t.dataset.ready) return;
+      t.dataset.ready = '1';
+      t.innerHTML = `
+        <input class="prop-input cp-q" id="cp-q" type="search" placeholder="Rechercher un client, un projet, un lien…  ( / )" aria-label="Rechercher un client ou un projet">
+        <select class="prop-input cp-sel" id="cp-stage" aria-label="Étape">
+          <option value="all">Toutes les étapes</option>
+          ${STAGE_ORDER.map(s => `<option value="${s}">${STAGE[s].icon} ${STAGE[s].label}</option>`).join('')}
+        </select>
+        <select class="prop-input cp-sel" id="cp-status" aria-label="Statut">
+          <option value="all">Tous les statuts</option>
+          <option value="open">Actifs et en pause</option>
+          ${Object.entries(STATUS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join('')}
+        </select>
+        <span class="cp-count" id="cp-count"></span>`;
+      const q = t.querySelector('#cp-q');
+      let timer = null;
+      q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { this._q = q.value.trim().toLowerCase(); this._paint(); }, 120); };
+      t.querySelector('#cp-stage').onchange = e => { this._stage = e.target.value; this._paint(); };
+      t.querySelector('#cp-status').onchange = e => { this._status = e.target.value; this._paint(); };
+      // « / » place le curseur dans la recherche quand la page est affichée.
+      document.addEventListener('keydown', e => {
+        if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+        const el = e.target, tag = el && el.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el && el.isContentEditable)) return;
+        if (!document.getElementById('page-cp')?.classList.contains('active')) return;
+        e.preventDefault(); q.focus();
+      });
+    },
+    _match(l) {
+      if (this._stage !== 'all' && (l.stage || 'request') !== this._stage) return false;
+      const st = l.status || 'active';
+      if (this._status === 'open' ? !(st === 'active' || st === 'inactive') : (this._status !== 'all' && st !== this._status)) return false;
+      if (!this._q) return true;
+      return [l.projectName, l.clientName, l.token].some(v => String(v || '').toLowerCase().includes(this._q));
+    },
+    _filtered() { return this._links.filter(l => this._match(l)); },
+    _filtering() { return !!(this._q || this._stage !== 'all' || this._status !== 'all'); },
+
     /* ── Rendu ───────────────────────────────────────────────────────────── */
     _paint() {
       const body = document.getElementById('cp-body'); if (!body) return;
+      this._toolsInit();
+      const cnt = document.getElementById('cp-count');
+      if (cnt) cnt.textContent = this._filtering() && this._links.length ? `${this._filtered().length} / ${this._links.length}` : '';
       let head = this._creating ? this._createPanel() : '';
       if (this._loading) { body.innerHTML = head + this._msg('Chargement de tes projets…'); return; }
       // Sans projet, la vue Clients montre quand même l'annuaire (sinon on
       // perdrait l'accès aux fiches en fusionnant l'ancienne page).
       if (!this._links.length && this._view !== 'clients') { body.innerHTML = head + this._empty(); return; }
+      if (!this._filtered().length && this._view !== 'clients') {
+        body.innerHTML = head + this._msg('Aucun projet ne correspond à cette recherche. <button class="btn btn-ghost" style="font-size:10px;margin-left:6px" onclick="CP.clearSearch()">Tout afficher</button>');
+        return;
+      }
       const view = this._view === 'list' ? this._list()
                  : this._view === 'clients' ? this._clients()
                  : this._pipeline();
@@ -101,8 +153,9 @@
     },
 
     _pipeline() {
+      const shown = this._filtered();
       const cols = STAGE_ORDER.map(stage => {
-        const items = this._links.filter(l => (l.stage || 'request') === stage);
+        const items = shown.filter(l => (l.stage || 'request') === stage);
         const cards = items.length
           ? items.map(l => this._card(l, true)).join('')
           : `<div class="cp-empty-col">—</div>`;
@@ -118,7 +171,7 @@
     },
 
     _list() {
-      const rows = this._links.map(l => {
+      const rows = this._filtered().map(l => {
         const s = STAGE[l.stage || 'request'], st = STATUS[l.status || 'active'];
         return `<div class="cp-row">
           <div class="cp-row-main">
@@ -162,7 +215,7 @@
       </div>`;
 
       const groups = new Map();
-      this._links.forEach(l => {
+      this._filtered().forEach(l => {
         const key = (l.clientName || '').trim() || '__none';
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(l);
@@ -247,6 +300,27 @@
     startRequest() { this._creating = false; this._paint();
       if (window.QuoteUI && QuoteUI.newRequestLink) QuoteUI.newRequestLink().then?.(() => setTimeout(() => this.render(), 600));
       else window.showPage?.('devis');
+    },
+    clearSearch() {
+      this._q = ''; this._stage = 'all'; this._status = 'all';
+      const t = document.getElementById('cp-tools');
+      if (t) { t.querySelector('#cp-q').value = ''; t.querySelector('#cp-stage').value = 'all'; t.querySelector('#cp-status').value = 'all'; }
+      this._paint();
+    },
+    /** Prospect (Harvey) → lien de demande rattaché à son nom ; la fiche garde le jeton. */
+    async leadToRequest(clientId) {
+      let roster = [];
+      try { roster = JSON.parse(localStorage.getItem('hub_clients') || '[]') || []; } catch { roster = []; }
+      const c = roster.find(x => String(x.id) === String(clientId)); if (!c) return;
+      if (!(window.QuoteUI && QuoteUI.newRequestLink)) return;
+      const token = await QuoteUI.newRequestLink({ clientName: c.name });
+      if (!token) return;
+      // Relecture : la création a pu prendre du temps, ne pas écraser une autre écriture.
+      try { roster = JSON.parse(localStorage.getItem('hub_clients') || '[]') || []; } catch { roster = []; }
+      const fresh = roster.find(x => String(x.id) === String(clientId));
+      if (fresh) { fresh.requestToken = token; fresh.status = 'active'; localStorage.setItem('hub_clients', JSON.stringify(roster)); }
+      window.renderClients?.();
+      setTimeout(() => this.render(), 600);
     },
     startDevis()  { this._creating = false; window.showPage?.('devis'); },
     startPortal() { this._creating = false; window.showPage?.('portals'); if (window.portalOpenForm) setTimeout(portalOpenForm, 120); },

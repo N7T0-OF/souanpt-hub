@@ -665,10 +665,14 @@ const QuoteUI = {
   _reqs: [],  // demandes reçues (formulaire public) à traiter
 
   /** Crée un lien de demande vide et le copie. Le client remplira le formulaire. */
-  async newRequestLink() {
+  /** opts.clientName (facultatif) : le projet naît rattaché à ce client
+      (prospect Harvey, fiche de l'annuaire). Renvoie le jeton, ou undefined. */
+  async newRequestLink(opts) {
+    opts = opts || {};
     if (!(window.Cloud && Cloud.enabled && Cloud.user()))
       return showToast?.('Connecte-toi pour créer un lien de demande', '#e4b24a', 4000);
     const token = this._newPublicToken();
+    const clientName = String(opts.clientName || '').trim().slice(0, 80);
     try {
       await Cloud._db.collection('requests').doc(token).set({
         owner: Cloud.user().uid,
@@ -676,12 +680,14 @@ const QuoteUI = {
         status: 'open', createdAt: Date.now(),
       });
       // Recense le lien canonique dès sa création (étape « demande »).
-      window.Registry && Registry.register(token, { stage: 'request' });
+      window.Registry && Registry.register(token, clientName ? { stage: 'request', clientName } : { stage: 'request' });
+      if (clientName && window.ClientWorkspace) ClientWorkspace.ensure(token, { clientName, stage: 'request' });
       const url = location.origin + '/c/' + token;
       const box = this._el('qf-msg');
       if (box) box.textContent = `Lien de demande créé :\n${url}\n\nEnvoie-le à ton client : il décrira son besoin et déposera ses références. Ce même lien deviendra ensuite l'estimation, puis la mission.`;
       navigator.clipboard?.writeText(url).catch(() => {});
       showToast?.('Lien de demande créé et copié ✓', '#2e9a63', 3500);
+      return token;
     } catch (e) { showToast?.('✗ ' + (e.message || 'Création impossible'), '#c0392b', 4000); }
   },
 

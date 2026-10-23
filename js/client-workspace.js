@@ -617,6 +617,68 @@
       return txt;
     },
 
+    /* ── parcours client : où en est le dossier, et quelle suite ─────────── */
+    /** Étapes du parcours, déduites des pièces RÉELLES du dossier (aucune
+        saisie en plus). state : 'done' | 'current' | 'todo'. */
+    journey(d) {
+      const w = d.w || {}, req = d.req, est = d.estDoc || d.est, portal = d.portal;
+      const step = portal ? (Number(portal.stepIndex) || 0) : -1;   // 0 Brief … 5 Terminé
+      const invoices = d.invoices || [];
+      const deposit = invoices.some(i => i.status === 'acompte' || i.status === 'paid') || step > 2;
+      const paidAll = d.totals && d.totals.invoiced > 0 && d.totals.due === 0;
+      const delivered = step >= 4 || !!(portal && (portal.deliverables || []).length);
+      const estOk = !!est && ['confirmed', 'accepted'].includes(String(est.status || '')) || !!portal;
+      const raw = [
+        { key: 'request',  label: 'Demande',    done: !!req && req.status !== 'open' || !!est || !!portal, date: req && (req.submittedAt || req.createdAt) },
+        { key: 'estimate', label: 'Devis',      done: estOk, date: est && (est.confirmedAt || est.createdAt) },
+        { key: 'deposit',  label: 'Acompte',    done: deposit },
+        { key: 'prod',     label: 'Production', done: step > 3 || delivered },
+        { key: 'delivery', label: 'Livraison',  done: delivered && (step >= 5 || w.stage === 'done' || paidAll) },
+        { key: 'paid',     label: 'Payé',       done: paidAll },
+      ];
+      // L'étape courante est la première non faite ; un dossier clôturé est entièrement « fait ».
+      let current = w.stage === 'done' ? -1 : raw.findIndex(s => !s.done);
+      return raw.map((s, i) => ({ ...s, state: s.done || current === -1 ? 'done' : i === current ? 'current' : 'todo' }));
+    },
+
+    /** Prochaine action conseillée — règles simples et transparentes, pas d'IA. */
+    nextAction(d) {
+      const w = d.w || {}, t = w.token, req = d.req, est = d.estDoc || d.est, portal = d.portal;
+      const day = 86400000, ago = ts => ts ? Math.floor((Date.now() - ts) / day) : 0;
+      if (w.stage === 'done') return { text: 'Dossier terminé — c\'est le bon moment pour demander un avis au client.', act: 'Avis', go: 'avis' };
+      if (!req && !est && !portal) return { text: 'Envoie le lien au client : il décrira son besoin et déposera ses références.', act: 'Copier le lien', copy: t };
+      if (req && req.status === 'open' && !est) return { text: `Lien envoyé${req.createdAt ? ' il y a ' + ago(req.createdAt) + ' j' : ''}, demande pas encore remplie — relance le client si besoin.`, act: 'Copier le lien', copy: t };
+      if (!est && !portal) return { text: 'La demande est complète : prépare le devis.', act: 'Faire le devis', go: 'devis' };
+      if (est && !portal && !['confirmed', 'accepted'].includes(String(est.status || ''))) {
+        const n = ago(est.createdAt);
+        return { text: n >= 7 ? `Devis envoyé il y a ${n} jours sans réponse — une relance s'impose.` : 'Devis envoyé : en attente de la réponse du client.', act: 'Copier le lien', copy: t };
+      }
+      if (!portal) return { text: 'Devis accepté : ouvre l\'espace mission (portail) du client.', act: 'Créer le portail', portal: true };
+      const j = this.journey(d);
+      const cur = j.find(s => s.state === 'current');
+      if (cur && cur.key === 'deposit') return { text: 'Mission ouverte : demande l\'acompte avant de lancer la production.', act: 'Facturer', go: 'facturation' };
+      if (cur && (cur.key === 'prod' || cur.key === 'delivery')) return { text: 'En production : dépose les livrables dans le portail au fur et à mesure.', act: 'Portail', go: 'portals' };
+      if (d.totals && d.totals.due > 0) return { text: `Reste à encaisser : ${this._money(d.totals.due).replace(/<[^>]+>/g, '')}.`, act: 'Facturation', go: 'facturation' };
+      return { text: 'Tout est livré et réglé : tu peux clôturer le dossier.', act: 'Terminer', close: true };
+    },
+
+    /** Notes privées du dossier (jamais publiées : public_links n'en reçoit rien). */
+    setNotes(token, text) {
+      const list = this.all();
+      const w = this._ensureIn(list, token, {});
+      if (!w) return;
+      w.notes = String(text || '').slice(0, 4000);
+      this.save(list);
+    },
+    runNext(token) {
+      const d = this._current; if (!d || !d.w || d.w.token !== token) return;
+      const a = this.nextAction(d);
+      if (a.copy) return this.copyLink(a.copy);
+      if (a.close) return this.closeMission(token);
+      if (a.portal) return this.editPortal('');
+      if (a.go) return this.go(a.go);
+    },
+
     /* ── rendu du dossier ───────────────────────────────────────────────── */
     _money(v, cur) {
       const n = Number(v) || 0;
@@ -694,6 +756,14 @@
         : this._none('Aucun livrable déposé pour l\'instant.');
 
       const closed = w.stage === 'done';
+      /* Parcours + prochaine action, en tête du dossier */
+      const steps6 = this.journey(d);
+      const nx = this.nextAction(d);
+      const journey = `<ol class="cw-journey" aria-label="Parcours du client">${steps6.map(s =>
+        `<li class="cw-j ${s.state}"${s.state === 'current' ? ' aria-current="step"' : ''}><i>${s.state === 'done' ? '✓' : ''}</i><span>${s.label}</span>${s.date && s.state === 'done' ? `<small>${this._date(s.date)}</small>` : ''}</li>`).join('')}</ol>
+        <div class="cw-next"><span>➜ ${esc(nx.text)}</span>${nx.act ? `<button class="cw-mini-btn" onclick="ClientWorkspace.runNext('${esc(w.token)}')">${esc(nx.act)}</button>` : ''}</div>`;
+      const notes = `<textarea class="cw-notes" rows="3" maxlength="4000" placeholder="Brief, préférences, contacts, prochain rendez-vous… (privé, jamais publié)"
+          onchange="ClientWorkspace.setNotes('${esc(w.token)}', this.value)">${esc(w.notes || '')}</textarea>`;
       return `
       <div class="cw-backdrop" onclick="ClientWorkspace.close()"></div>
       <aside class="cw-drawer" role="dialog" aria-label="Dossier client">
@@ -711,8 +781,10 @@
               ? `<button class="cw-btn" onclick="ClientWorkspace.reopen('${esc(w.token)}')">↺ Rouvrir</button>`
               : `<button class="cw-btn go" onclick="ClientWorkspace.closeMission('${esc(w.token)}')" title="Passe le dossier en Terminé — rien n'est supprimé">✅ Terminer</button>`}
           </div>
+          ${journey}
         </header>
 
+        ${this._sec('Notes', '📝', notes)}
         ${this._sec('Client', '🧑', client + sib, `<button class="cw-sec-a" onclick="ClientWorkspace.toRoster()">Annuaire</button>`)}
         ${this._sec('Demande', '📥', req, `<button class="cw-sec-a" onclick="ClientWorkspace.newRequest()">+ Lien</button>`)}
         ${this._sec('Devis', '📄', est, `<button class="cw-sec-a" onclick="ClientWorkspace.go('devis')">Ouvrir</button>`)}

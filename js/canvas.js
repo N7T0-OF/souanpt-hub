@@ -882,31 +882,99 @@ function edSet(k, v, live) { SiteConfig.set(k, v); live ? edUpdatePreview() : ed
 
 /* ── 🎨 Thème (ex-groupe « Thème » du panneau) ── */
 function edWinTheme(btn) {
-  const c = SiteConfig.get();
   // aperçus miniatures : on voit la structure du style, pas seulement son nom
   const styles = [
     ['float', '📱 Barre flottante', '<b class="p1"></b><b class="p2"></b><b class="p2"></b>'],
     ['sidebar', '🖥 Barre latérale', '<b class="s1"></b><b class="s2"></b><b class="s3"></b>'],
     ['bento', '🧩 Bento', '<b class="b1"></b><b class="b2"></b><b class="b3"></b><b class="b4"></b>'],
   ];
-  const html = `
+  const radii = [['default', 'Standard'], ['sharp', 'Net'], ['soft', 'Doux'], ['round', 'Rond']];
+  const ratio = v => v === null ? '—' : v.toFixed(1) + ':1';
+  const contrastNote = c => {
+    const k = SiteTheme.checkContrast(c);
+    return k.ok
+      ? `<span class="th-ok">✓ Lisible</span> accent sur le fond ${ratio(k.onBg)} · texte des boutons ${ratio(k.onBtn)}`
+      : `<span class="th-warn">⚠ Contraste faible</span> accent sur le fond ${ratio(k.onBg)} · texte des boutons ${ratio(k.onBtn)} — vise au moins 3:1`;
+  };
+  const draw = () => {
+    const c = SiteConfig.get();
+    const cur = String(c.accentColor || '').toLowerCase();
+    return `
+    <div class="edw-l">Palettes</div>
+    <div class="th-presets">${SiteTheme.PRESETS.map(p =>
+      `<button class="th-pre${cur === p.accentColor.toLowerCase() && (c.theme || SiteTheme.DARK) === p.theme ? ' on' : ''}" data-p="${p.id}" title="${_eesc(p.label)}">
+         <span class="th-sw" style="background:${p.theme};border-color:${p.accentColor}"><i style="background:${p.accentColor}"></i></span>${_eesc(p.label)}</button>`).join('')}</div>
     <div class="edw-l">Style du site</div>
     <div class="edw-styles">${styles.map(([v, n, mini]) =>
       `<button class="edw-sty${c.layoutStyle === v ? ' on' : ''}" data-v="${v}"><span class="edw-mini m-${v}">${mini}</span>${n}</button>`).join('')}</div>
     <div class="edw-l">Couleur d'accent</div>
     <input type="color" class="edw-color" id="edw-accent" value="${_eesc(c.accentColor || '#C8FF00')}">
+    <p class="edw-hint" id="th-contrast">${contrastNote(c)}</p>
     <div class="edw-l">Fond</div>
     <div class="edw-row"><button class="edw-st${c.theme !== '#f8f8f8' ? ' on' : ''}" data-t="#060606">Sombre</button><button class="edw-st${c.theme === '#f8f8f8' ? ' on' : ''}" data-t="#f8f8f8">Clair</button></div>
+    <div class="edw-l">Police</div>
+    <select class="edw-in" id="th-font">${Object.entries(SITE_FONTS).map(([k, f]) =>
+      `<option value="${k}"${(c.font || 'syne') === k ? ' selected' : ''}>${_eesc(f.label)}</option>`).join('')}</select>
+    <div class="edw-l">Arrondis des cartes</div>
+    <div class="edw-row">${radii.map(([v, n]) => `<button class="edw-st${(c.radius || 'default') === v ? ' on' : ''}" data-r="${v}">${n}</button>`).join('')}</div>
     <div class="edw-l">Colonnes de projets</div>
-    <div class="edw-row">${['2', '3', '4'].map(n => `<button class="edw-st${String(c.layout) === n ? ' on' : ''}" data-c="${n}">${n}</button>`).join('')}</div>`;
-  EdWin.open(btn, '🎨 Thème', html, w => {
-    const pick = (sel, key) => w.querySelectorAll(sel).forEach(b => b.onclick = () => {
-      w.querySelectorAll(sel).forEach(x => x.classList.toggle('on', x === b));
-      edSet(key, b.dataset.v || b.dataset.t || b.dataset.c);
-    });
-    pick('[data-v]', 'layoutStyle'); pick('[data-t]', 'theme'); pick('[data-c]', 'layout');
-    const a = w.querySelector('#edw-accent');
-    a.oninput = () => edSet('accentColor', a.value, true);
+    <div class="edw-row">${['2', '3', '4'].map(n => `<button class="edw-st${String(c.layout) === n ? ' on' : ''}" data-c="${n}">${n}</button>`).join('')}</div>
+    <div class="edw-l">Partager ou restaurer</div>
+    <div class="edw-row">
+      <button class="edw-sec-rst" id="th-copy" title="Copie les réglages visuels (aucun contenu du site)">📋 Copier le thème</button>
+      <button class="edw-sec-rst" id="th-paste-t">📥 Coller un thème</button>
+      <button class="edw-sec-rst" id="th-reset" title="Couleurs, police, arrondis et colonnes d'origine">↺ Par défaut</button>
+    </div>
+    <div id="th-paste" style="display:none">
+      <textarea class="edw-in" id="th-json" rows="4" placeholder='{"kind":"souanpt-theme","theme":{…}}'></textarea>
+      <button class="edw-ok" id="th-apply">Appliquer ce thème</button>
+    </div>`;
+  };
+  /** Applique plusieurs réglages en UNE écriture et UN rafraîchissement. */
+  const applyMany = patch => {
+    const c = SiteConfig.get();
+    Object.assign(c, patch);
+    SiteConfig.save(c);
+    edRefreshPreview();
+  };
+  EdWin.open(btn, '🎨 Thème', `<div id="th-body">${draw()}</div>`, w => {
+    const body = w.querySelector('#th-body');
+    const redraw = () => { body.innerHTML = draw(); bind(); };
+    const bind = () => {
+      const q = s => body.querySelector(s);
+      const pick = (sel, key) => body.querySelectorAll(sel).forEach(b => b.onclick = () => {
+        edSet(key, b.dataset.v || b.dataset.t || b.dataset.c || b.dataset.r); redraw();
+      });
+      pick('[data-v]', 'layoutStyle'); pick('[data-t]', 'theme'); pick('[data-c]', 'layout'); pick('[data-r]', 'radius');
+      body.querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
+        const p = SiteTheme.PRESETS.find(x => x.id === b.dataset.p); if (!p) return;
+        applyMany({ accentColor: p.accentColor, theme: p.theme }); redraw();
+      });
+      const a = q('#edw-accent');
+      a.oninput = () => { edSet('accentColor', a.value, true); q('#th-contrast').innerHTML = contrastNote(SiteConfig.get()); };
+      a.onchange = redraw;
+      q('#th-font').onchange = e => edSet('font', e.target.value);
+      q('#th-copy').onclick = () => {
+        const json = SiteTheme.serialize(SiteConfig.get());
+        (navigator.clipboard ? navigator.clipboard.writeText(json) : Promise.reject())
+          .then(() => showToast?.('Thème copié ✓ — colle-le dans un autre hub', '#2e9a63', 2200))
+          .catch(() => { q('#th-paste').style.display = ''; q('#th-json').value = json; q('#th-json').select(); });
+      };
+      q('#th-paste-t').onclick = () => { const p = q('#th-paste'); p.style.display = p.style.display ? '' : 'none'; };
+      q('#th-apply').onclick = () => {
+        let theme;
+        try { theme = SiteTheme.parse(q('#th-json').value); }
+        catch (e) { return showToast?.('✗ ' + e.message, '#c0392b', 2500); }
+        applyMany(theme); redraw();
+        showToast?.(`Thème appliqué ✓ (${Object.keys(theme).length} réglage${Object.keys(theme).length > 1 ? 's' : ''})`, '#2e9a63', 2200);
+      };
+      q('#th-reset').onclick = () => {
+        const d = SiteConfig.defaults();
+        applyMany({ accentColor: d.accentColor, theme: d.theme, layout: d.layout, font: 'syne', radius: 'default' }); redraw();
+        showToast?.('Thème d\'origine rétabli — la structure et le contenu ne bougent pas', '#666', 2400);
+      };
+    };
+    bind();
   });
 }
 
@@ -1420,6 +1488,34 @@ function edWinSections(btn) {
    et pour TOUS les thèmes qui ont une bannière (Flottante & Latérale).
    La carte Profil du thème Bento garde son dégradé : une photo en fond de
    grille rendrait le texte illisible — le rappel est affiché dans la fenêtre. */
+const BN_GIF_MAX_MB = 3;
+/** Première image d'un GIF, TOUJOURS en format fixe (WebP, sinon JPEG) —
+    compressImageSrc garderait le GIF lui-même s'il est plus léger. */
+function gifPoster(src, cb) {
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const max = 1600, k = Math.min(1, max / (img.naturalWidth || 1));
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.naturalWidth * k)); cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      let out = cv.toDataURL('image/webp', 0.8);
+      if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', 0.82);
+      cb(out);
+    } catch { cb(''); }
+  };
+  img.onerror = () => cb('');
+  img.src = src;
+}
+/** Change l'image de bannière. `heroFile` (copie pleine taille rangée sur
+    GitHub par HubImages) est TOUJOURS remise à zéro : sinon la publication
+    résoudrait l'ANCIEN fichier et ignorerait la nouvelle image ou le retrait. */
+function setHero(src, poster) {
+  const c = SiteConfig.get();
+  c.heroImage = src; c.heroPoster = poster || ''; c.heroFile = '';
+  SiteConfig.save(c);
+  edRefreshPreview();
+}
 function edWinBanner(anchor) {
   const HL_TYPES = [['none', 'Aucune action'], ['url', 'Ouvrir un lien'],
                     ['section', 'Aller vers une section'], ['project', 'Voir un projet']];
@@ -1444,9 +1540,10 @@ function edWinBanner(anchor) {
         <button class="edw-sec-rst" id="bn-pick">📁 Importer une image</button>
         <input class="edw-in" id="bn-imgurl" value="${c.heroImage && !String(c.heroImage).startsWith('data:') ? _eesc(c.heroImage) : ''}" placeholder="… ou colle l'URL d'une image déjà en ligne">
         ${c.heroImage ? '<button class="edw-sec-rst" id="bn-clear">✖ Retirer</button>' : ''}
-        <input type="file" id="bn-file" accept="image/*" hidden>
+        <input type="file" id="bn-file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" hidden>
       </div>
     </div>
+    <p class="edw-hint">GIF animé accepté (${BN_GIF_MAX_MB} Mo max) : il reste animé sur le site, et s'affiche figé pour les visiteurs qui demandent moins d'animations.</p>
     <div class="edw-l">Action de la bannière</div>
     <select class="edw-in" id="bn-type">${HL_TYPES.map(([v, l]) => `<option value="${v}"${t === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
     ${t === 'url' ? `<input class="edw-in" id="bn-urlv" value="${_eesc(hl.url || '')}" placeholder="https://…">` : ''}
@@ -1481,16 +1578,35 @@ function edWinBanner(anchor) {
       if (q('#bn-pick')) q('#bn-pick').onclick = () => pick && pick.click();
       if (pick) pick.onchange = e => {
         const f = e.target.files[0]; if (!f) return;
-        fileToDataURL(f, d => { edSet('heroImage', d); showToast?.('Image de bannière importée ✓', '#2e9a63', 2000); redraw(); });
         e.target.value = '';
+        if (f.type !== 'image/gif') {
+          fileToDataURL(f, d => { setHero(d, ''); showToast?.('Image de bannière importée ✓', '#2e9a63', 2000); redraw(); });
+          return;
+        }
+        // ⚠ Un GIF ne passe JAMAIS par le canvas : il y perdrait son animation.
+        if (f.size > BN_GIF_MAX_MB * 1048576) {
+          showToast?.(`GIF trop lourd (${(f.size / 1048576).toFixed(1)} Mo, ${BN_GIF_MAX_MB} Mo max) — compresse-le ou colle son URL`, '#c0392b', 4500);
+          return;
+        }
+        const rd = new FileReader();
+        rd.onload = ev => {
+          const raw = ev.target.result;
+          // Première image figée : servie aux visiteurs « moins d'animations ».
+          gifPoster(raw, still => {
+            try { setHero(raw, still || ''); }
+            catch { return showToast?.('⚠ Stockage local plein — colle plutôt l\'URL du GIF', '#c0392b', 4500); }
+            showToast?.('GIF de bannière importé — animé ✓', '#2e9a63', 2200); redraw();
+          });
+        };
+        rd.readAsDataURL(f);
       };
       const iu = q('#bn-imgurl');
       if (iu) iu.onchange = () => {
         const v = iu.value.trim();
         if (v === String(SiteConfig.get().heroImage || '')) return;
-        edSet('heroImage', v); redraw();
+        setHero(v, ''); redraw();
       };
-      if (q('#bn-clear')) q('#bn-clear').onclick = () => { edSet('heroImage', ''); redraw(); };
+      if (q('#bn-clear')) q('#bn-clear').onclick = () => { setHero('', ''); redraw(); };
       if (q('#bn-vis')) q('#bn-vis').onclick = () => {
         const c = SiteConfig.get();
         const blocks = getBlocks(c);
@@ -1515,6 +1631,8 @@ function edWinEdit(blockId) {
     (type === 'area' ? `<textarea class="edw-in" id="${id}" rows="3">${_eesc(val)}</textarea>`
                      : `<input class="edw-in" id="${id}" value="${_eesc(val)}">`);
   let title = 'Modifier', html = '', save = null;
+  // Projet : éditeur de tags à pastilles, monté une fois la fenêtre ouverte.
+  let tagInit = null, tagEd = null;
 
   if (b.type === 'profile') {
     title = '✎ Profil';
@@ -1618,7 +1736,9 @@ function edWinEdit(blockId) {
     const p = getProjects().find(x => String(x.id) === String(bRef(b))) || {};
     const f = bFocal(b);
     title = '✎ Projet';
-    html = F('e1', 'Titre', p.title || '') + F('e2', 'Tags (séparés par une virgule)', (p.tags || []).join(', '))
+    tagInit = p.tags || [];
+    html = F('e1', 'Titre', p.title || '')
+         + `<div class="edw-l">Tags <span class="edw-hint">Entrée ou virgule pour valider · 🏷 Tags dans la barre pour tout renommer</span></div><div id="e2tags"></div>`
          + F('e3', 'Lien du projet', p.url || '') + F('e4', 'Couverture — URL image', p.cover || '')
          // Cadrage NON destructif : on ne touche jamais au fichier (les GIF restent animés)
          + (p.cover ? `<div class="edw-l">Cadrage de la couverture <span class="edw-hint">le fichier n'est pas modifié</span></div>
@@ -1630,7 +1750,7 @@ function edWinEdit(blockId) {
     save = w => {
       const ps = getProjects(); const x = ps.find(y => String(y.id) === String(bRef(b)));
       if (x) { x.title = w.querySelector('#e1').value;
-               x.tags = w.querySelector('#e2').value.split(',').map(t => t.trim()).filter(Boolean);
+               x.tags = tagEd ? tagEd.get() : x.tags;
                x.url = w.querySelector('#e3').value; x.cover = w.querySelector('#e4').value;
                localStorage.setItem('hub_projects', JSON.stringify(ps));
                if (typeof renderProjects === 'function') renderProjects(); }
@@ -1699,6 +1819,8 @@ function edWinEdit(blockId) {
       w.querySelectorAll('[data-on],[data-v]').forEach(el => { el.oninput = check; el.onchange = check; });
       check();
     }
+    const tgBox = w.querySelector('#e2tags');
+    if (tgBox && window.ProjectTags) tagEd = ProjectTags.mount(tgBox, tagInit);
     const ok = w.querySelector('#edw-save');
     if (ok) ok.onclick = () => { save(w); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
   });
@@ -1718,8 +1840,8 @@ function edAddProject() {
     <input class="edw-in" id="ap-url" placeholder="https://…/image.jpg">
     <div class="edw-l">Titre</div>
     <input class="edw-in" id="ap-title" placeholder="Nom du projet">
-    <div class="edw-l">Tags (séparés par une virgule)</div>
-    <input class="edw-in" id="ap-tags" placeholder="branding, motion">
+    <div class="edw-l">Tags <span class="edw-hint">Entrée ou virgule pour valider</span></div>
+    <div id="ap-tags"></div>
     <div class="edw-l">Lien du projet</div>
     <input class="edw-in" id="ap-link" placeholder="https://behance.net/…">
     ${projs.length ? `<div class="edw-l">…ou dupliquer un projet existant</div>
@@ -1727,6 +1849,7 @@ function edAddProject() {
     <button class="edw-ok" id="ap-ok">Créer le projet</button>`;
   EdWin.open(null, '＋ Nouveau projet', html, w => {
     let cover = '', coverFile = '';
+    let tagEd = window.ProjectTags ? ProjectTags.mount(w.querySelector('#ap-tags'), []) : null;
     const dz = w.querySelector('#ap-dz'), prev = w.querySelector('#ap-prev'),
           info = w.querySelector('#ap-info'), drop = w.querySelector('#ap-drop'), file = w.querySelector('#ap-file');
     const ko = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.round(n / 1024) + ' Ko';
@@ -1756,7 +1879,7 @@ function edAddProject() {
     if (dup) dup.onchange = () => {
       const p = projs.find(x => String(x.id) === dup.value); if (!p) return;
       w.querySelector('#ap-title').value = (p.title || '') + ' (copie)';
-      w.querySelector('#ap-tags').value = (p.tags || []).join(', ');
+      if (window.ProjectTags) tagEd = ProjectTags.mount(w.querySelector('#ap-tags'), p.tags || []);
       w.querySelector('#ap-link').value = p.url || '';
       if (p.cover) { cover = p.cover; coverFile = p.coverFile || ''; prev.src = p.cover; drop.classList.add('has'); info.textContent = 'Couverture reprise du projet dupliqué'; }
     };
@@ -1765,7 +1888,7 @@ function edAddProject() {
       if (!title) return showToast?.('Donne un titre au projet', '#c0392b', 2000);
       const src = cover || w.querySelector('#ap-url').value.trim();
       const p = { id: Date.now().toString(), title,
-        tags: w.querySelector('#ap-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+        tags: tagEd ? tagEd.get() : [],
         url: w.querySelector('#ap-link').value.trim(), cover: src, coverFile: coverFile || '',
         views: 0, createdAt: Date.now() };
       const ps = getProjects(); ps.push(p);

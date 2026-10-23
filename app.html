@@ -1188,6 +1188,88 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cw-warn{margin-top:7px;font-size:9px;color:var(--gold-l);line-height:1.9}
 .cw-warn .cw-mini-btn{margin-left:4px}
 @media(max-width:560px){.cw-drawer{width:100%;max-width:none}}
+
+/* ── Tags des projets (éditeur à pastilles + gestionnaire) ── */
+.tg-box{display:flex;flex-wrap:wrap;gap:5px;align-items:center;background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:5px 6px;min-height:34px}
+.tg-box:focus-within{border-color:var(--accent)}
+.tg-chip{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:3px 4px 3px 9px;border-radius:999px;background:rgba(200,255,0,.1);color:var(--accent)}
+.tg-chip button{background:none;border:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 4px;opacity:.7}
+.tg-chip button:hover,.tg-chip button:focus-visible{opacity:1}
+.tg-in{flex:1;min-width:90px;background:none;border:none;outline:none;color:var(--text);font-family:inherit;font-size:11px;padding:3px}
+.tg-sugg{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:6px;font-size:9px;color:var(--muted2)}
+.tg-s{background:var(--s2);border:1px solid var(--border);border-radius:999px;color:var(--muted3);font-family:inherit;font-size:9px;padding:3px 8px;cursor:pointer}
+.tg-s:hover{color:var(--text);border-color:var(--border2)}
+.tg-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+.tg-row .edw-in{flex:1}
+.tg-n{font-size:9px;color:var(--muted2);white-space:nowrap}
+
+/* ── Thème : palettes et contraste ── */
+.th-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:5px}
+.th-pre{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:6px 4px;color:var(--muted3);font-family:inherit;font-size:9px;cursor:pointer}
+.th-pre.on,.th-pre:hover{border-color:var(--accent);color:var(--text)}
+.th-sw{width:30px;height:18px;border-radius:5px;border:1px solid;display:flex;align-items:center;justify-content:center}
+.th-sw i{width:10px;height:10px;border-radius:50%}
+.th-ok{color:var(--green);font-weight:700}.th-warn{color:var(--gold-l);font-weight:700}
+#th-contrast{font-size:9px;line-height:1.5;margin:5px 0 0}
+
+/* ── Avis : filtres, synthèse, réponse, historique ── */
+.av-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.av-tabs button{font-size:10px}
+.av-n{opacity:.6;font-weight:700}
+.av-q{flex:1;min-width:200px;max-width:340px}
+.av-sum{display:flex;gap:22px;align-items:center;padding:14px 18px;margin-bottom:12px;flex-wrap:wrap}
+.av-avg{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:90px}
+.av-avg b{font-size:26px;line-height:1}.av-avg small{font-size:9px;color:var(--muted2)}
+.av-dist{flex:1;min-width:180px;display:flex;flex-direction:column;gap:3px}
+.av-bar{display:grid;grid-template-columns:22px 1fr 22px;gap:7px;align-items:center;font-size:9px;color:var(--muted3)}
+.av-bar i{height:6px;border-radius:3px;background:var(--s3);overflow:hidden}
+.av-bar i b{display:block;height:100%;background:var(--gold-l)}
+.rv-src{font-size:8px;color:var(--muted2);font-weight:500}
+.rv-reply{margin-top:8px;padding:7px 10px;border-left:2px solid var(--accent);font-size:10px;color:var(--muted3);line-height:1.5}
+.rv-reply b{color:var(--text)}
+.rv-reply-ed{margin-top:8px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.rv-reply-ed textarea{width:100%;resize:vertical}
+.modbtns{flex-wrap:wrap}
+.rv-hist{margin-top:8px;font-size:9px;color:var(--muted2);line-height:1.7}
+.rv-hist summary{cursor:pointer;color:var(--muted3)}
+
+/* ── Clients & Projets : recherche ── */
+.cp-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.cp-q{flex:1;min-width:220px}
+.cp-sel{width:auto;min-width:150px}
+.cp-count{font-size:10px;color:var(--muted2)}
+
+/* ── Dossier : parcours, prochaine action, notes ── */
+.cw-journey{list-style:none;display:flex;gap:2px;margin:12px 0 0;padding:0;counter-reset:j}
+.cw-j{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:8px;color:var(--muted2);text-align:center;position:relative;min-width:0}
+.cw-j::before{content:'';position:absolute;top:8px;left:-50%;width:100%;height:2px;background:var(--border2);z-index:0}
+.cw-j:first-child::before{display:none}
+.cw-j i{width:17px;height:17px;border-radius:50%;border:2px solid var(--border2);background:var(--s1);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:9px;z-index:1}
+.cw-j.done{color:var(--muted3)}.cw-j.done i{background:var(--green);border-color:var(--green);color:#060606}.cw-j.done::before{background:var(--green)}
+.cw-j.current{color:var(--text);font-weight:700}.cw-j.current i{border-color:var(--accent);box-shadow:0 0 0 3px rgba(200,255,0,.15)}
+.cw-j small{font-size:7px;color:var(--muted2);font-weight:400}
+.cw-next{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:11px;padding:8px 10px;border-radius:8px;background:rgba(200,255,0,.06);border:1px solid rgba(200,255,0,.18);font-size:10px;line-height:1.5}
+.cw-notes{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:8px 9px;color:var(--text);font-family:inherit;font-size:10px;resize:vertical}
+
+/* ── Passerelle Harvey ── */
+.hv-modal{position:fixed;inset:0;z-index:880;background:rgba(4,4,4,.75);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px}
+.hv-box{width:min(720px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:16px 18px}
+.hv-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:13px}
+.hv-x{background:none;border:none;color:var(--muted3);font-size:15px;cursor:pointer}
+.hv-tabs{margin-bottom:10px}.hv-tabs button{font-size:10px}
+.hv-p{font-size:10px;color:var(--muted3);line-height:1.6;margin:8px 0}.hv-p a{color:var(--accent)}
+.hv-small{font-size:9px;color:var(--muted2)}
+.hv-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hv-f{display:flex;flex-direction:column;gap:3px;font-size:9px;color:var(--muted2)}
+.hv-wide{grid-column:1/-1}
+.hv-warn{font-size:10px;color:var(--gold-l);margin:8px 0}.hv-ok{font-size:10px;color:var(--green);margin:8px 0}
+.hv-act{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.hv-steps{font-size:10px;color:var(--muted3);line-height:1.9;padding-left:18px}
+.hv-steps code{background:var(--s3);padding:1px 6px;border-radius:4px;font-size:9px;color:var(--text)}
+.hv-file{display:inline-flex;align-items:center;gap:8px;font-size:10px;cursor:pointer;margin:6px 0}
+.hv-sts{display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0}
+.hv-list{margin:6px 0 0 16px;line-height:1.7}.hv-list small{color:var(--muted2)}
+@media(max-width:560px){.hv-grid{grid-template-columns:1fr}.cw-j span{font-size:7px}}
 </style>
 </head>
 <body>
@@ -1500,7 +1582,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <span id="ed-canvas-status" style="font-size:9px;color:var(--muted2);min-width:54px;text-align:right"></span>
           <button class="btn btn-ghost edtb-b" onclick="edWinTheme(this)" title="Style, couleurs, colonnes — raccourci T">🎨<span class="edtb-t"> Thème</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinFx(this)" title="Animations & effets — raccourci E">⚡<span class="edtb-t"> Effets</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinBanner(this)" title="Image, accroche et action de la bannière principale — raccourci B">🖼<span class="edtb-t"> Bannière</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinBanner(this)" title="Image ou GIF, accroche et action de la bannière principale — raccourci B">🖼<span class="edtb-t"> Bannière</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="ProjectTags.openManager(this)" title="Renommer, fusionner ou retirer les tags des projets">🏷<span class="edtb-t"> Tags</span></button>
           <span class="edtb-sep"></span>
           <button class="btn btn-ghost edtb-b" id="ed-undo" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" disabled>↶</button>
           <button class="btn btn-ghost edtb-b" id="ed-redo" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" disabled>↷</button>
@@ -1561,9 +1644,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button data-v="list" onclick="CP.setView('list')">Liste</button>
           <button data-v="clients" onclick="CP.setView('clients')">Clients</button>
         </div>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="HarveyBridge.open()" title="Facultatif : relier Harvey, l'agent de prospection qui tourne sur ton ordinateur">🤖 Harvey</button>
         <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau client / projet</button>
       </div>
       <div class="infobox">🗂️ <strong>Tout ton relationnel client au même endroit.</strong> Chaque demande, devis et mission d'un même projet vit sur <strong>un seul lien</strong> qui suit son cycle de vie — de la première prise de contact à la livraison. Les outils détaillés (analyse, grille tarifaire, portail) restent accessibles depuis chaque projet.</div>
+      <div class="cp-tools" id="cp-tools"></div>
       <div id="cp-body"></div>
     </div>
 
@@ -1697,7 +1782,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="form-box" id="add-review-form">
         <div class="biz-form">
           <div><div class="prop-label">Auteur</div><input class="prop-input" id="rv-author" placeholder="Prénom NOM"></div>
-          <div><div class="prop-label">Projet</div><input class="prop-input" id="rv-project" placeholder="Nom du projet"></div>
+          <div><div class="prop-label">Projet</div><input class="prop-input" id="rv-project" list="dl-rv-projects" placeholder="Nom du projet"><datalist id="dl-rv-projects"></datalist></div>
           <div><div class="prop-label">Note /5</div><input class="prop-input" id="rv-rating" type="number" min="1" max="5" value="5"></div>
         </div>
         <div style="margin-top:8px"><div class="prop-label">Avis</div><textarea class="prop-input" id="rv-text" style="height:60px;resize:none" placeholder="Ce que dit le client…"></textarea></div>
@@ -1706,6 +1791,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button class="btn btn-ghost" onclick="document.getElementById('add-review-form').classList.remove('visible')">Annuler</button>
         </div>
       </div>
+      <div id="avis-stats"></div>
+      <div class="av-tools" id="avis-tools"></div>
       <div class="biz-2col" id="reviews-list"></div>
     </div>
 
@@ -2244,12 +2331,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
      autoBackup) et précéder ui.js (les timers d'auto-backup l'attendent). -->
 <script src="js/hub-sync.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/site-theme.js"></script>
+<script src="js/tags.js"></script>
 <script src="js/canvas.js"></script>
 <script src="js/storage-ui.js"></script>
 <script src="js/analytics.js"></script>
 <script src="js/quote.js"></script>
 <script src="js/client-workspace.js"></script>
 <script src="js/clients.js"></script>
+<script src="js/harvey-bridge.js"></script>
 <script>
 /* ═══ SETTINGS ═══ */
 function settingsTab(name, el) {
@@ -2892,8 +2982,11 @@ function addClient() {
 }
 function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); renderClients(); }
 function renderClients() {
-  const cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');
+  const all=JSON.parse(localStorage.getItem('hub_clients')||'[]');
   const ct=document.getElementById('clients-list'); if(!ct) return;
+  // Recherche de la page Clients & Projets (CP._q) : nom, type, e-mail, notes.
+  const q=(window.CP&&CP._q)||'';
+  const cl=q?all.filter(c=>[c.name,c.type,c.email,c.company,c.notes].some(v=>String(v||'').toLowerCase().includes(q))):all;
   // Accès au DOSSIER client depuis l'annuaire — fonctionne aussi hors-ligne
   // (le dossier lit le cache local, pas le registre public).
   const cwBtn=(name)=>{
@@ -2911,8 +3004,20 @@ function renderClients() {
     sub.textContent=cl.length+' fiche'+(cl.length>1?'s':'')+(withP?' · '+withP+' avec projet':''); }
   const cols=['rgba(201,146,42,.12)','rgba(46,154,99,.1)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
-  if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
-  ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${(c.name||'?')[0].toUpperCase()}</div><div><div class="client-name">${c.name}</div><div class="client-sub">${c.type||'Nouveau'}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${c.progress||0}%"></div></div><span>${c.progress||0}%</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}<button onclick="deleteClient('${c.id}')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`).join('');
+  if(!all.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
+  if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucune fiche ne correspond</div><div class="empty-sub">Essaie un autre nom, type ou e-mail</div></div>';return;}
+  // Tout passe par esc() : une fiche importée (Harvey, CSV) peut contenir du HTML.
+  const LEAD={ replied:'A répondu', meeting:'RDV obtenu', closed:'Gagné', contacted:'Contacté', new:'Nouveau', lost:'Perdu' };
+  ct.innerHTML=cl.map((c,i)=>{
+    const lead=c.source==='harvey';
+    const badge=lead?`<span class="rstatus st-w" title="Prospect importé depuis Harvey">🤖 ${esc(LEAD[c.leadStatus]||'Lead')}</span>`
+      :`<span class="rstatus st-ok">${c.status==='active'?'Actif':'En cours'}</span>`;
+    return `<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div style="min-width:0"><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Nouveau')}</div></div><span style="margin-left:auto">${badge}</span></div>${
+      c.email?`<div class="client-sub" style="margin-bottom:6px">✉ <a href="mailto:${esc(c.email)}" style="color:inherit">${esc(c.email)}</a>${c.title?' · '+esc(c.title):''}</div>`:''}${
+      c.notes?`<div class="client-sub" style="margin-bottom:6px;white-space:pre-line">${esc(String(c.notes).slice(0,160))}</div>`:''}${
+      lead?'':`<div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${Number(c.progress)||0}%"></div></div><span>${Number(c.progress)||0}%</span></div>`}<div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}${
+      lead&&window.QuoteUI&&QuoteUI.newRequestLink?`<button data-cl="${esc(c.id)}" onclick="CP.leadToRequest(this.dataset.cl)" title="Créer un lien de demande pour ce prospect" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted3);font-size:10px;padding:3px 8px;font-family:inherit">📥 Lien de demande</button>`:''}<button data-cl="${esc(c.id)}" onclick="deleteClient(this.dataset.cl)" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`;
+  }).join('');
 }
 
 /* ═══ FACTURATION V2 — recherche, pagination, catalogue, statuts, CSV ═══ */
@@ -3047,30 +3152,133 @@ function exportInvoicesCSV() {
   showToast('Export CSV téléchargé ✓ (compatible Excel)','#2e9a63',2500);
 }
 
+/* ═══ AVIS V2 — filtres, recherche, réponse, mise en avant, historique ═══
+   Un avis n'est JAMAIS présenté comme « vérifié » : on affiche seulement sa
+   provenance (relevé sur le site / ajouté à la main). Les doublons sont
+   signalés (même auteur + même texte), jamais supprimés d'eux-mêmes. */
+const AVIS_STATUS = {
+  pending:  { label:'En attente', cls:'st-w' },
+  approved: { label:'Publié',     cls:'st-ok' },
+  refused:  { label:'Refusé',     cls:'st-no' },
+};
+const AVIS_ACT_LABEL = { approved:'publié', refused:'refusé', pending:'remis en attente', feature:'mis à la une', unfeature:'retiré de la une', reply:'réponse modifiée', created:'ajouté à la main' };
+let _avisFilter = 'all', _avisQ = '';
+function getHubReviews() { try { return JSON.parse(localStorage.getItem('hub_reviews')||'[]') || []; } catch { return []; } }
+function saveHubReviews(rv) { localStorage.setItem('hub_reviews', JSON.stringify(rv)); }
+function avisHist(r, a) { r.history = [...(Array.isArray(r.history) ? r.history : []), { a, at: Date.now() }].slice(-20); }
+function avisDupKey(r) { return (String(r.author||'').trim().toLowerCase() + '|' + String(r.text||'').replace(/\s+/g,' ').trim().toLowerCase().slice(0, 120)); }
+
 function addReview() {
   const author=document.getElementById('rv-author')?.value.trim(), text=document.getElementById('rv-text')?.value.trim();
-  if(!author||!text) return;
-  const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
-  rv.push({ id:Date.now().toString(), author, text, rating:parseInt(document.getElementById('rv-rating')?.value)||5, status:'pending', project:document.getElementById('rv-project')?.value||'', createdAt:Date.now() });
-  localStorage.setItem('hub_reviews', JSON.stringify(rv));
+  if(!author||!text) { showToast('Auteur et texte requis','#c0392b',1800); return; }
+  const rating=Math.min(5,Math.max(1,parseInt(document.getElementById('rv-rating')?.value)||5));
+  const rv=getHubReviews();
+  const r={ id:Date.now().toString(), author:author.slice(0,60), text:text.slice(0,600), rating, status:'pending', source:'manual',
+    project:(document.getElementById('rv-project')?.value||'').slice(0,80), createdAt:Date.now() };
+  avisHist(r,'created');
+  if(rv.some(x=>avisDupKey(x)===avisDupKey(r))) showToast('⚠ Un avis identique existe déjà — il est signalé comme doublon','#e4b24a',3000);
+  rv.push(r); saveHubReviews(rv);
   renderReviews();
   document.getElementById('add-review-form').classList.remove('visible');
+  ['rv-author','rv-text','rv-project'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
 }
 function reviewAction(id, action) {
-  const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
-  if(action==='delete'){localStorage.setItem('hub_reviews',JSON.stringify(rv.filter(r=>r.id!==id)));}
-  else{const r=rv.find(r=>r.id===id);if(r)r.status=action;localStorage.setItem('hub_reviews',JSON.stringify(rv));}
-  renderReviews();
-  if(action==='approved') showToast('Approuvé ✓ — clique 🚀 Publier pour l\'afficher sur le site','#2e9a63',3500);
+  const rv=getHubReviews();
+  const r=rv.find(x=>String(x.id)===String(id)); if(!r) return;
+  if(action==='delete'){
+    if(!confirm('Supprimer définitivement l\'avis de « '+(r.author||'?')+' » ?')) return;
+    saveHubReviews(rv.filter(x=>x!==r)); renderReviews(); return;
+  }
+  if(action==='feature'||action==='unfeature') r.featured = action==='feature';
+  else if(AVIS_STATUS[action]) { r.status=action; if(action!=='approved') r.featured=false; }
+  else return;
+  avisHist(r, action); saveHubReviews(rv); renderReviews();
+  if(action==='approved') showToast('Publié ✓ — clique 🚀 Publier pour l\'afficher sur le site','#2e9a63',3500);
+  if(action==='pending') showToast('Retiré du site au prochain 🚀 Publier','#666',2500);
+}
+function reviewReply(id) {
+  const box=document.querySelector(`.rv-reply-ed[data-id="${CSS.escape(String(id))}"]`); if(!box) return;
+  box.style.display = box.style.display==='none' ? '' : 'none';
+  if(box.style.display==='') box.querySelector('textarea')?.focus();
+}
+function reviewReplySave(id) {
+  const box=document.querySelector(`.rv-reply-ed[data-id="${CSS.escape(String(id))}"]`); if(!box) return;
+  const rv=getHubReviews(); const r=rv.find(x=>String(x.id)===String(id)); if(!r) return;
+  r.reply=box.querySelector('textarea').value.trim().slice(0,400);
+  avisHist(r,'reply'); saveHubReviews(rv); renderReviews();
+  showToast(r.reply?'Réponse enregistrée — visible sous l\'avis publié':'Réponse retirée','#2e9a63',2500);
+}
+function avisToolsInit() {
+  const t=document.getElementById('avis-tools'); if(!t||t.dataset.ready) return;
+  t.dataset.ready='1';
+  t.innerHTML=`<div class="ed-modes av-tabs">${[['all','Tous'],['pending','En attente'],['approved','Publiés'],['refused','Refusés'],['featured','À la une']]
+    .map(([v,l])=>`<button data-f="${v}"${v==='all'?' class="active"':''}>${l} <span class="av-n" data-n="${v}"></span></button>`).join('')}</div>
+    <input class="prop-input av-q" id="avis-q" type="search" placeholder="Rechercher un auteur, un mot, un projet…" aria-label="Rechercher dans les avis">`;
+  t.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ _avisFilter=b.dataset.f;
+    t.querySelectorAll('[data-f]').forEach(x=>x.classList.toggle('active',x===b)); renderReviews(); });
+  t.querySelector('#avis-q').oninput=e=>{ _avisQ=e.target.value.trim().toLowerCase(); renderReviews(); };
+  // Actions déléguées : l'id ne passe jamais dans le code d'un onclick.
+  const list=document.getElementById('reviews-list');
+  if(list) list.onclick=e=>{ const b=e.target.closest('[data-act]'); if(!b) return;
+    const id=b.closest('[data-id]')?.dataset.id; if(!id) return;
+    const a=b.dataset.act;
+    if(a==='reply') reviewReply(id); else if(a==='reply-save') reviewReplySave(id); else reviewAction(id,a); };
 }
 function renderReviews() {
-  const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
+  const rv=getHubReviews();
   const ct=document.getElementById('reviews-list'); if(!ct) return;
+  avisToolsInit();
   const wt=rv.filter(r=>r.status==='pending').length;
   const badge=document.getElementById('avis-badge');
   if(badge){badge.textContent=wt||'';badge.style.display=wt?'':'none';}
+  // Projets proposés dans le formulaire manuel
+  const dl=document.getElementById('dl-rv-projects');
+  if(dl) dl.innerHTML=(typeof getProjects==='function'?getProjects():[]).map(p=>`<option value="${esc(p.title||'')}">`).join('');
+
+  const count={ all:rv.length, pending:wt, approved:0, refused:0, featured:0 };
+  rv.forEach(r=>{ if(r.status==='approved') count.approved++; if(r.status==='refused') count.refused++; if(r.featured&&r.status==='approved') count.featured++; });
+  document.querySelectorAll('#avis-tools [data-n]').forEach(s=>s.textContent=count[s.dataset.n]||'');
+
+  // Synthèse des avis PUBLIÉS (ce que voient les visiteurs)
+  const pub=rv.filter(r=>r.status==='approved');
+  const st=document.getElementById('avis-stats');
+  if(st){
+    if(!pub.length){ st.innerHTML=''; }
+    else {
+      const avg=pub.reduce((s,r)=>s+(Number(r.rating)||5),0)/pub.length;
+      const dist=[5,4,3,2,1].map(n=>({ n, c:pub.filter(r=>(Number(r.rating)||5)===n).length }));
+      st.innerHTML=`<div class="gc av-sum"><div class="av-avg"><b>${avg.toFixed(1)}</b><span class="stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg))}</span><small>${pub.length} avis publié${pub.length>1?'s':''}</small></div>
+        <div class="av-dist">${dist.map(d=>`<div class="av-bar"><span>${d.n}★</span><i><b style="width:${Math.round(d.c*100/pub.length)}%"></b></i><span>${d.c}</span></div>`).join('')}</div></div>`;
+    }
+  }
+
   if(!rv.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun avis</div><div class="empty-sub">Relève ceux laissés sur ton site publié, ou ajoute-les à la main</div></div>';return;}
-  ct.innerHTML=rv.map(r=>`<div class="gc rcard"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${r.ghIssue?' <span style="font-size:8px;color:var(--accent3)">via le site</span>':''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${esc(r.text)}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
+  const dupN=new Map(); rv.forEach(r=>{ const k=avisDupKey(r); dupN.set(k,(dupN.get(k)||0)+1); });
+  const shown=rv.filter(r=>{
+    if(_avisFilter==='featured'){ if(!(r.featured&&r.status==='approved')) return false; }
+    else if(_avisFilter!=='all' && (r.status||'pending')!==_avisFilter) return false;
+    if(!_avisQ) return true;
+    return [r.author,r.text,r.project,r.reply].some(v=>String(v||'').toLowerCase().includes(_avisQ));
+  }).sort((a,b)=>((a.status==='pending')?0:1)-((b.status==='pending')?0:1) || (b.createdAt||0)-(a.createdAt||0));
+  if(!shown.length){ ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun avis ne correspond</div><div class="empty-sub">Change de filtre ou de recherche</div></div>'; return; }
+
+  const btn=(act,label,cls)=>`<button class="mbtn ${cls}" data-act="${act}">${label}</button>`;
+  ct.innerHTML=shown.map(r=>{
+    const s=AVIS_STATUS[r.status]||AVIS_STATUS.pending, rating=Math.min(5,Math.max(1,Number(r.rating)||5));
+    const src=r.ghIssue?'relevé sur le site':(r.source==='manual'?'ajouté à la main':'');
+    const acts = r.status==='approved'
+      ? btn(r.featured?'unfeature':'feature', r.featured?'☆ Retirer de la une':'⭐ Mettre à la une','mb-ok')+btn('pending','Dépublier','mb-no')
+      : r.status==='refused' ? btn('approved','Publier','mb-ok')
+      : btn('approved','Publier','mb-ok')+btn('refused','Refuser','mb-no');
+    const hist=(Array.isArray(r.history)?r.history:[]).slice().reverse();
+    return `<div class="gc rcard" data-id="${esc(String(r.id))}"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${src?` <span class="rv-src">${src}</span>`:''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}${r.project?' · '+esc(r.project):''}</div></div><div class="stars" style="margin-left:auto" aria-label="${rating} sur 5">${'★'.repeat(rating)}${'☆'.repeat(5-rating)}</div><span class="rstatus ${s.cls}">${s.label}</span>${r.featured&&r.status==='approved'?'<span class="rstatus st-w">⭐ À la une</span>':''}${dupN.get(avisDupKey(r))>1?'<span class="rstatus st-no" title="Même auteur et même texte qu\'un autre avis">Doublon probable</span>':''}</div>
+      <div class="rtext">${esc(r.text)}</div>
+      ${r.reply?`<div class="rv-reply"><b>Ta réponse :</b> ${esc(r.reply)}</div>`:''}
+      <div class="rv-reply-ed" data-id="${esc(String(r.id))}" style="display:none"><textarea class="prop-input" rows="2" maxlength="400" placeholder="Remercie, précise, corrige… (visible sous l'avis publié)">${esc(r.reply||'')}</textarea>${btn('reply-save','Enregistrer la réponse','mb-ok')}</div>
+      <div class="modbtns">${acts}${btn('reply',r.reply?'💬 Modifier la réponse':'💬 Répondre','mb-del')}${btn('delete','Supprimer','mb-del')}</div>
+      ${hist.length?`<details class="rv-hist"><summary>Historique (${hist.length})</summary>${hist.map(h=>`<div>${new Date(h.at).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})} — ${esc(AVIS_ACT_LABEL[h.a]||h.a)}</div>`).join('')}</details>`:''}
+    </div>`;
+  }).join('');
 }
 
 /* Partage le site publié en QR (ou invite à déployer) */
