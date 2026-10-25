@@ -179,9 +179,6 @@ const GH = {
   async commitFiles(token, owner, repo, files, message) {
     const info   = await this.api(token, `/repos/${owner}/${repo}`);
     const branch = info.default_branch || 'main';
-    const ref    = await this.api(token, `/repos/${owner}/${repo}/git/ref/heads/${branch}`);
-    const baseSha    = ref.object.sha;
-    const baseCommit = await this.api(token, `/repos/${owner}/${repo}/git/commits/${baseSha}`);
     // Binaire d'abord (séquentiellement : GitHub limite les requêtes simultanées),
     // puis un seul arbre — les blobs sont réutilisés s'ils existent déjà.
     const entries = [];
@@ -196,19 +193,33 @@ const GH = {
         entries.push({ path: f.path, mode: '100644', type: 'blob', content: f.content });
       }
     }
-    const tree = await this.api(token, `/repos/${owner}/${repo}/git/trees`, {
-      method: 'POST',
-      body: JSON.stringify({ base_tree: baseCommit.tree.sha, tree: entries }),
-    });
-    const commit = await this.api(token, `/repos/${owner}/${repo}/git/commits`, {
-      method: 'POST',
-      body: JSON.stringify({ message, tree: tree.sha, parents: [baseSha] }),
-    });
-    await this.api(token, `/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ sha: commit.sha, force: false }),
-    });
-    return commit.sha;
+    // Une sauvegarde ou un autre onglet peut avancer la branche pendant la
+    // génération. Repartir du nouveau parent sans jamais forcer la référence.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const ref = await this.api(token, `/repos/${owner}/${repo}/git/ref/heads/${branch}`);
+      const baseSha = ref.object.sha;
+      const baseCommit = await this.api(token, `/repos/${owner}/${repo}/git/commits/${baseSha}`);
+      const tree = await this.api(token, `/repos/${owner}/${repo}/git/trees`, {
+        method: 'POST',
+        body: JSON.stringify({ base_tree: baseCommit.tree.sha, tree: entries }),
+      });
+      const commit = await this.api(token, `/repos/${owner}/${repo}/git/commits`, {
+        method: 'POST',
+        body: JSON.stringify({ message, tree: tree.sha, parents: [baseSha] }),
+      });
+      try {
+        await this.api(token, `/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ sha: commit.sha, force: false }),
+        });
+        return commit.sha;
+      } catch (error) {
+        const conflict = (error.status === 409 || error.status === 422)
+          && /fast.forward|reference update failed/i.test(error.message || '');
+        if (!conflict || attempt === 3) throw error;
+        await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
+      }
+    }
   },
 
   /** Active GitHub Pages (branche main, racine). Idempotent. */
@@ -851,7 +862,8 @@ const SiteConfig = {
     // Section Réseaux (v3.10) : présentation publique. Le défaut reprend
     // l'ancien rendu (icône + texte) → aucun site publié ne change d'apparence.
     socialsStyle: 'ic-texte',      // ic-texte · ic-seules · boutons · cartes · barre
-    animLevel: 'smooth', fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
+    animLevel: 'smooth', smoothWheel: false,
+    fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
   save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); },
@@ -867,6 +879,19 @@ function esc(str) {
 }
 function getProjects() { try { return JSON.parse(localStorage.getItem('hub_projects') || '[]'); } catch { return []; } }
 function getReviews()  { try { return JSON.parse(localStorage.getItem('hub_reviews')  || '[]'); } catch { return []; } }
+function ensureReviewClient(name) {
+  name = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  if (!name || name.toLowerCase() === 'visiteur') return false;
+  let clients;
+  try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch { clients = []; }
+  if (!Array.isArray(clients)) clients = [];
+  if (clients.some(c => String(c.name || '').trim().toLocaleLowerCase('fr') === name.toLocaleLowerCase('fr'))) return false;
+  clients.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name,
+    type: 'Avis client', status: 'active', progress: 0, revenue: 0, createdAt: Date.now() });
+  localStorage.setItem('hub_clients', JSON.stringify(clients));
+  window.renderClients?.();
+  return true;
+}
 function getLinks()    { try { return JSON.parse(localStorage.getItem('hub_links')    || '[]'); } catch { return []; } }
 
 /* ══════════════════════════════════════════════════════
@@ -1804,12 +1829,12 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
 .ptags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}.ptag{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(200,255,0,.1);color:var(--a);font-weight:600}
 .pm{font-size:10px;color:var(--m)}
 /* ── AVIS ── */
-.rg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:24px}
-.rc{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:18px}
-.rh{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.rav{width:34px;height:34px;border-radius:50%;background:rgba(200,255,0,.12);color:var(--a);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px}
-.rn{font-size:12px;font-weight:700}.rs{color:#e4b24a;font-size:12px}
-.rt{font-size:12px;color:var(--m);line-height:1.7}.rp{font-size:10px;color:var(--m);margin-top:8px;opacity:.7}
+.rg{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px;margin-bottom:24px}
+.rc{background:var(--s);border:1px solid var(--b);border-radius:16px;padding:24px;min-height:180px}
+.rh{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.rav{width:44px;height:44px;flex-shrink:0;border-radius:50%;background:rgba(200,255,0,.12);color:var(--a);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+.rn{font-size:16px;font-weight:700;line-height:1.35}.rs{color:#e4b24a;font-size:20px;letter-spacing:1px;line-height:1.3}
+.rt{font-size:16px;color:var(--t);line-height:1.6;margin:0}.rp{font-size:12px;color:var(--m);margin-top:12px;opacity:.9}
 /* ── FORM AVIS ── */
 .leave{text-align:center}
 #revform{display:none;max-width:440px;margin:18px auto 0;text-align:left;background:var(--s);border:1px solid var(--b);border-radius:14px;padding:20px}
@@ -1848,7 +1873,7 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .mqtrack{display:flex;width:max-content;animation:mqs 40s linear infinite}
 .mq:hover .mqtrack{animation-play-state:paused}
 .mqhalf{display:flex;gap:14px;padding-right:14px}
-.mq .rc{width:280px;flex-shrink:0}
+.mq .rc{width:min(340px,85vw);flex-shrink:0}
 @keyframes mqs{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 /* ── APPARITION AU SCROLL ── */
 .rev{opacity:${animLevel==='none'?1:0};transform:translateY(${revY}px);transition:opacity ${revDur}s ease,transform ${revDur}s ease}
@@ -2012,6 +2037,31 @@ ${bodySections}
 <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>`}
 <a class="made" href="${HUB_HOME_URL}" target="_blank" rel="noopener" title="Créé avec Souanpt HUB — clique pour découvrir"><span class="mic">✳</span>Made by <b>Souanpt&nbsp;HUB</b></a>
 <script>
+${cfg.smoothWheel ? `(function(){
+  if (!window.matchMedia || !matchMedia('(hover:hover) and (pointer:fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var root=document.scrollingElement||document.documentElement, target=root.scrollTop, frame=0, prior='';
+  function step(){
+    var diff=target-root.scrollTop;
+    if(Math.abs(diff)<.8){root.scrollTop=target;frame=0;root.style.scrollBehavior=prior;return;}
+    root.scrollTop+=diff*.22;
+    frame=requestAnimationFrame(step);
+  }
+  document.addEventListener('wheel',function(e){
+    if(e.ctrlKey||e.metaKey||e.shiftKey||Math.abs(e.deltaX)>Math.abs(e.deltaY))return;
+    // Les petits deltas viennent généralement d'un pavé tactile : conserver son inertie native.
+    if(e.deltaMode===0&&Math.abs(e.deltaY)<40)return;
+    for(var node=e.target;node&&node!==document.body&&node!==root;node=node.parentElement){
+      if(node.scrollHeight>node.clientHeight+1&&/auto|scroll/.test(getComputedStyle(node).overflowY))return;
+    }
+    var amount=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?innerHeight:1);
+    var max=Math.max(0,root.scrollHeight-root.clientHeight);
+    var next=Math.max(0,Math.min(max,(frame?target:root.scrollTop)+amount));
+    if(next===root.scrollTop&&!frame)return;
+    e.preventDefault();target=next;
+    if(!frame){prior=root.style.scrollBehavior;root.style.scrollBehavior='auto';frame=requestAnimationFrame(step);}
+  },{passive:false});
+  document.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('a[href^="#"]')&&frame){cancelAnimationFrame(frame);frame=0;root.style.scrollBehavior=prior;}});
+})();` : ''}
 var _rvN=5;
 document.querySelectorAll('#rvstars span').forEach(function(s,i){
   s.onclick=function(){_rvN=i+1;document.querySelectorAll('#rvstars span').forEach(function(x,j){x.classList.toggle('on',j<_rvN);});};
@@ -2736,6 +2786,7 @@ async function fetchVisitorReviews(silent) {
       author, text, rating, status: 'pending',
       project: '', createdAt: new Date(is.created_at).getTime(),
     });
+    ensureReviewClient(author);
     added++;
     // Ferme l'issue une fois importée (l'avis vit désormais dans le hub)
     try { await GH.api(token, `/repos/${owner}/${repo}/issues/${is.number}`, { method: 'PATCH', body: JSON.stringify({ state: 'closed' }) }); } catch {}
