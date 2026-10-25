@@ -21,9 +21,11 @@ const API = 'https://api.github.com';
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'];
 
 /** En-têtes de réponse à transmettre tels quels (pas content-encoding :
- *  le corps est lu puis ré-émit, il est déjà décompressé). */
+ *  le corps est lu puis ré-émit, il est déjà décompressé). Ne pas transmettre
+ *  cache-control : une ref GitHub mise en cache ferait échouer le commit suivant
+ *  avec « Update is not a fast forward » même après plusieurs retries. */
 const PASS = [
-  'content-type', 'cache-control', 'etag', 'last-modified',
+  'content-type', 'etag', 'last-modified',
   'content-disposition', 'link',
   'x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset',
   'x-ratelimit-used', 'retry-after', 'location', 'x-github-request-id',
