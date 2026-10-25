@@ -71,6 +71,10 @@ const GHPage = {
     if (dBtn) dBtn.style.display='none';
     const main = document.getElementById('gh-main-section');
     if (main) main.style.display='none';
+    const dot = document.getElementById('ed-gh-dot');
+    const label = document.getElementById('ed-gh-label');
+    if (dot) dot.style.background='var(--muted)';
+    if (label) label.textContent='GitHub non connecté — cliquer';
   },
 
   async loadRepo() {
@@ -536,8 +540,9 @@ async function edExportSite() {
 }
 
 async function edDeploy() {
-  if (!Auth.ok()) { showToast('Connecte GitHub dans "GitHub & Déploiement"','#e4b24a',3000); showPage('github'); return; }
-  edSaveConfig();
+  // Keep the draft before checking GitHub: reconnecting must never discard edits.
+  edSaveConfig(true);
+  if (!Auth.ok()) { showToast('Reconnecte GitHub dans Paramètres → Intégrations, puis republie. Tes modifications sont sauvegardées.','#e4b24a',6000); showPage('github'); return; }
   const btn1=document.getElementById('ed-deploy-btn'); const btn2=document.getElementById('ed-deploy-btn2');
   const status=document.getElementById('ed-status');
   [btn1,btn2].forEach(b=>{if(b)b.disabled=true;});
@@ -548,7 +553,8 @@ async function edDeploy() {
     showToast('✓ Déployé !','#2e9a63');
   } catch(e) {
     if(status)status.textContent='✗ '+e.message;
-    showToast('✗ '+e.message,'#c0392b');
+    showToast('✗ '+e.message,'#c0392b',6000);
+    if (e.code === 'GITHUB_AUTH_EXPIRED') showPage('github');
   } finally {
     [btn1,btn2].forEach(b=>{if(b)b.disabled=false;});
   }
@@ -709,7 +715,11 @@ function refreshAvail() {
 }
 window.refreshAvail = refreshAvail;
 // Session GitHub ouverte / fermée (core.js : Auth.set, Auth.setSession, Auth.clear)
-window.addEventListener('hub-auth', () => refreshAvail());
+window.addEventListener('hub-auth', () => {
+  refreshAvail();
+  if (!Auth.ok()) GHPage.showDisconnected();
+  if (typeof renderGhConnectState === 'function') renderGhConnectState();
+});
 
 function showPage(id) {
   // Portfolio ET Profil Links ont fusionné dans l'Éditeur : projets et liens y
