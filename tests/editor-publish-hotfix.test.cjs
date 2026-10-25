@@ -13,8 +13,55 @@ function loadCore() {
   vm.createContext(context);
   vm.runInContext(fs.readFileSync('js/core.js', 'utf8') +
     ';globalThis.exported={GH,SiteConfig,generateSite,ensureReviewClient};', context);
-  return { ...context.exported, localStorage };
+  return { ...context.exported, localStorage, context };
 }
+
+test('GitHub ref reads bypass the browser cache in both auth modes', async () => {
+  const { GH, context } = loadCore();
+  const requests = [];
+  context.fetch = async (url, init) => { requests.push({ url, init }); return {}; };
+  GH.relayBase = () => 'https://souanptjub.pages.dev';
+  GH.relayMode = () => true;
+  await GH.req('/repos/owner/site/git/ref/heads/main');
+  GH.relayMode = () => false;
+  await GH.req('/repos/owner/site/git/ref/heads/main');
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests.map(r => r.init.cache), ['no-store', 'no-store']);
+  assert.equal(requests[0].init.credentials, 'include');
+});
+
+test('publication skips a duplicate commit when the desired files are already live', async () => {
+  const { GH } = loadCore();
+  const writes = [];
+  GH.api = async (_token, path, opts = {}) => {
+    if (opts.method) writes.push(path);
+    if (path === '/repos/owner/site') return { default_branch: 'main' };
+    if (path.endsWith('/git/ref/heads/main')) return { object: { sha: 'live-commit' } };
+    if (path.endsWith('/git/commits/live-commit')) return { tree: { sha: 'live-tree' } };
+    if (path.endsWith('/git/trees')) return { sha: 'live-tree' };
+    throw new Error('Unexpected path: ' + path);
+  };
+  assert.equal(await GH.commitFiles('token', 'owner', 'site',
+    [{ path: 'index.html', content: '<h1>live</h1>' }], 'deploy'), 'live-commit');
+  assert.deepEqual(writes, ['/repos/owner/site/git/trees']);
+});
+
+test('relay never forwards a cacheable GitHub response to the browser', async () => {
+  const { onRequest } = await import('../functions/api/gh.js');
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response('{"object":{"sha":"fresh"}}', {
+      headers: { 'content-type': 'application/json', 'cache-control': 'private, max-age=60' },
+    });
+    const request = new Request('https://souanptjub.pages.dev/api/gh?path=%2Frepos%2Fowner%2Fsite%2Fgit%2Fref%2Fheads%2Fmain', {
+      headers: { cookie: 'hub_gh=' + encodeURIComponent(JSON.stringify({ t: 'test-token' })), origin: 'https://souanptjub.pages.dev' },
+    });
+    const response = await onRequest({ request, env: {} });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal((await response.json()).object.sha, 'fresh');
+  } finally { globalThis.fetch = originalFetch; }
+});
 
 test('publication retries a moved GitHub branch without force pushing', async () => {
   const { GH } = loadCore();

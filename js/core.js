@@ -39,9 +39,9 @@ const GH = {
       const headers = Object.assign({}, init.headers || {});
       delete headers.Authorization; delete headers.authorization;
       return fetch(this.relayBase() + '/api/gh?path=' + encodeURIComponent(path),
-        Object.assign({}, init, { headers, credentials: 'include' }));
+        Object.assign({}, init, { headers, credentials: 'include', cache: 'no-store' }));
     }
-    return fetch(this.BASE + path, init);
+    return fetch(this.BASE + path, { ...init, cache: 'no-store' });
   },
 
   async api(token, path, opts) {
@@ -195,7 +195,9 @@ const GH = {
     }
     // Une sauvegarde ou un autre onglet peut avancer la branche pendant la
     // génération. Repartir du nouveau parent sans jamais forcer la référence.
-    for (let attempt = 0; attempt < 4; attempt++) {
+    // Les lectures de ref contournent le cache HTTP (GH.req), sinon les essais
+    // repartent tous d'un ancien SHA et échouent en boucle.
+    for (let attempt = 0; attempt < 6; attempt++) {
       const ref = await this.api(token, `/repos/${owner}/${repo}/git/ref/heads/${branch}`);
       const baseSha = ref.object.sha;
       const baseCommit = await this.api(token, `/repos/${owner}/${repo}/git/commits/${baseSha}`);
@@ -203,6 +205,9 @@ const GH = {
         method: 'POST',
         body: JSON.stringify({ base_tree: baseCommit.tree.sha, tree: entries }),
       });
+      // Une autre publication a déjà posé exactement ces fichiers. Éviter un
+      // commit redondant, qui provoquerait une nouvelle course entre onglets.
+      if (tree.sha === baseCommit.tree.sha) return baseSha;
       const commit = await this.api(token, `/repos/${owner}/${repo}/git/commits`, {
         method: 'POST',
         body: JSON.stringify({ message, tree: tree.sha, parents: [baseSha] }),
@@ -214,10 +219,9 @@ const GH = {
         });
         return commit.sha;
       } catch (error) {
-        const conflict = (error.status === 409 || error.status === 422)
-          && /fast.forward|reference update failed/i.test(error.message || '');
-        if (!conflict || attempt === 3) throw error;
-        await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
+        const conflict = /fast.forward|reference update failed/i.test(error.message || '');
+        if (!conflict || attempt === 5) throw error;
+        await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
       }
     }
   },
