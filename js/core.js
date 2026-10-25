@@ -45,6 +45,7 @@ const GH = {
   },
 
   async api(token, path, opts) {
+    const authBefore = typeof Auth !== 'undefined' ? Auth.get() : {};
     const headers = {
       ...this.authHeaders(token),
       'Accept': 'application/vnd.github.v3+json',
@@ -58,7 +59,23 @@ const GH = {
     const res = await this.req(path, { ...opts, headers });
     if (res.status === 204) return {};
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'GitHub ' + res.status);
+    if (!res.ok) {
+      if (res.status === 401) {
+        // A stored token or relay cookie can expire while the editor still looks
+        // connected. Invalidate only the credential used for this request: another
+        // tab may already have connected a new account in the meantime.
+        const current = Auth.get();
+        if ((authBefore.session === 'relay' && current.session === 'relay' && current.ts === authBefore.ts)
+          || (token && current.token === token)) Auth.clear();
+        const error = new Error('Connexion GitHub expirée. Reconnecte-toi dans Paramètres → Intégrations → GitHub, puis republie. Tes modifications restent sauvegardées.');
+        error.code = 'GITHUB_AUTH_EXPIRED';
+        error.status = 401;
+        throw error;
+      }
+      const error = new Error(data.message || 'GitHub ' + res.status);
+      error.status = res.status;
+      throw error;
+    }
     return data;
   },
 
@@ -110,7 +127,8 @@ const GH = {
 
   /** Crée le dépôt s'il n'existe pas */
   async ensureRepo(token, username, repoName, isPrivate = true) {
-    try { await this.api(token, `/repos/${username}/${repoName}`); return; } catch {}
+    try { await this.api(token, `/repos/${username}/${repoName}`); return; }
+    catch (error) { if (error.status !== 404) throw error; }
     await this.api(token, '/user/repos', { method: 'POST', body: JSON.stringify({
       name: repoName, private: isPrivate, auto_init: true,
       description: 'souanpt.hub — généré automatiquement',
