@@ -37,6 +37,18 @@
     _links: [],
     _loading: false,
     _creating: false,
+    _clientFormOpen: false,
+    _clientDraft: { name: '', type: '' },
+
+    toggleClientForm(open) {
+      this._clientFormOpen = open === undefined ? !this._clientFormOpen : !!open;
+      const form = document.getElementById('add-client-form');
+      if (form) form.classList.toggle('visible', this._clientFormOpen);
+      if (this._clientFormOpen) {
+        form?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        document.getElementById('cl-name')?.focus();
+      }
+    },
 
     /* ── Chargement ──────────────────────────────────────────────────────── */
     async render() {
@@ -145,17 +157,17 @@
         <div class="cp-roster-h">
           <span><b>📇 Annuaire</b>
             <span class="cp-roster-sub">${roster.length} fiche${roster.length > 1 ? 's' : ''}${withProject.size ? ' · ' + withProject.size + ' avec projet' : ''}</span></span>
-          <button class="btn btn-ghost" style="font-size:10px;margin-left:auto" onclick="toggleForm('add-client-form')">+ Client</button>
+          <button class="btn btn-ghost" style="font-size:10px;margin-left:auto" onclick="CP.toggleClientForm()">+ Client</button>
         </div>
-        <div class="form-box" id="add-client-form">
+        <div class="form-box${this._clientFormOpen ? ' visible' : ''}" id="add-client-form">
           <div class="biz-form">
-            <div><div class="prop-label">Nom</div><input class="prop-input" id="cl-name" placeholder="Entreprise"></div>
-            <div><div class="prop-label">Type</div><input class="prop-input" id="cl-type" placeholder="Design, Dev..."></div>
+            <div><div class="prop-label">Nom</div><input class="prop-input" id="cl-name" placeholder="Entreprise" value="${this._esc(this._clientDraft.name)}" oninput="CP._clientDraft.name=this.value"></div>
+            <div><div class="prop-label">Type</div><input class="prop-input" id="cl-type" placeholder="Design, Dev..." value="${this._esc(this._clientDraft.type)}" oninput="CP._clientDraft.type=this.value"></div>
           </div>
           <div class="hintbox" style="margin-top:10px">💡 La fiche est partagée : <strong style="color:var(--text)">Facturation</strong> et <strong style="color:var(--text)">Portails</strong> proposent ce nom automatiquement — et créent la fiche si elle n'existe pas.</div>
           <div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn btn-accent" onclick="addClient()">Ajouter</button>
-            <button class="btn btn-ghost" onclick="document.getElementById('add-client-form').classList.remove('visible')">Annuler</button>
+            <button class="btn btn-ghost" onclick="CP.toggleClientForm(false)">Annuler</button>
           </div>
         </div>
         <div class="cp-roster-grid" id="clients-list"></div>

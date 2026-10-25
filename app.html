@@ -1560,7 +1560,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button data-v="list" onclick="CP.setView('list')">Liste</button>
           <button data-v="clients" onclick="CP.setView('clients')">Clients</button>
         </div>
-        <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau client / projet</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="openClientForm()">+ Client</button>
+        <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau projet</button>
       </div>
       <div class="infobox">🗂️ <strong>Tout ton relationnel client au même endroit.</strong> Chaque demande, devis et mission d'un même projet vit sur <strong>un seul lien</strong> qui suit son cycle de vie — de la première prise de contact à la livraison. Les outils détaillés (analyse, grille tarifaire, portail) restent accessibles depuis chaque projet.</div>
       <div id="cp-body"></div>
@@ -2553,6 +2554,8 @@ function IMGQ() {
 function fileToDataURL(file, cb) {
   const rd = new FileReader();
   rd.onload = e => {
+    // Un canvas ne garde que la première image d'un GIF animé.
+    if (file.type === 'image/gif' || /\.gif$/i.test(file.name || '')) { cb(e.target.result); return; }
     const img = new Image();
     img.onload = () => {
       const { MAX, Q } = IMGQ(); let w = img.width, h = img.height;
@@ -2570,6 +2573,7 @@ function fileToDataURL(file, cb) {
 /* Compresse une image (data: URL) en WebP ≤900px. Renvoie null si échec/CORS. */
 function compressImageSrc(src, cb) {
   if (!src || !src.startsWith('data:')) { cb(null); return; }  // URL distante = pas de recompression (canvas tainté)
+  if (/^data:image\/gif[;,]/i.test(src)) { cb(src); return; }
   const img = new Image();
   img.onload = () => {
     try {
@@ -2883,11 +2887,15 @@ function deleteLink(id) { localStorage.setItem('hub_links', JSON.stringify(JSON.
 
 function addClient() {
   const name=document.getElementById('cl-name')?.value.trim(); if(!name) return;
-  const cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');
-  cl.push({ id:Date.now().toString(), name, type:document.getElementById('cl-type')?.value||'', status:'active', progress:0, revenue:0, createdAt:Date.now() });
+  let cl; try { cl=JSON.parse(localStorage.getItem('hub_clients')||'[]'); } catch { cl=[]; }
+  if(!Array.isArray(cl)) cl=[];
+  if(cl.some(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===name.toLocaleLowerCase('fr'))){showToast('Ce client existe déjà','#e4b24a',2200);return;}
+  cl.push({ id:Date.now().toString(36)+Math.random().toString(36).slice(2,7), name, type:document.getElementById('cl-type')?.value||'', status:'active', progress:0, revenue:0, createdAt:Date.now() });
   localStorage.setItem('hub_clients', JSON.stringify(cl));
   renderClients();
-  document.getElementById('add-client-form').classList.remove('visible');
+  CP._clientFormOpen=false; CP._clientDraft={name:'',type:''};
+  document.getElementById('add-client-form')?.classList.remove('visible');
+  showToast('Client ajouté ✓','#2e9a63',1800);
 }
 function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); renderClients(); }
 function renderClients() {
@@ -2911,7 +2919,7 @@ function renderClients() {
   const cols=['rgba(201,146,42,.12)','rgba(46,154,99,.1)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
   if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
-  ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${(c.name||'?')[0].toUpperCase()}</div><div><div class="client-name">${c.name}</div><div class="client-sub">${c.type||'Nouveau'}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${c.progress||0}%"></div></div><span>${c.progress||0}%</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}<button onclick="deleteClient('${c.id}')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`).join('');
+  ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Nouveau')}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${Math.max(0,Math.min(100,Number(c.progress)||0))}%"></div></div><span>${Math.max(0,Math.min(100,Number(c.progress)||0))}%</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}<button onclick="deleteClient('${esc(c.id)}')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`).join('');
 }
 
 /* ═══ FACTURATION V2 — recherche, pagination, catalogue, statuts, CSV ═══ */
@@ -3052,6 +3060,7 @@ function addReview() {
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
   rv.push({ id:Date.now().toString(), author, text, rating:parseInt(document.getElementById('rv-rating')?.value)||5, status:'pending', project:document.getElementById('rv-project')?.value||'', createdAt:Date.now() });
   localStorage.setItem('hub_reviews', JSON.stringify(rv));
+  ensureReviewClient(author);
   renderReviews();
   document.getElementById('add-review-form').classList.remove('visible');
 }
@@ -3808,6 +3817,7 @@ function toggleForm(id, force) {
    sur la vue Clients puis le formulaire — même si le rendu asynchrone du
    registre n'a pas encore eu lieu (on réessaie quelques dizaines de fois). */
 function openClientForm() {
+  if (window.CP) CP._clientFormOpen = true;
   window.CP?.setView('clients');
   showPage('cp');
   let tries = 0;

@@ -159,7 +159,7 @@ const EdCanvas = {
     this.commit(blocks); this.rerender();
     showToast?.('Bloc collé ✓', '#2e9a63', 1600);
   },
-  _ui(t) { return !!(t && t.closest && t.closest('#ed-tb,.ed-rz,.ed-h')); },
+  _ui(t) { return !!(t && t.closest && t.closest('#ed-tb,.ed-rz,.ed-h,.ed-ctx')); },
 
   _css(doc) {
     if (doc.getElementById('ed-canvas-css')) return;
@@ -922,6 +922,9 @@ function edWinFx(btn) {
     <div class="edw-row">${lv.map(([v, n]) => `<button class="edw-st${(c.animLevel || 'smooth') === v ? ' on' : ''}" data-a="${v}">${n}</button>`).join('')}</div>
     <div class="edw-l">Effets au survol <span class="edw-hint">ordinateur uniquement</span></div>
     ${tg.map(([k, n]) => `<label class="edw-tog"><input type="checkbox" data-f="${k}"${fx[k] ? ' checked' : ''}> ${n}</label>`).join('')}
+    <div class="edw-l">Défilement</div>
+    <label class="edw-tog"><input type="checkbox" id="edw-wheel"${c.smoothWheel ? ' checked' : ''}> Défilement fluide à la molette</label>
+    <p class="edw-hint">S'applique au site publié et à l'aperçu. Le pavé tactile et la préférence de mouvement réduit sont respectés.</p>
     <div class="edw-l" id="edw-int-l" style="${fx.tilt ? '' : 'display:none'}">Intensité 3D — <b id="edw-int-v">${fx.intensity || 7}</b>°</div>
     <input type="range" id="edw-int" min="3" max="16" value="${fx.intensity || 7}" style="${fx.tilt ? '' : 'display:none'};width:100%">`;
   EdWin.open(btn, '⚡ Animations & effets', html, w => {
@@ -939,6 +942,7 @@ function edWinFx(btn) {
       w.querySelector('#edw-int').style.display = on ? '' : 'none';
     };
     w.querySelectorAll('[data-f]').forEach(i => i.onchange = sync);
+    w.querySelector('#edw-wheel').onchange = e => edSet('smoothWheel', e.target.checked);
     const r = w.querySelector('#edw-int');
     r.oninput = () => { w.querySelector('#edw-int-v').textContent = r.value; };
     r.onchange = sync;
@@ -1441,10 +1445,10 @@ function edWinBanner(anchor) {
     <div class="bn-img">
       ${c.heroImage ? `<img src="${_eesc(c.heroImage)}" alt="Bannière">` : '<span>🌄 Aucune image — dégradé du thème</span>'}
       <div class="bn-img-a">
-        <button class="edw-sec-rst" id="bn-pick">📁 Importer une image</button>
+        <button class="edw-sec-rst" id="bn-pick">📁 Importer une image ou un GIF</button>
         <input class="edw-in" id="bn-imgurl" value="${c.heroImage && !String(c.heroImage).startsWith('data:') ? _eesc(c.heroImage) : ''}" placeholder="… ou colle l'URL d'une image déjà en ligne">
         ${c.heroImage ? '<button class="edw-sec-rst" id="bn-clear">✖ Retirer</button>' : ''}
-        <input type="file" id="bn-file" accept="image/*" hidden>
+        <input type="file" id="bn-file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" hidden>
       </div>
     </div>
     <div class="edw-l">Action de la bannière</div>
@@ -1481,16 +1485,36 @@ function edWinBanner(anchor) {
       if (q('#bn-pick')) q('#bn-pick').onclick = () => pick && pick.click();
       if (pick) pick.onchange = e => {
         const f = e.target.files[0]; if (!f) return;
-        fileToDataURL(f, d => { edSet('heroImage', d); showToast?.('Image de bannière importée ✓', '#2e9a63', 2000); redraw(); });
+        fileToDataURL(f, async d => {
+          const gif = f.type === 'image/gif' || /\.gif$/i.test(f.name || '');
+          // Un GIF peut dépasser le quota localStorage : placer l'original dans
+          // le dépôt privé avant de ne garder qu'une miniature locale.
+          if (gif && window.HubImages?.ready() && d.length >= HubImages.MIN_OFFLOAD) {
+            try {
+              const stored = (await HubImages.put([{ dataUrl: d, label: 'bannière animée' }]))[0];
+              const thumb = await HubImages.thumb(d);
+              if (stored?.path && thumb && thumb !== d) {
+                HubImages._cache.set(stored.path, d);
+                SiteConfig.set('heroFile', stored.path);
+                edSet('heroImage', thumb);
+                showToast?.('GIF animé conservé ✓', '#2e9a63', 2000); redraw(); return;
+              }
+            } catch (error) { console.warn('[bannière GIF]', error); }
+          }
+          try {
+            SiteConfig.set('heroFile', ''); edSet('heroImage', d);
+            showToast?.(gif ? 'GIF animé conservé ✓' : 'Image de bannière importée ✓', '#2e9a63', 2000); redraw();
+          } catch (error) { showToast?.('Image trop volumineuse : connecte GitHub puis réessaie', '#c0392b', 4000); }
+        });
         e.target.value = '';
       };
       const iu = q('#bn-imgurl');
       if (iu) iu.onchange = () => {
         const v = iu.value.trim();
         if (v === String(SiteConfig.get().heroImage || '')) return;
-        edSet('heroImage', v); redraw();
+        SiteConfig.set('heroFile', ''); edSet('heroImage', v); redraw();
       };
-      if (q('#bn-clear')) q('#bn-clear').onclick = () => { edSet('heroImage', ''); redraw(); };
+      if (q('#bn-clear')) q('#bn-clear').onclick = () => { SiteConfig.set('heroFile', ''); edSet('heroImage', ''); redraw(); };
       if (q('#bn-vis')) q('#bn-vis').onclick = () => {
         const c = SiteConfig.get();
         const blocks = getBlocks(c);
