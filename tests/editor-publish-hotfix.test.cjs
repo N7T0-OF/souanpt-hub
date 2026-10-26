@@ -213,3 +213,15 @@ test('a portal launched from a client dossier keeps that exact project link', ()
   assert.equal(ClientWorkspace.get('project-2').refs.portal, 'portal-1');
   assert.equal(ClientWorkspace.get('project-1').refs.portal, undefined);
 });
+
+test('public Firebase functions use the same project settings as the dashboard', async () => {
+  const { PROJECT_ID, WEB_API_KEY, STORAGE_BUCKET } = await import('../firebase/edge-config.js');
+  const context = { window: {} };
+  vm.runInNewContext(fs.readFileSync('firebase/firebase-config.js', 'utf8'), context);
+  const cfg = context.window.FIREBASE_CONFIG;
+  assert.equal(PROJECT_ID, cfg.projectId);
+  assert.equal(WEB_API_KEY, cfg.apiKey);
+  assert.equal(STORAGE_BUCKET, cfg.storageBucket);
+  await Promise.all(['c/[token].js', 'request/[token].js', 'estimate/[code].js', 'u/[pseudo].js']
+    .map(path => import('../functions/' + path)));
+});

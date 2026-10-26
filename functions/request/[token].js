@@ -16,10 +16,7 @@
  * qu'elle est ouverte, jamais à toucher un prix, un statut ou un autre dossier.
  */
 
-const PROJECT = 'souanpt-hub';
-const API_KEY = 'AIzaSyCBe6IUWsTBJ0H29KNxw5qU3YiC32Nenvk';   // clé Web publique par conception
-const DOCS    = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
-const STORAGE_BUCKET = 'souanpt-hub.firebasestorage.app';
+import { PROJECT_ID, DOCS, WEB_API_KEY as API_KEY, STORAGE_BUCKET } from '../../firebase/edge-config.js';
 
 // Limites (côté client + revalidées par les règles Storage/Firestore).
 const MAX_FILES = 10, MAX_MB = 20;
@@ -225,7 +222,7 @@ function answerScript(token, pending) {
   var storage=null;
   if(NEEDS_FILE){ try{
     if(!(window.firebase&&firebase.apps&&firebase.apps.length))
-      firebase.initializeApp({apiKey:KEY,projectId:'souanpt-hub',storageBucket:${JSON.stringify(STORAGE_BUCKET)}});
+      firebase.initializeApp({apiKey:KEY,projectId:${JSON.stringify(PROJECT_ID)},storageBucket:${JSON.stringify(STORAGE_BUCKET)}});
     storage=firebase.storage();
   }catch(e){ storage=null; } }
 
@@ -511,7 +508,7 @@ export async function onRequestGet(ctx) {
 
   // Firebase Storage — activé si le projet l'a configuré. Sinon, dépôt par lien.
   try {
-    firebase.initializeApp({ apiKey:KEY, projectId:'souanpt-hub', storageBucket:BUCKET });
+    firebase.initializeApp({ apiKey:KEY, projectId:${JSON.stringify(PROJECT_ID)}, storageBucket:BUCKET });
     storage=firebase.storage(); storageReady=true;
   } catch(e){ storageReady=false; }
   if(!storageReady) el('q-upnote').textContent='Dépôt de fichiers indisponible ici — ajoute plutôt un lien vers tes références.';
