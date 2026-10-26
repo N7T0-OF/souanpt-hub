@@ -1031,6 +1031,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cp-roster-sub{font-size:9.5px;color:var(--muted);font-weight:400}
 .cp-roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
 @media(max-width:640px){.cp-roster-grid{grid-template-columns:1fr}}
+.client-card summary{display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none}
+.client-card summary::-webkit-details-marker{display:none}
+.client-card summary:after{content:'⌄';font-size:16px;color:var(--muted2);margin-left:4px;transition:transform .18s}
+.client-card[open] summary:after{transform:rotate(180deg)}
+.client-card .client-extra{border-top:1px solid var(--border);padding-top:11px;margin-top:11px;font-size:11px}
+.client-card .client-extra h4{font-size:10px;color:var(--muted2);margin:10px 0 5px;text-transform:uppercase;letter-spacing:.08em}
+.client-card .client-extra .client-item{padding:7px 8px;background:var(--s2);border:1px solid var(--border);border-radius:7px;margin-top:5px;line-height:1.45}
+.client-card .client-extra .client-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
 /* Communs */
 .cp-badge{font-size:9px;font-weight:800;border:1px solid;border-radius:20px;padding:2px 8px;white-space:nowrap;flex-shrink:0}
 .cp-a{background:var(--s3);border:1px solid var(--border);border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1;color:var(--text);transition:border-color .15s}
@@ -1203,6 +1211,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .portal-step{border:1px solid var(--border);border-radius:12px;padding:17px;margin:13px 0;background:var(--s1)}
 .portal-step h4{display:flex;align-items:center;gap:8px;font-size:12px;margin:0 0 5px}.portal-step h4 span{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#080808;display:inline-grid;place-items:center}
 .portal-step p{font-size:10px;color:var(--muted2);margin:0 0 12px;line-height:1.5}
+.portal-form .portal-step{display:none}
+.portal-form .portal-step.is-current{display:block}
+.portal-form [hidden]{display:none!important}
+.portal-wizard-progress{font-size:10px;color:var(--muted2);margin:11px 0}
+.portal-wizard-track{height:5px;border-radius:9px;background:var(--s3);overflow:hidden;margin-top:7px}
+.portal-wizard-track span{display:block;height:100%;width:33.33%;background:var(--accent);transition:width .2s}
 </style>
 </head>
 <body>
@@ -1738,13 +1752,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       </div>
 
       <div class="form-box portal-form" id="portal-form">
-        <h3>Créer un espace client</h3><p class="portal-intro">Renseigne la mission, puis les informations visibles par ton client. Tu pourras modifier le portail après sa création.</p>
-        <div class="portal-step"><h4><span>1</span> Mission et client</h4><p>Le titre et le nom du client seront visibles sur son portail.</p>
+        <h3>Créer un espace client</h3><p class="portal-intro">Trois étapes courtes. Tu peux revenir en arrière sans perdre tes réponses.</p>
+        <div class="portal-wizard-progress" id="pt-progress" aria-live="polite">Étape 1 sur 3 — Mission et client<div class="portal-wizard-track"><span id="pt-progress-bar"></span></div></div>
+        <div class="portal-step is-current"><h4><span>1</span> Mission et client</h4><p>Pour qui crées-tu cet espace, et comment s'appelle la mission ? Seul le nom de la mission est obligatoire.</p>
         <div class="biz-form">
           <div><div class="prop-label">Nom de la mission *</div><input class="prop-input" id="pt-mission" placeholder="Identité visuelle Bloom Studio" required></div>
-          <div><div class="prop-label">Client</div><input class="prop-input" id="pt-client" placeholder="Choisir ou créer…" list="dl-clients"></div>
+          <div><div class="prop-label">Nom du client</div><input class="prop-input" id="pt-client" placeholder="Choisir un client ou saisir un nouveau nom" list="dl-clients"><div class="client-sub">Un nouveau nom créera automatiquement sa fiche client.</div></div>
         </div>
-        </div><div class="portal-step"><h4><span>2</span> Avancement et paiement</h4><p>Indique l’étape actuelle et les montants que le client peut consulter.</p>
+        </div><div class="portal-step"><h4><span>2</span> Avancement et paiement</h4><p>Où en est la mission ? Indique les montants visibles par le client. Tu peux laisser les champs de paiement vides.</p>
         <div class="biz-form" style="margin-top:8px">
           <div><div class="prop-label">Montant total (€)</div><input class="prop-input" id="pt-total" type="number" min="0" step="0.01" placeholder="2400"></div>
           <div><div class="prop-label">Acompte %</div><input class="prop-input" id="pt-acompte" type="number" min="0" max="100" value="50"></div>
@@ -1756,7 +1771,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div><div class="prop-label">Lien de paiement (Stripe, PayPal, SumUp…)</div><input class="prop-input" id="pt-pay" placeholder="https://buy.stripe.com/…"></div>
           <div><div class="prop-label">Mot de passe (optionnel)</div><input class="prop-input" id="pt-pw" type="password" autocomplete="new-password" placeholder="laisser vide = aucun"></div>
         </div>
-        </div><div class="portal-step"><h4><span>3</span> Message et livrables</h4><p>Ajoute une note claire et les liens que le client pourra ouvrir.</p>
+        </div><div class="portal-step"><h4><span>3</span> Message et livrables</h4><p>Quel est le prochain message pour ton client ? Ajoute les liens à livrer maintenant ou plus tard.</p>
         <div style="margin-top:8px"><div class="prop-label">Note pour le client (optionnel)</div><input class="prop-input" id="pt-note" placeholder="Prochaine étape : validation des maquettes"></div>
         <div style="margin-top:10px"><div class="prop-label">Livrables — liens (Drive, WeTransfer, GitHub Release…)</div>
           <div id="pt-deliv-list"></div>
@@ -1765,7 +1780,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         </div>
         <div class="hintbox">💡 Le lien de paiement et les livrables sont de simples liens externes — Souanpt Hub ne stocke aucun fichier lourd et ne touche jamais à l'argent.</div>
         <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-accent" id="pt-submit" onclick="portalSave()">Créer le portail</button>
+          <button class="btn btn-ghost" id="pt-back" onclick="portalStep(-1)" hidden>← Retour</button>
+          <button class="btn btn-accent" id="pt-next" onclick="portalStep(1)">Continuer →</button>
+          <button class="btn btn-accent" id="pt-submit" onclick="portalSave()" hidden>Créer le portail</button>
           <button class="btn btn-ghost" onclick="portalCloseForm()">Annuler</button>
         </div>
       </div>
@@ -2924,7 +2941,8 @@ function addClient() {
 }
 function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); SiteAutoPublish.queue(); renderClients(); }
 function renderClients() {
-  const cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');
+  let cl=[]; try{cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+  if(!Array.isArray(cl)) cl=[];
   const ct=document.getElementById('clients-list'); if(!ct) return;
   // Accès au DOSSIER client depuis l'annuaire — fonctionne aussi hors-ligne
   // (le dossier lit le cache local, pas le registre public).
@@ -2945,8 +2963,26 @@ function renderClients() {
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
   if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
   const sorted=cl.slice().sort((a,b)=>CP.sortMode==='az' ? String(a.name||'').localeCompare(String(b.name||''),'fr') : (Number(b.createdAt)||0)-(Number(a.createdAt)||0));
-  ct.innerHTML=sorted.map((c,i)=>`<div class="gc client-card" id="client-card-${esc(c.id)}" tabindex="-1"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Nouveau')}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${Math.max(0,Math.min(100,Number(c.progress)||0))}%"></div></div><span>${Math.max(0,Math.min(100,Number(c.progress)||0))}%</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}<button onclick="deleteClient('${esc(c.id)}')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`).join('');
+  let reviews=[]; try{reviews=JSON.parse(localStorage.getItem('hub_reviews')||'[]');}catch{}
+  if(!Array.isArray(reviews)) reviews=[];
+  const projects=(window.CP&&Array.isArray(CP._links)?CP._links:[]);
+  const norm=s=>String(s||'').trim().toLocaleLowerCase('fr');
+  const uniqueName=c=>cl.filter(x=>norm(x.name)===norm(c.name)).length===1;
+  const mine=(entry,c,field)=>entry.clientId ? entry.clientId===c.id : uniqueName(c)&&norm(entry[field])===norm(c.name);
+  ct.innerHTML=sorted.map((c,i)=>{
+    const cp=projects.filter(p=>mine(p,c,'clientName'));
+    const cr=reviews.filter(r=>mine(r,c,'author'));
+    const types=[...new Set(cp.map(p=>p.projectType||p.type).filter(Boolean))];
+    const progress=Math.max(0,Math.min(100,Number(c.progress)||0));
+    return `<details class="gc client-card" id="client-card-${esc(c.id)}" tabindex="-1"><summary><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div style="flex:1;min-width:0"><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Client')} · ${cp.length} projet${cp.length>1?'s':''} · ${cr.length} avis</div></div><span class="rstatus st-ok">${c.status==='active'?'Actif':'En cours'}</span></summary>
+      <div class="client-extra"><div>Progression <b>${progress}%</b><div class="progress-bar-w" style="width:100%;margin-top:5px"><div class="progress-bar" style="width:${progress}%"></div></div></div>
+      <h4>Projets (${cp.length})</h4>${cp.length?cp.map(p=>`<div class="client-item"><b>${esc(p.projectName||'Projet sans nom')}</b>${p.projectType?` · ${esc(p.projectType)}`:''}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="ClientWorkspace.open('${esc(p.token)}')">Ouvrir</button></div>`).join(''):'<div class="client-sub">Aucun projet lié.</div>'}
+      ${types.length?`<div class="client-sub" style="margin-top:7px">Types : ${types.map(esc).join(', ')}</div>`:''}
+      <h4>Avis (${cr.length})</h4>${cr.length?cr.map(r=>`<div class="client-item"><span style="color:var(--gold-l)">${'★'.repeat(Math.max(0,Math.min(5,Number(r.rating)||0)))}</span> ${esc(String(r.text||'').slice(0,100))}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="clientReviewJump('${esc(r.id)}')">Voir</button></div>`).join(''):'<div class="client-sub">Aucun avis lié.</div>'}
+      <div class="client-actions"><button class="btn btn-accent" style="font-size:10px" onclick="CP.startManual('${esc(c.id)}')">+ Projet manuel</button>${cwBtn(c.name)}<button class="btn btn-ghost" style="font-size:10px" onclick="deleteClient('${esc(c.id)}')">Supprimer</button></div></div></details>`;
+  }).join('');
 }
+function clientReviewJump(id){showPage('avis');setTimeout(()=>{const card=document.getElementById('review-card-'+id);card?.scrollIntoView({behavior:'smooth',block:'center'});card?.focus({preventScroll:true});},80);}
 
 /* ═══ FACTURATION V2 — recherche, pagination, catalogue, statuts, CSV ═══ */
 const INV_STATUS = {
@@ -3119,7 +3155,7 @@ function renderReviews() {
   const badge=document.getElementById('avis-badge');
   if(badge){badge.textContent=wt||'';badge.style.display=wt?'':'none';}
   if(!rv.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun avis</div><div class="empty-sub">Relève ceux laissés sur ton site publié, ou ajoute-les à la main</div></div>';return;}
-  ct.innerHTML=rv.map(r=>`<div class="gc rcard"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${r.ghIssue?' <span style="font-size:8px;color:var(--accent3)">via le site</span>':''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${esc(r.text)}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
+  ct.innerHTML=rv.map(r=>`<div class="gc rcard" id="review-card-${esc(r.id)}" tabindex="-1"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${r.ghIssue?' <span style="font-size:8px;color:var(--accent3)">via le site</span>':''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${esc(r.text)}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
 }
 
 /* Partage le site publié en QR (ou invite à déployer) */
@@ -3248,6 +3284,25 @@ function renderActivity(){
 
 /* ═══ PORTAILS CLIENTS ═══ */
 let _ptEditId = null;
+let _ptStep = 0;
+function portalStep(delta) {
+  const steps=[...document.querySelectorAll('#portal-form .portal-step')];
+  if (!steps.length) return;
+  if (delta > 0 && _ptStep === 0 && !document.getElementById('pt-mission')?.value.trim()) {
+    showToast('Indique le nom de la mission', '#c0392b', 2500);
+    document.getElementById('pt-mission')?.focus(); return;
+  }
+  _ptStep=Math.max(0,Math.min(steps.length-1,_ptStep+delta));
+  steps.forEach((step,i)=>step.classList.toggle('is-current',i===_ptStep));
+  const names=['Mission et client','Avancement et paiement','Message et livrables'];
+  const progress=document.getElementById('pt-progress');
+  if(progress) progress.firstChild.textContent=`Étape ${_ptStep+1} sur ${steps.length} — ${names[_ptStep]}`;
+  const bar=document.getElementById('pt-progress-bar');if(bar)bar.style.width=((_ptStep+1)/steps.length*100)+'%';
+  document.getElementById('pt-back').hidden=_ptStep===0;
+  document.getElementById('pt-next').hidden=_ptStep===steps.length-1;
+  document.getElementById('pt-submit').hidden=_ptStep!==steps.length-1;
+  steps[_ptStep].scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 function getPortals() { try { return JSON.parse(localStorage.getItem('hub_portals')||'[]'); } catch { return []; } }
 function setPortals(p) { localStorage.setItem('hub_portals', JSON.stringify(p)); }
 
@@ -3264,6 +3319,7 @@ function portalOpenForm(prefill) {
   if (prefill) { if(prefill.client) document.getElementById('pt-client').value=prefill.client; if(prefill.mission) document.getElementById('pt-mission').value=prefill.mission; if(prefill.total) document.getElementById('pt-total').value=prefill.total; }
   document.getElementById('pt-submit').textContent = 'Créer le portail';
   document.getElementById('portal-form').classList.add('visible');
+  _ptStep=0; portalStep(0);
   refreshInvDatalists();
   document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
 }
@@ -3327,8 +3383,9 @@ function portalSave() {
   // Dossier client : le portail créé à la main n'a pas de jeton → il se rattache
   // au seul projet de ce nom (si non ambigu), sinon il reste « à rattacher ».
   if (newPortal && client && window.ClientWorkspace) { try { ClientWorkspace.bindByClient(client, newPortal.id, 'portal'); } catch {} }
+  const wasEditing=!!_ptEditId;
   portalCloseForm(); renderPortals();
-  showToast(_ptEditId?'Portail mis à jour ✓ — republie pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
+  showToast(wasEditing?'Portail mis à jour ✓ — republie pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
 }
 function portalEdit(id) {
   const p = getPortals().find(x=>x.id===id); if(!p) return;
@@ -3341,6 +3398,7 @@ function portalEdit(id) {
   (p.deliverables||[]).forEach(d=>portalAddDelivRow(d.label,d.url)); if(!(p.deliverables||[]).length) portalAddDelivRow();
   document.getElementById('pt-submit').textContent='Enregistrer';
   document.getElementById('portal-form').classList.add('visible');
+  _ptStep=0; portalStep(0);
   document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
 }
 function portalDelete(id) {

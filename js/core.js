@@ -867,7 +867,7 @@ const SiteConfig = {
     // l'ancien rendu (icône + texte) → aucun site publié ne change d'apparence.
     socialsStyle: 'ic-texte',      // ic-texte · ic-seules · boutons · cartes · barre
     animLevel: 'smooth', smoothWheel: false,
-    siteLogo: '', favicon: '', titleEffect: 'none', autoPublish: false,
+    siteLogo: '', brandMode: 'auto', brandSize: 32, favicon: '', titleEffect: 'none', autoPublish: false,
     backgroundMusic: '', clickSound: '',
     fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
   }),
@@ -1420,7 +1420,11 @@ function generateSite(cfg, projects, reviews, opts) {
   const musicUrl = publicMediaUrl(cfg.backgroundMusic);
   const clickSoundUrl = publicMediaUrl(cfg.clickSound);
   const titleEffect = ['glow','gradient','float'].includes(cfg.titleEffect) ? cfg.titleEffect : 'none';
-  const brandIcon = siteLogo ? `<img src="${esc(siteLogo)}" alt="" class="brand-img">` : '<span class="ic">✳</span>';
+  const brandMode = ['auto','image','both','text'].includes(cfg.brandMode) ? cfg.brandMode : 'auto';
+  const brandSize = Math.max(20, Math.min(64, Number(cfg.brandSize) || 32));
+  const brandHasImage = !!siteLogo && brandMode !== 'text';
+  const brandHasName = !brandHasImage || brandMode === 'both';
+  const brandIcon = brandHasImage ? `<img src="${esc(siteLogo)}" alt="" class="brand-img" style="width:${brandSize}px;height:${brandSize}px">` : brandMode === 'text' ? '' : '<span class="ic">✳</span>';
   /* Section « Réseaux » : les blocs Lien VISIBLES, dans l'ordre des blocs —
      la même source que la grille Bento, donc un lien masqué disparaît aussi
      d'ici (aucun lien mort ni fuite d'un lien désactivé). */
@@ -2017,7 +2021,7 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 ${layoutStyle === 'bento' ? `
 <div class="bn-page">
   <div class="navwrap"><nav>
-    <a href="#" class="logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${siteLogo ? '' : esc(cfg.siteName) + '<span class="d">.</span>'}</a>
+    <a href="#" class="logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${brandHasName ? esc(cfg.siteName) + '<span class="d">.</span>' : ''}</a>
     <div class="nl">${bentoNav}</div>
     ${cfg.email ? `<a class="ncta" href="mailto:${esc(cfg.email)}">Me contacter</a>` : ''}
   </nav></div>
@@ -2028,7 +2032,7 @@ ${layoutStyle === 'bento' ? `
 </div>` : layoutStyle === 'sidebar' ? `
 <div class="sb-wrap" id="sbw">
   <aside class="sb-side">
-    <a href="#" class="sb-logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${siteLogo ? '' : esc(cfg.siteName)}</a>
+    <a href="#" class="sb-logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${brandHasName ? esc(cfg.siteName) : ''}</a>
     <nav class="sb-nav">
       ${order.filter(k=>secLive(k)).map(k=>`<a href="#${k}"><span class="sbi">${SEC_ICONS[k]||'•'}</span>${SEC_LABELS[k]}</a>`).join('')}
       ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank"><span class="sbi">↗</span>Behance</a>`:''}
@@ -2047,7 +2051,7 @@ ${layoutStyle === 'bento' ? `
   </main>
 </div>` : `
 <div class="navwrap"><nav>
-  <a href="#" class="logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${siteLogo ? '' : esc(cfg.siteName) + '<span class="d">.</span>'}</a>
+  <a href="#" class="logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${brandHasName ? esc(cfg.siteName) + '<span class="d">.</span>' : ''}</a>
   <div class="nl">
     ${navLinks}
     ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}

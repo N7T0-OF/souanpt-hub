@@ -914,14 +914,18 @@ async function edUploadSiteAsset(file, kind) {
 function edWinBrand() {
   const c = SiteConfig.get();
   EdWin.open(null, '✳ Identité du site', `
-    <div class="edw-l">Logo à la place du nom dans la navigation</div>
+    <div class="edw-l">Logo personnalisé du site</div>
     <input class="edw-in" id="brand-logo" type="url" placeholder="https://…/logo.png" value="${_eesc(c.siteLogo || '')}"><input type="file" id="brand-logo-file" accept="image/*">
+    <div class="edw-l">Affichage dans la navigation</div>
+    <select class="edw-in" id="brand-mode"><option value="auto">Automatique — logo si présent, sinon nom</option><option value="image">Logo seul</option><option value="both">Logo et nom</option><option value="text">Nom seul</option></select>
+    <div class="edw-l">Taille du logo (20 à 64 px)</div><input class="edw-in" id="brand-size" type="number" min="20" max="64" value="${Math.max(20,Math.min(64,Number(c.brandSize)||32))}">
     <div class="edw-l">Icône de l'onglet (favicon)</div>
     <input class="edw-in" id="brand-icon" type="url" placeholder="https://…/favicon.png" value="${_eesc(c.favicon || '')}"><input type="file" id="brand-icon-file" accept="image/*">
     <div class="edw-l">Effet du nom sur le site</div>
     <select class="edw-in" id="brand-effect"><option value="none">Aucun</option><option value="glow">Lueur</option><option value="gradient">Dégradé</option><option value="float">Flottement doux</option></select>
     <p class="edw-hint">Le logo et l'icône importés sont publics. Les animations respectent la préférence de mouvement réduit.</p><button class="edw-ok" id="brand-save">Enregistrer</button>`, w => {
     w.querySelector('#brand-effect').value = c.titleEffect || 'none';
+    w.querySelector('#brand-mode').value = c.brandMode || 'auto';
     [['brand-logo-file','brand-logo'],['brand-icon-file','brand-icon']].forEach(([fileId,urlId]) => {
       w.querySelector('#'+fileId).onchange = async e => {
         const input = w.querySelector('#'+urlId); input.placeholder = 'Import en cours…';
@@ -933,7 +937,9 @@ function edWinBrand() {
     w.querySelector('#brand-save').onclick = () => {
       const logo = w.querySelector('#brand-logo').value.trim(), icon = w.querySelector('#brand-icon').value.trim();
       if ((logo && !publicMediaUrl(logo)) || (icon && !publicMediaUrl(icon))) return showToast?.('Utilise une URL HTTPS valide pour les images','#c0392b',3000);
-      SiteConfig.set('siteLogo',logo);SiteConfig.set('favicon',icon);SiteConfig.set('titleEffect',w.querySelector('#brand-effect').value);
+      SiteConfig.set('siteLogo',logo);SiteConfig.set('brandMode',w.querySelector('#brand-mode').value);
+      SiteConfig.set('brandSize',Math.max(20,Math.min(64,Number(w.querySelector('#brand-size').value)||32)));
+      SiteConfig.set('favicon',icon);SiteConfig.set('titleEffect',w.querySelector('#brand-effect').value);
       SiteAutoPublish.queue();
       EdWin.close();edRefreshPreview();
     };

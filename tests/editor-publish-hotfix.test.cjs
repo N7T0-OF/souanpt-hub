@@ -160,3 +160,33 @@ test('project filters, branding and optional audio work in all three public them
     }
   }
 });
+
+test('custom logo and site name can appear together in every public layout', () => {
+  const { SiteConfig, generateSite } = loadCore();
+  for (const layoutStyle of ['float', 'sidebar', 'bento']) {
+    const html = generateSite({ ...SiteConfig.defaults(), layoutStyle,
+      siteName: 'Folio', siteLogo: 'https://example.com/logo.png',
+      brandMode: 'both', brandSize: 48 }, [], []);
+    assert.match(html, /class="brand-img" style="width:48px;height:48px"/);
+    assert.match(html, /Folio/);
+  }
+});
+
+test('Clients & Projets keeps local workspaces visible without Firebase', async () => {
+  const data = new Map();
+  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
+  const local = { token: 'local-token', clientName: 'Alice', projectName: 'Identité', localOnly: true };
+  const ClientWorkspace = { all: () => [local], migrate: async () => ({}) };
+  const body = { innerHTML: '' };
+  const context = { console, localStorage, ClientWorkspace,
+    window: { ClientWorkspace }, document: { getElementById: id => id === 'cp-body' ? body : null } };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('js/clients.js', 'utf8'), context);
+  const CP = context.window.CP;
+  CP._paint = () => { body.innerHTML = CP._links.map(x => x.projectName).join(','); };
+  await CP.render();
+  assert.equal(body.innerHTML, 'Identité');
+  assert.equal(CP._links[0].localOnly, true);
+  assert.match(CP._actions(CP._links[0]), /Local/);
+  assert.doesNotMatch(CP._actions(CP._links[0]), /Ouvrir le lien client/);
+});

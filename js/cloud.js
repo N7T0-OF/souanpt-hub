@@ -39,7 +39,7 @@ const Cloud = {
 
   authErrorMessage(error) {
     const code = error?.code || '';
-    if (code === 'auth/api-key-not-valid' || code === 'auth/invalid-api-key')
+    if (code.startsWith('auth/api-key-not-valid') || code === 'auth/invalid-api-key' || /api-key-not-valid|invalid-api-key/i.test(error?.message || ''))
       return 'Configuration Firebase invalide. Le propriétaire doit remplacer la configuration Web dans Paramètres du projet Firebase → Général.';
     if (code === 'auth/unauthorized-domain')
       return 'Ce domaine doit être ajouté dans Firebase → Authentication → Paramètres → Domaines autorisés.';

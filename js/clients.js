@@ -39,6 +39,7 @@
     _creating: false,
     _clientFormOpen: false,
     _clientDraft: { name: '', type: '' },
+    _manualClientId: '',
     sortMode: localStorage.getItem('cp_sort') === 'az' ? 'az' : 'recent',
 
     setSort() {
@@ -71,7 +72,17 @@
     viewClient(id) {
       this.toggleClientForm(false); this.setView('clients');
       const card = document.getElementById('client-card-' + id);
-      if (card) { card.scrollIntoView({ behavior:'smooth', block:'center' }); card.focus({ preventScroll:true }); card.style.outline = '2px solid var(--accent)'; setTimeout(() => { card.style.outline = ''; }, 2500); }
+      if (card) { card.open = true; card.scrollIntoView({ behavior:'smooth', block:'center' }); card.focus({ preventScroll:true }); card.style.outline = '2px solid var(--accent)'; setTimeout(() => { card.style.outline = ''; }, 2500); }
+    },
+    _localLinks() {
+      try { return (window.ClientWorkspace ? ClientWorkspace.all() : [])
+        .filter(w => w && w.token && w.status !== 'trashed').map(w => ({ ...w })); }
+      catch { return []; }
+    },
+    _mergeLinks(remote = []) {
+      const byToken = new Map(this._localLinks().map(w => [w.token, w]));
+      remote.forEach(l => { if (l?.token) byToken.set(l.token, { ...byToken.get(l.token), ...l, localOnly: false }); });
+      return [...byToken.values()];
     },
 
     toggleClientForm(open) {
@@ -91,17 +102,12 @@
       const sortButton = document.getElementById('cp-sort');
       if (sortButton) sortButton.textContent = 'Trier : ' + (this.sortMode === 'az' ? 'A-Z' : 'Plus récent');
       if (!(window.Cloud && Cloud.enabled && Cloud.user())) {
-        this._loading = false; this._links = [];
-        // La vue « Clients » (annuaire) ne dépend pas du cloud : elle reste
-        // utilisable avec un simple navigateur, comme l'ancienne page l'était.
-        body.innerHTML = this._view === 'clients'
-          ? this._clients()
-          : this._msg('⚠️ <b>Connecte-toi avec Google ou Discord</b> pour retrouver ici tous tes clients et projets.');
-        this._after();
+        this._loading = false; this._links = this._mergeLinks();
+        this._paint();
         this._badge();
-        // Hors-ligne aussi : le dossier travaille sur le cache local, la
-        // migration recense ce que les collections locales contiennent.
-        if (window.ClientWorkspace) ClientWorkspace.migrate().catch(() => {});
+        if (window.ClientWorkspace) ClientWorkspace.migrate().then(() => {
+          this._links = this._mergeLinks(); this._paint(); this._badge();
+        }).catch(() => {});
         return;
       }
       this._loading = true; this._paint();
@@ -112,13 +118,15 @@
       if (!links.length && window.Registry) {
         try { await Registry.sync(true); links = await Registry.list(); } catch (e) {}
       }
-      this._links = links;
+      this._links = this._mergeLinks(links);
       this._loading = false;
       this._paint();
       this._badge();
       // Recense les projets + rattache factures/portails sans jeton (1×/session,
       // non destructif) : le dossier n'affiche rien d'autre que ce qui existe.
-      if (window.ClientWorkspace) ClientWorkspace.migrate().catch(() => {});
+      if (window.ClientWorkspace) ClientWorkspace.migrate().then(() => {
+        this._links = this._mergeLinks(links); this._paint(); this._badge();
+      }).catch(() => {});
     },
 
     setView(v) {
@@ -131,6 +139,7 @@
     _paint() {
       const body = document.getElementById('cp-body'); if (!body) return;
       let head = this._creating ? this._createPanel() : '';
+      if (!(window.Cloud && Cloud.enabled && Cloud.user())) head += '<div class="infobox" style="margin:10px 0">Mode local : tes fiches et dossiers de ce navigateur restent accessibles. La synchronisation attend une connexion Google ou Discord valide.</div>';
       if (this._loading) { body.innerHTML = head + this._msg('Chargement de tes projets…'); return; }
       // Sans projet, la vue Clients montre quand même l'annuaire (sinon on
       // perdrait l'accès aux fiches en fusionnant l'ancienne page).
@@ -188,6 +197,7 @@
              ici : mêmes fiches, même formulaire, plus les projets du client. */
       let roster = [];
       try { roster = JSON.parse(localStorage.getItem('hub_clients') || '[]') || []; } catch { roster = []; }
+      if (!Array.isArray(roster)) roster = [];
       const withProject = new Set(this._links
         .map(l => (l.clientName || '').trim().toLowerCase()).filter(Boolean));
       const rosterHtml = `<div class="cp-roster">
@@ -214,6 +224,7 @@
       const groups = new Map();
       this.orderedLinks().forEach(l => {
         const key = (l.clientName || '').trim() || '__none';
+        if (key !== '__none' && roster.some(c => String(c.name || '').trim().toLocaleLowerCase('fr') === key.toLocaleLowerCase('fr'))) return;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(l);
       });
@@ -233,7 +244,7 @@
         </div>`;
       }).join('');
       return (window.ClientWorkspace ? ClientWorkspace.valPanel() : '') + rosterHtml + (cards
-        ? `<div class="cp-clients">${cards}</div>`
+        ? `<div class="cp-roster-sub" style="margin:12px 0 8px">Projets sans fiche client</div><div class="cp-clients">${cards}</div>`
         : `<div class="cp-empty" style="padding:20px 16px">
              <div style="font-size:12px;color:var(--muted);max-width:430px;margin:0 auto">Aucun projet rattaché pour l'instant. Crée une demande ou un devis : il viendra se ranger ici sous le nom de son client.</div>
            </div>`);
@@ -254,6 +265,8 @@
 
     _actions(l) {
       const t = this._esc(l.token);
+      if (l.localOnly) return `<span class="cp-badge" title="Projet interne conservé dans ce navigateur ; aucun lien public pour le moment">Local</span>
+        <button class="cp-a" title="Gérer ce projet" onclick="CP.manage('${t}')">⚙</button>`;
       return `<button class="cp-a" title="Ouvrir le lien client" onclick="CP.openLink('${t}')">🔗</button>
         <button class="cp-a" title="Copier le lien" onclick="CP.copyLink('${t}')">📋</button>
         <button class="cp-a" title="Gérer ce projet" onclick="CP.manage('${t}')">⚙</button>`;
@@ -283,6 +296,9 @@
       return `<div class="cp-create">
         <div class="cp-create-h">Démarrer un client / projet</div>
         <div class="cp-create-opts">
+          <button class="cp-create-opt" onclick="CP.startManual()">
+            <span class="cp-create-ic">✎</span><b>Ajouter un projet manuellement</b>
+            <small>Renseigne le client, le type et le nom du projet, même sans connexion cloud.</small></button>
           <button class="cp-create-opt" onclick="CP.startRequest()">
             <span class="cp-create-ic">📥</span><b>Envoyer un lien de demande</b>
             <small>Le client décrit son besoin et dépose ses références. Un projet apparaît ici.</small></button>
@@ -302,6 +318,46 @@
     },
     startDevis()  { this._creating = false; window.showPage?.('devis'); },
     startPortal() { this._creating = false; window.showPage?.('portals'); if (window.portalOpenForm) setTimeout(portalOpenForm, 120); },
+    startManual(clientId = '') {
+      this._manualClientId = clientId;
+      this._creating = true;
+      this._paint();
+      const panel = document.querySelector('.cp-create');
+      if (!panel) return;
+      let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      const chosen = clients.find(c => c.id === clientId);
+      panel.innerHTML = `<div class="cp-create-h">Nouveau projet manuel</div>
+        <div class="biz-form"><div><div class="prop-label">Client *</div><input class="prop-input" id="cp-manual-client" list="dl-clients" value="${this._esc(chosen?.name || '')}" placeholder="Nom du client"></div>
+        <div><div class="prop-label">Nom du projet *</div><input class="prop-input" id="cp-manual-name" placeholder="Ex. Identité visuelle"></div>
+        <div><div class="prop-label">Type de projet</div><input class="prop-input" id="cp-manual-type" placeholder="Ex. Design, site web"></div></div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-accent" onclick="CP.saveManual()">Créer le projet</button><button class="btn btn-ghost" onclick="CP.newProject()">Annuler</button></div>`;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      panel.querySelector('#cp-manual-name')?.focus();
+    },
+    saveManual() {
+      const clientName = document.getElementById('cp-manual-client')?.value.trim() || '';
+      const projectName = document.getElementById('cp-manual-name')?.value.trim() || '';
+      const projectType = document.getElementById('cp-manual-type')?.value.trim() || '';
+      if (!clientName || !projectName) return window.showToast?.('Client et nom du projet requis', '#c0392b', 2500);
+      if (!window.ClientWorkspace) return window.showToast?.('Dossier client indisponible', '#c0392b', 2500);
+      let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      let client = clients.find(c => String(c.name || '').trim().toLocaleLowerCase('fr') === clientName.toLocaleLowerCase('fr'));
+      if (!client) {
+        client = { id: crypto.randomUUID(), name: clientName, type: '', status: 'active', progress: 0, revenue: 0, createdAt: Date.now() };
+        clients.push(client); localStorage.setItem('hub_clients', JSON.stringify(clients));
+      }
+      const token = crypto.randomUUID().replace(/-/g, '').slice(0, 20);
+      const w = ClientWorkspace.ensure(token, { clientId: client.id, clientName: client.name, projectName, projectType, stage: 'request' });
+      w.localOnly = true;
+      const workspaces = ClientWorkspace.all();
+      const index = workspaces.findIndex(item => item.token === token);
+      if (index >= 0) { workspaces[index] = w; ClientWorkspace.save(workspaces); }
+      this._creating = false; this._manualClientId = '';
+      this._links = this._mergeLinks(); this._view = 'clients';
+      document.querySelectorAll('#cp-views button').forEach(b => b.classList.toggle('active', b.dataset.v === 'clients'));
+      this._paint(); this._badge(); this.viewClient(client.id);
+      window.showToast?.('Projet créé dans ce navigateur ✓', '#2e9a63', 2500);
+    },
 
     /* ── Badge de navigation : nombre de projets actifs (hors terminés) ──── */
     _badge() {
@@ -312,11 +368,13 @@
 
     /* ── Helpers ─────────────────────────────────────────────────────────── */
     _empty() {
+      let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      const hasClients = Array.isArray(clients) && clients.length > 0;
       return `<div class="cp-empty">
         <div style="font-size:34px;margin-bottom:8px">🗂️</div>
-        <div style="font-weight:700;margin-bottom:4px">Aucun client ni projet pour l'instant</div>
+        <div style="font-weight:700;margin-bottom:4px">${hasClients ? 'Aucun projet pour l’instant' : 'Aucun client ni projet pour l’instant'}</div>
         <div style="font-size:12px;color:var(--muted);max-width:420px;margin:0 auto 12px;line-height:1.6">
-          Chaque demande, devis et mission apparaîtra ici, sur un seul lien qui suit ton client de bout en bout.</div>
+          Tes dossiers enregistrés dans ce navigateur apparaissent ici même sans connexion Google. Ouvre l’onglet Clients pour voir tes fiches.</div>
         <button class="btn btn-accent" style="font-size:11px" onclick="CP.newProject()">+ Nouveau client / projet</button>
       </div>`;
     },
