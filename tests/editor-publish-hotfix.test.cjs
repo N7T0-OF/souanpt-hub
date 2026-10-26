@@ -225,3 +225,11 @@ test('public Firebase functions use the same project settings as the dashboard',
   await Promise.all(['c/[token].js', 'request/[token].js', 'estimate/[code].js', 'u/[pseudo].js']
     .map(path => import('../functions/' + path)));
 });
+
+test('invalid legacy Firebase config leaves GitHub access available', () => {
+  const context = { console, window: { FIREBASE_CONFIG: { disabled: true, apiKey: 'invalid' } } };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('js/cloud.js', 'utf8'), context);
+  assert.equal(context.window.Cloud.enabled, false);
+  assert.match(context.window.Cloud.unavailableReason, /Firebase est suspendu/);
+});

@@ -12,6 +12,10 @@ const Cloud = {
   init() {
     try {
       const cfg = window.FIREBASE_CONFIG;
+      if (cfg?.disabled) {
+        this.unavailableReason = 'Firebase est suspendu : l’ancienne clé Web est invalide. Connecte GitHub pour accéder au Hub pendant la restauration.';
+        return;
+      }
       if (!cfg || !cfg.apiKey || String(cfg.apiKey).startsWith('TON_')) return; // placeholder → local
       if (typeof firebase === 'undefined' || !firebase.initializeApp) { console.warn('[cloud] SDK Firebase absent — mode local'); return; }
       firebase.initializeApp(cfg);
