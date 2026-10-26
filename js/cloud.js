@@ -37,6 +37,17 @@ const Cloud = {
   },
   user() { return this._user || null; },
 
+  authErrorMessage(error) {
+    const code = error?.code || '';
+    if (code === 'auth/api-key-not-valid' || code === 'auth/invalid-api-key')
+      return 'Configuration Firebase invalide. Le propriétaire doit remplacer la configuration Web dans Paramètres du projet Firebase → Général.';
+    if (code === 'auth/unauthorized-domain')
+      return 'Ce domaine doit être ajouté dans Firebase → Authentication → Paramètres → Domaines autorisés.';
+    if (code === 'auth/popup-blocked') return 'Fenêtre Google bloquée : autorise les pop-ups pour ce site.';
+    if (code === 'auth/popup-closed-by-user') return 'Connexion annulée.';
+    return error?.message || 'Connexion impossible pour le moment.';
+  },
+
   async signInGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -68,7 +79,7 @@ const Cloud = {
     const token = decodeURIComponent(m[1]);
     history.replaceState(null, '', location.pathname + location.search); // nettoie l'URL
     try { await this._auth.signInWithCustomToken(token); return true; }
-    catch (e) { console.error('[cloud] discord token', e); showToast?.('Connexion Discord échouée', '#c0392b', 3000); return false; }
+    catch (e) { console.error('[cloud] discord token', e); showToast?.('Connexion Discord : ' + this.authErrorMessage(e), '#c0392b', 6000); return false; }
   },
 
   // ── Profil utilisateur (users/{uid}) ──

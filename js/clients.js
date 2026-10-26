@@ -39,6 +39,40 @@
     _creating: false,
     _clientFormOpen: false,
     _clientDraft: { name: '', type: '' },
+    sortMode: localStorage.getItem('cp_sort') === 'az' ? 'az' : 'recent',
+
+    setSort() {
+      this.sortMode = this.sortMode === 'recent' ? 'az' : 'recent';
+      localStorage.setItem('cp_sort', this.sortMode);
+      const btn = document.getElementById('cp-sort');
+      if (btn) btn.textContent = 'Trier : ' + (this.sortMode === 'az' ? 'A-Z' : 'Plus récent');
+      this._paint();
+    },
+    _time(item) { return Number(item.updatedAt || item.createdAt) || Date.parse(item.updatedAt || item.createdAt || '') || 0; },
+    orderedLinks(list = this._links) {
+      return list.slice().sort((a,b) => this.sortMode === 'az'
+        ? String(a.projectName || '').localeCompare(String(b.projectName || ''), 'fr')
+        : this._time(b) - this._time(a));
+    },
+    checkClientDuplicate() {
+      const name = document.getElementById('cl-name')?.value.trim().toLocaleLowerCase('fr') || '';
+      let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      const existing = name && clients.find(c => String(c.name || '').trim().toLocaleLowerCase('fr') === name);
+      const box = document.getElementById('cl-duplicate'); if (!box) return existing || null;
+      box.replaceChildren(); box.hidden = !existing;
+      if (existing) {
+        const label = document.createElement('span'); label.textContent = 'Ce client existe déjà : ' + existing.name + '. ';
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-ghost'; button.textContent = 'Voir la fiche →';
+        button.onclick = () => this.viewClient(existing.id);
+        box.append(label, button);
+      }
+      return existing || null;
+    },
+    viewClient(id) {
+      this.toggleClientForm(false); this.setView('clients');
+      const card = document.getElementById('client-card-' + id);
+      if (card) { card.scrollIntoView({ behavior:'smooth', block:'center' }); card.focus({ preventScroll:true }); card.style.outline = '2px solid var(--accent)'; setTimeout(() => { card.style.outline = ''; }, 2500); }
+    },
 
     toggleClientForm(open) {
       this._clientFormOpen = open === undefined ? !this._clientFormOpen : !!open;
@@ -47,12 +81,15 @@
       if (this._clientFormOpen) {
         form?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         document.getElementById('cl-name')?.focus();
+        this.checkClientDuplicate();
       }
     },
 
     /* ── Chargement ──────────────────────────────────────────────────────── */
     async render() {
       const body = document.getElementById('cp-body'); if (!body) return;
+      const sortButton = document.getElementById('cp-sort');
+      if (sortButton) sortButton.textContent = 'Trier : ' + (this.sortMode === 'az' ? 'A-Z' : 'Plus récent');
       if (!(window.Cloud && Cloud.enabled && Cloud.user())) {
         this._loading = false; this._links = [];
         // La vue « Clients » (annuaire) ne dépend pas du cloud : elle reste
@@ -114,7 +151,7 @@
 
     _pipeline() {
       const cols = STAGE_ORDER.map(stage => {
-        const items = this._links.filter(l => (l.stage || 'request') === stage);
+        const items = this.orderedLinks(this._links.filter(l => (l.stage || 'request') === stage));
         const cards = items.length
           ? items.map(l => this._card(l, true)).join('')
           : `<div class="cp-empty-col">—</div>`;
@@ -130,7 +167,7 @@
     },
 
     _list() {
-      const rows = this._links.map(l => {
+      const rows = this.orderedLinks().map(l => {
         const s = STAGE[l.stage || 'request'], st = STATUS[l.status || 'active'];
         return `<div class="cp-row">
           <div class="cp-row-main">
@@ -161,9 +198,10 @@
         </div>
         <div class="form-box${this._clientFormOpen ? ' visible' : ''}" id="add-client-form">
           <div class="biz-form">
-            <div><div class="prop-label">Nom</div><input class="prop-input" id="cl-name" placeholder="Entreprise" value="${this._esc(this._clientDraft.name)}" oninput="CP._clientDraft.name=this.value"></div>
+            <div><div class="prop-label">Nom</div><input class="prop-input" id="cl-name" placeholder="Entreprise" value="${this._esc(this._clientDraft.name)}" oninput="CP._clientDraft.name=this.value;CP.checkClientDuplicate()"></div>
             <div><div class="prop-label">Type</div><input class="prop-input" id="cl-type" placeholder="Design, Dev..." value="${this._esc(this._clientDraft.type)}" oninput="CP._clientDraft.type=this.value"></div>
           </div>
+          <div id="cl-duplicate" role="alert" style="color:var(--gold-l);font-size:11px;margin-top:8px" hidden></div>
           <div class="hintbox" style="margin-top:10px">💡 La fiche est partagée : <strong style="color:var(--text)">Facturation</strong> et <strong style="color:var(--text)">Portails</strong> proposent ce nom automatiquement — et créent la fiche si elle n'existe pas.</div>
           <div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn btn-accent" onclick="addClient()">Ajouter</button>
@@ -174,12 +212,14 @@
       </div>`;
 
       const groups = new Map();
-      this._links.forEach(l => {
+      this.orderedLinks().forEach(l => {
         const key = (l.clientName || '').trim() || '__none';
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(l);
       });
-      const cards = [...groups.entries()].sort((a, b) => b[1].length - a[1].length).map(([key, items]) => {
+      const cards = [...groups.entries()].sort((a, b) => this.sortMode === 'az'
+        ? a[0].localeCompare(b[0], 'fr')
+        : Math.max(...b[1].map(x=>this._time(x))) - Math.max(...a[1].map(x=>this._time(x)))).map(([key, items]) => {
         const name = key === '__none' ? 'Sans nom de client' : key;
         const total = items.reduce((s, l) => s + (Number(l.total) || 0), 0);
         const cur = (items.find(l => l.currency) || {}).currency || '€';

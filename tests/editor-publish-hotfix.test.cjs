@@ -12,7 +12,7 @@ function loadCore() {
   const context = { console, setTimeout, localStorage, window: {}, document: {} };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync('js/core.js', 'utf8') +
-    ';globalThis.exported={GH,SiteConfig,generateSite,ensureReviewClient};', context);
+    ';globalThis.exported={GH,Auth,SiteConfig,generateSite,deployPortfolio,ensureReviewClient};', context);
   return { ...context.exported, localStorage, context };
 }
 
@@ -115,4 +115,48 @@ test('generated portfolio includes readable reviews and optional wheel smoothing
   }
   const without = generateSite({ ...cfg, smoothWheel: false }, [], []);
   assert.doesNotMatch(without, /addEventListener\('wheel'/);
+});
+
+test('publication waits for the build of its own commit and omits local deployment metadata', async () => {
+  const { GH, Auth, SiteConfig, deployPortfolio, localStorage, context } = loadCore();
+  context.setTimeout = callback => { callback(); return 0; };
+  Auth.ok = () => true; Auth.token = () => 'token'; Auth.owner = () => 'owner';
+  SiteConfig.save({ ...SiteConfig.defaults(), repo: 'owner/site',
+    lastDeploy: { url: 'https://old.example/', ts: 1 },
+    contactMethods: [{ id: 'phone', on: false, value: 'private phone' }],
+    projectTags: ['Unpublished draft'] });
+  let committed, polls = 0;
+  GH.ensureRepo = async () => {}; GH.enablePages = async () => {};
+  GH.commitFiles = async (_token, _owner, _repo, files) => { committed = files; return 'new-sha'; };
+  GH.pagesInfo = async () => ({ html_url: 'https://owner.github.io/site/' });
+  GH.pagesLatestBuild = async () => (++polls === 1
+    ? { status: 'built', commit: 'old-sha' }
+    : { status: 'built', commit: 'new-sha' });
+  const result = await deployPortfolio();
+  assert.equal(result.verified, true);
+  assert.equal(result.sha, 'new-sha');
+  assert.equal(polls, 2);
+  const manifest = JSON.parse(committed.find(f => f.path === 'site-config.json').content);
+  assert.equal(manifest.lastDeploy, undefined);
+  assert.equal(manifest.contactMethods, undefined);
+  assert.equal(manifest.projectTags, undefined);
+  assert.doesNotMatch(committed.find(f => f.path === 'index.html').content, /private phone|Unpublished draft/);
+  assert.equal(JSON.parse(localStorage.getItem(SiteConfig._K)).lastDeploy.sha, 'new-sha');
+});
+
+test('project filters, branding and optional audio work in all three public themes', () => {
+  const { SiteConfig, generateSite } = loadCore();
+  const project = { id: 'p1', title: 'Exemple', tags: ['Motion', 'Logo'], cover: '' };
+  for (const layoutStyle of ['float', 'sidebar', 'bento']) {
+    const html = generateSite({ ...SiteConfig.defaults(), layoutStyle,
+      siteLogo: 'https://example.com/logo.png', favicon: 'https://example.com/icon.png',
+      titleEffect: 'glow', backgroundMusic: 'https://example.com/music.mp3' }, [project], []);
+    assert.match(html, /data-tag="motion"/);
+    assert.match(html, /data-tags="\[&quot;motion&quot;,&quot;logo&quot;\]"/);
+    assert.match(html, /class="site-sound"/);
+    assert.match(html, /rel="icon" href="https:\/\/example.com\/icon.png"/);
+    for (const [, script] of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) {
+      if (script.trim()) new vm.Script(script);
+    }
+  }
 });

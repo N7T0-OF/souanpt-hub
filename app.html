@@ -1188,10 +1188,33 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cw-warn{margin-top:7px;font-size:9px;color:var(--gold-l);line-height:1.9}
 .cw-warn .cw-mini-btn{margin-left:4px}
 @media(max-width:560px){.cw-drawer{width:100%;max-width:none}}
+.publish-panel{position:fixed;right:18px;bottom:18px;width:min(380px,calc(100vw - 36px));padding:18px;background:#111;border:1px solid #394319;border-radius:12px;box-shadow:0 18px 55px #000b;z-index:10000;color:#f5f5ed;font-size:12px}
+.publish-panel[hidden],.publish-reopen[hidden]{display:none}
+.publish-panel h3{margin:0 0 5px;font-size:15px}
+.publish-panel p{margin:0 0 12px;color:#b4b9aa;line-height:1.5}
+.publish-track{height:8px;background:#333;border-radius:9px;overflow:hidden;margin:8px 0 14px}
+.publish-track>div{height:100%;width:0;background:#c8ff00;transition:width .25s}
+.publish-steps{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:8px}
+.publish-steps li{color:#898f84}.publish-steps li.active{color:#c8ff00}.publish-steps li.done{color:#f5f5ed}.publish-steps li.error{color:#f26f60}
+.publish-panel a{color:#c8ff00;overflow-wrap:anywhere}.publish-panel button,.publish-reopen{border:1px solid #505846;background:#1c2115;color:#e8f2da;border-radius:7px;padding:7px 11px;cursor:pointer}
+.publish-reopen{position:fixed;right:18px;bottom:18px;z-index:9999;box-shadow:0 8px 25px #0008}
+.portal-form{max-width:900px;margin:16px auto;padding:22px!important}
+.portal-form h3{font-size:16px;margin:0 0 6px}.portal-form .portal-intro{color:var(--muted2);font-size:11px;line-height:1.6;margin:0 0 18px}
+.portal-step{border:1px solid var(--border);border-radius:12px;padding:17px;margin:13px 0;background:var(--s1)}
+.portal-step h4{display:flex;align-items:center;gap:8px;font-size:12px;margin:0 0 5px}.portal-step h4 span{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#080808;display:inline-grid;place-items:center}
+.portal-step p{font-size:10px;color:var(--muted2);margin:0 0 12px;line-height:1.5}
 </style>
 </head>
 <body>
 <div id="sm2-toast"></div>
+<aside id="publish-panel" class="publish-panel" role="status" aria-live="polite" hidden>
+  <h3>🚀 Publication du site</h3><p id="publish-message">Préparation…</p>
+  <div class="publish-track" role="progressbar" aria-label="Étapes terminées" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0" id="publish-progress"><div id="publish-progress-fill"></div></div>
+  <ol class="publish-steps" id="publish-steps"><li data-phase="behance">○ Lecture des contenus publics</li><li data-phase="generate">○ Génération du site</li><li data-phase="commit">○ Envoi sur GitHub</li><li data-phase="pages">○ Vérification sur GitHub Pages</li></ol>
+  <a id="publish-link" href="#" target="_blank" rel="noopener" hidden></a>
+  <div style="margin-top:12px"><button type="button" onclick="PublishUI.hide()" id="publish-hide">Continuer en arrière-plan</button></div>
+</aside>
+<button type="button" class="publish-reopen" id="publish-reopen" onclick="PublishUI.show()" hidden>🚀 Voir la publication</button>
 <!-- Tiroir du DOSSIER CLIENT (js/client-workspace.js) : rempli à la demande -->
 <div id="cw-root" aria-hidden="true"></div>
 
@@ -1482,9 +1505,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
     <!-- ══ PAGE: ÉDITEUR ══ -->
     <div class="page" id="page-editor" style="padding:0;height:calc(100vh - 52px);overflow:hidden">
-      <!-- Topbar : RÉGLAGES GLOBAUX uniquement (la structure = colonne « Blocs »).
-           v3.10 : « ☰ Sections » a été déplacé en « Blocs ✏️ » — un seul accès,
-           et la barre reste lisible même étroite (libellés masqués avant les icônes). -->
+      <!-- Commandes globales ; les commandes de structure sont aussi injectées
+           dans la navigation réelle de l'aperçu par EdCanvas. -->
       <div class="edtb">
         <div class="edperf">
           <span class="edperf-ic">⚡</span>
@@ -1500,6 +1522,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button class="btn btn-ghost edtb-b" onclick="edWinTheme(this)" title="Style, couleurs, colonnes — raccourci T">🎨<span class="edtb-t"> Thème</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinFx(this)" title="Animations & effets — raccourci E">⚡<span class="edtb-t"> Effets</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinBanner(this)" title="Image, accroche et action de la bannière principale — raccourci B">🖼<span class="edtb-t"> Bannière</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinSections(this)" title="Nom, ordre et visibilité des sections — raccourci S">☰<span class="edtb-t"> Sections</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edAddBlock()" title="Ajouter un bloc au site">＋<span class="edtb-t"> Bloc</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinTags()" title="Créer des tags et classer les projets">🏷<span class="edtb-t"> Tags</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinBrand()" title="Logo, favicon et effet du nom">✳<span class="edtb-t"> Identité</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinAudio()" title="Musique de fond et son de clic">🔊<span class="edtb-t"> Son</span></button>
+          <button class="btn btn-ghost edtb-b" id="ed-auto-publish" onclick="SiteAutoPublish.toggle()" title="Publier automatiquement les contenus publics après leur sauvegarde">Auto : désactivé</button>
           <span class="edtb-sep"></span>
           <button class="btn btn-ghost edtb-b" id="ed-undo" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" disabled>↶</button>
           <button class="btn btn-ghost edtb-b" id="ed-redo" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" disabled>↷</button>
@@ -1516,20 +1544,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       </div>
       <!-- Body -->
       <div style="display:flex;flex:1;height:calc(100% - 42px);overflow:hidden">
-        <!-- Blocks -->
-        <div style="width:180px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--s1);flex-shrink:0">
-          <!-- v3.10 : LA configuration des sections vit ici (l'accès principal),
-               plus dans la topbar. Le ✏️ ouvre ☰ Sections (nom, ordre, activation,
-               Chiffres clés, Réseaux). -->
-          <div class="ed-blocks-h">
-            <span>Blocs</span>
-            <button class="ed-blocks-go" onclick="edWinSections(this)" title="Configurer les sections : nom, ordre, Chiffres clés, Réseaux — raccourci S">✏️</button>
-          </div>
-          <div style="flex:1;overflow-y:auto;padding:7px" id="ed-blocks-list">
-            <div style="font-size:9px;color:var(--muted2);padding:8px">Chargement…</div>
-          </div>
-          <div style="padding:8px 10px;border-top:1px solid var(--border);font-size:8px;color:var(--muted2);line-height:1.7">⋮⋮ glisser pour réordonner<br>👁 afficher / masquer</div>
-        </div>
         <!-- Preview iframe -->
         <div style="flex:1;display:flex;flex-direction:column;background:#050505;position:relative">
           <div style="display:flex;align-items:center;gap:7px;padding:5px 10px;background:#030303;border-bottom:1px solid #111;flex-shrink:0">
@@ -1560,6 +1574,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button data-v="list" onclick="CP.setView('list')">Liste</button>
           <button data-v="clients" onclick="CP.setView('clients')">Clients</button>
         </div>
+        <button class="btn btn-ghost" id="cp-sort" style="font-size:10px" onclick="CP.setSort()">Trier : Plus récent</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="openClientForm()">+ Client</button>
         <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau projet</button>
       </div>
@@ -1691,12 +1706,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     <div class="page" id="page-avis">
       <div class="section-header"><div class="section-title">Avis clients</div><div class="section-line"></div>
         <button class="btn btn-accent" style="font-size:10px" id="avis-check-btn" onclick="checkAvis()">📥 Relever les avis</button>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="toggleForm('add-review-form')">+ Manuel</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="toggleForm('add-review-form');populateReviewClientSelect()">+ Manuel</button>
       </div>
       <div class="infobox">⭐ <strong>Comment ça marche :</strong> les visiteurs laissent leur avis <strong>directement sur ton site publié</strong> (bouton « ✎ Laisser un avis »). Ils arrivent ici automatiquement — toi tu <strong>approuves ou refuses</strong>, c'est tout. Les avis approuvés s'affichent sur le site au prochain déploiement 🚀. Relève auto toutes les 5 min · <span id="avis-last-check" style="color:var(--muted2)">jamais relevé</span></div>
       <div class="form-box" id="add-review-form">
         <div class="biz-form">
-          <div><div class="prop-label">Auteur</div><input class="prop-input" id="rv-author" placeholder="Prénom NOM"></div>
+          <div><div class="prop-label">Auteur</div><select class="prop-input" id="rv-client" onchange="reviewPickClient()"><option value="">Choisir un client existant ou saisir un nom</option></select><input class="prop-input" id="rv-author" placeholder="Prénom NOM" style="margin-top:6px" oninput="document.getElementById('rv-client').value=''"></div>
           <div><div class="prop-label">Projet</div><input class="prop-input" id="rv-project" placeholder="Nom du projet"></div>
           <div><div class="prop-label">Note /5</div><input class="prop-input" id="rv-rating" type="number" min="1" max="5" value="5"></div>
         </div>
@@ -1722,26 +1737,31 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div class="kpi-card k2"><div class="kpi-label">Publiés</div><div class="kpi-val" id="pt-published">0</div></div>
       </div>
 
-      <div class="form-box" id="portal-form">
+      <div class="form-box portal-form" id="portal-form">
+        <h3>Créer un espace client</h3><p class="portal-intro">Renseigne la mission, puis les informations visibles par ton client. Tu pourras modifier le portail après sa création.</p>
+        <div class="portal-step"><h4><span>1</span> Mission et client</h4><p>Le titre et le nom du client seront visibles sur son portail.</p>
         <div class="biz-form">
-          <div><div class="prop-label">Nom de la mission</div><input class="prop-input" id="pt-mission" placeholder="Identité visuelle Bloom Studio"></div>
+          <div><div class="prop-label">Nom de la mission *</div><input class="prop-input" id="pt-mission" placeholder="Identité visuelle Bloom Studio" required></div>
           <div><div class="prop-label">Client</div><input class="prop-input" id="pt-client" placeholder="Choisir ou créer…" list="dl-clients"></div>
         </div>
+        </div><div class="portal-step"><h4><span>2</span> Avancement et paiement</h4><p>Indique l’étape actuelle et les montants que le client peut consulter.</p>
         <div class="biz-form" style="margin-top:8px">
-          <div><div class="prop-label">Montant total (€)</div><input class="prop-input" id="pt-total" type="number" placeholder="2400"></div>
-          <div><div class="prop-label">Acompte %</div><input class="prop-input" id="pt-acompte" type="number" value="50"></div>
+          <div><div class="prop-label">Montant total (€)</div><input class="prop-input" id="pt-total" type="number" min="0" step="0.01" placeholder="2400"></div>
+          <div><div class="prop-label">Acompte %</div><input class="prop-input" id="pt-acompte" type="number" min="0" max="100" value="50"></div>
           <div><div class="prop-label">Étape actuelle</div><select class="prop-input prop-select" id="pt-step">
             <option value="0">Brief</option><option value="1">Devis</option><option value="2">Acompte</option><option value="3" selected>Production</option><option value="4">Livraison</option><option value="5">Terminé</option>
           </select></div>
         </div>
         <div class="biz-form" style="margin-top:8px">
           <div><div class="prop-label">Lien de paiement (Stripe, PayPal, SumUp…)</div><input class="prop-input" id="pt-pay" placeholder="https://buy.stripe.com/…"></div>
-          <div><div class="prop-label">Mot de passe (optionnel)</div><input class="prop-input" id="pt-pw" placeholder="laisser vide = aucun"></div>
+          <div><div class="prop-label">Mot de passe (optionnel)</div><input class="prop-input" id="pt-pw" type="password" autocomplete="new-password" placeholder="laisser vide = aucun"></div>
         </div>
+        </div><div class="portal-step"><h4><span>3</span> Message et livrables</h4><p>Ajoute une note claire et les liens que le client pourra ouvrir.</p>
         <div style="margin-top:8px"><div class="prop-label">Note pour le client (optionnel)</div><input class="prop-input" id="pt-note" placeholder="Prochaine étape : validation des maquettes"></div>
         <div style="margin-top:10px"><div class="prop-label">Livrables — liens (Drive, WeTransfer, GitHub Release…)</div>
           <div id="pt-deliv-list"></div>
           <button class="btn btn-ghost" style="font-size:9px;margin-top:6px" onclick="portalAddDelivRow()">+ Ajouter un livrable</button>
+        </div>
         </div>
         <div class="hintbox">💡 Le lien de paiement et les livrables sont de simples liens externes — Souanpt Hub ne stocke aucun fichier lourd et ne touche jamais à l'argent.</div>
         <div style="display:flex;gap:8px;margin-top:10px">
@@ -2405,7 +2425,7 @@ async function intGoogleConnect() {
   if (!(window.Cloud && Cloud.enabled)) { showToast('Cloud non configuré', '#e4b24a', 2500); return; }
   if (Cloud.user()) { hubSignOut(); return; }
   try { await Cloud.signInGoogle(); renderIntegrations(); }
-  catch (e) { showToast('✗ ' + (e.message || 'Connexion annulée'), '#c0392b', 3000); }
+  catch (e) { showToast('✗ ' + Cloud.authErrorMessage(e), '#c0392b', 6000); }
 }
 async function intBackupNow() {
   if (!Auth.ok()) { showToast('Connecte GitHub d\'abord (carte GitHub, juste au-dessus)', '#e4b24a', 3000); intOpen('github'); return; }
@@ -2693,13 +2713,14 @@ function addProject() {
     }
     try { localStorage.setItem('hub_projects', JSON.stringify(projs)); }
     catch { showToast('⚠ Image trop lourde — utilise une URL d\'image à la place','#c0392b',3500); return; }
+    SiteAutoPublish.queue();
     const target = wasEdit ? _editingId : newId;      // avant reset (qui efface _editingId)
     resetProjectForm(); renderProjects(); syncKPIs();
     showToast(wasEdit ? 'Projet mis à jour ✓' : 'Projet ajouté ✓','#2e9a63');
     // T4 : la couverture quitte le navigateur dès qu'on est connecté (1 commit,
     // miniature conservée). Silencieux si échec → le base64 reste en local.
     if (target && window.HubImages) {
-      HubImages.offloadProject(target).then(p => { if (p) { renderProjects(); syncKPIs(); } });
+      HubImages.offloadProject(target).then(p => { if (p) { renderProjects(); syncKPIs(); SiteAutoPublish.queue(); } });
     }
   };
   // Couverture collée en data: (ex : champ URL) non-WebP → on compresse avant de stocker
@@ -2776,6 +2797,7 @@ function editProject(id) {
 }
 function deleteProject(id) {
   localStorage.setItem('hub_projects', JSON.stringify(getProjects().filter(p=>p.id!==id)));
+  SiteAutoPublish.queue();
   renderProjects(); syncKPIs();
 }
 function renderProjects() {
@@ -2873,6 +2895,7 @@ function addLink() {
   const links = JSON.parse(localStorage.getItem('hub_links')||'[]');
   links.push({ id:Date.now().toString(), title:t, url:u, clicks:0 });
   localStorage.setItem('hub_links', JSON.stringify(links));
+  SiteAutoPublish.queue();
   renderLinks();
   document.getElementById('add-link-form')?.classList.remove('visible');
   ['new-link-title','new-link-url'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -2883,21 +2906,23 @@ function renderLinks() {
   if (!links.length) { ct.innerHTML = '<div class="empty"><div class="empty-title">Aucun lien</div><div class="empty-sub">Ajoute ton premier lien</div></div>'; return; }
   ct.innerHTML = links.map(l => `<div class="link-row"><div class="link-thumb" style="background:rgba(200,255,0,.08)">🔗</div><div style="flex:1"><div style="font-size:11px;font-weight:600">${l.title}</div><div style="font-size:9px;color:var(--muted2)">${l.url}</div></div><div style="font-size:11px;font-weight:700;color:var(--accent3)">${l.clicks} clics</div><button onclick='deleteLink("${l.id}")' style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:13px">✕</button></div>`).join('');
 }
-function deleteLink(id) { localStorage.setItem('hub_links', JSON.stringify(JSON.parse(localStorage.getItem('hub_links')||'[]').filter(l=>l.id!==id))); renderLinks(); }
+function deleteLink(id) { localStorage.setItem('hub_links', JSON.stringify(JSON.parse(localStorage.getItem('hub_links')||'[]').filter(l=>l.id!==id))); SiteAutoPublish.queue(); renderLinks(); }
 
 function addClient() {
   const name=document.getElementById('cl-name')?.value.trim(); if(!name) return;
   let cl; try { cl=JSON.parse(localStorage.getItem('hub_clients')||'[]'); } catch { cl=[]; }
   if(!Array.isArray(cl)) cl=[];
-  if(cl.some(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===name.toLocaleLowerCase('fr'))){showToast('Ce client existe déjà','#e4b24a',2200);return;}
+  const existing=cl.find(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===name.toLocaleLowerCase('fr'));
+  if(existing){CP.checkClientDuplicate();showToast('Ce client existe déjà — utilise « Voir la fiche »','#e4b24a',3500);return;}
   cl.push({ id:Date.now().toString(36)+Math.random().toString(36).slice(2,7), name, type:document.getElementById('cl-type')?.value||'', status:'active', progress:0, revenue:0, createdAt:Date.now() });
   localStorage.setItem('hub_clients', JSON.stringify(cl));
+  SiteAutoPublish.queue();
   renderClients();
   CP._clientFormOpen=false; CP._clientDraft={name:'',type:''};
   document.getElementById('add-client-form')?.classList.remove('visible');
   showToast('Client ajouté ✓','#2e9a63',1800);
 }
-function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); renderClients(); }
+function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); SiteAutoPublish.queue(); renderClients(); }
 function renderClients() {
   const cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');
   const ct=document.getElementById('clients-list'); if(!ct) return;
@@ -2919,7 +2944,8 @@ function renderClients() {
   const cols=['rgba(201,146,42,.12)','rgba(46,154,99,.1)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
   if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
-  ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Nouveau')}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${Math.max(0,Math.min(100,Number(c.progress)||0))}%"></div></div><span>${Math.max(0,Math.min(100,Number(c.progress)||0))}%</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}<button onclick="deleteClient('${esc(c.id)}')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`).join('');
+  const sorted=cl.slice().sort((a,b)=>CP.sortMode==='az' ? String(a.name||'').localeCompare(String(b.name||''),'fr') : (Number(b.createdAt)||0)-(Number(a.createdAt)||0));
+  ct.innerHTML=sorted.map((c,i)=>`<div class="gc client-card" id="client-card-${esc(c.id)}" tabindex="-1"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Nouveau')}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${Math.max(0,Math.min(100,Number(c.progress)||0))}%"></div></div><span>${Math.max(0,Math.min(100,Number(c.progress)||0))}%</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}<button onclick="deleteClient('${esc(c.id)}')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`).join('');
 }
 
 /* ═══ FACTURATION V2 — recherche, pagination, catalogue, statuts, CSV ═══ */
@@ -3054,22 +3080,37 @@ function exportInvoicesCSV() {
   showToast('Export CSV téléchargé ✓ (compatible Excel)','#2e9a63',2500);
 }
 
+function populateReviewClientSelect() {
+  const select=document.getElementById('rv-client'); if(!select) return;
+  let clients=[]; try{clients=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+  select.replaceChildren(new Option('Choisir un client existant ou saisir un nom',''));
+  clients.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'fr')).forEach(c=>select.add(new Option(c.name,c.id)));
+}
+function reviewPickClient() {
+  const select=document.getElementById('rv-client'), author=document.getElementById('rv-author');
+  if(select?.value&&author) author.value=select.selectedOptions[0].textContent;
+}
 function addReview() {
   const author=document.getElementById('rv-author')?.value.trim(), text=document.getElementById('rv-text')?.value.trim();
   if(!author||!text) return;
+  if (ensureReviewClient(author)) SiteAutoPublish.queue();
+  let clients=[]; try{clients=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+  const selectedId=document.getElementById('rv-client')?.value;
+  const client=clients.find(c=>c.id===selectedId)||clients.find(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===author.toLocaleLowerCase('fr'));
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
-  rv.push({ id:Date.now().toString(), author, text, rating:parseInt(document.getElementById('rv-rating')?.value)||5, status:'pending', project:document.getElementById('rv-project')?.value||'', createdAt:Date.now() });
+  rv.push({ id:Date.now().toString(), author, clientId:client?.id||'', text, rating:parseInt(document.getElementById('rv-rating')?.value)||5, status:'pending', project:document.getElementById('rv-project')?.value||'', createdAt:Date.now() });
   localStorage.setItem('hub_reviews', JSON.stringify(rv));
-  ensureReviewClient(author);
   renderReviews();
   document.getElementById('add-review-form').classList.remove('visible');
 }
 function reviewAction(id, action) {
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
+  const wasApproved=rv.find(r=>r.id===id)?.status==='approved';
   if(action==='delete'){localStorage.setItem('hub_reviews',JSON.stringify(rv.filter(r=>r.id!==id)));}
   else{const r=rv.find(r=>r.id===id);if(r)r.status=action;localStorage.setItem('hub_reviews',JSON.stringify(rv));}
+  if (action==='approved' || wasApproved) SiteAutoPublish.queue();
   renderReviews();
-  if(action==='approved') showToast('Approuvé ✓ — clique 🚀 Publier pour l\'afficher sur le site','#2e9a63',3500);
+  if(action==='approved') showToast(SiteConfig.get().autoPublish?'Approuvé ✓ — mise à jour publique programmée':'Approuvé ✓ — clique 🚀 Publier pour l\'afficher sur le site','#2e9a63',3500);
 }
 function renderReviews() {
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
@@ -3495,10 +3536,7 @@ async function gateGoogle() {
   try {
     await Cloud.signInGoogle();   // la suite est gérée par Cloud.onAuth → afterGoogleLogin
   } catch (e) {
-    const m = e.code === 'auth/popup-blocked' ? 'Pop-up bloquée — autorise les pop-ups pour ce site'
-            : e.code === 'auth/unauthorized-domain' ? 'Domaine non autorisé — ajoute-le dans Firebase → Authentication → Settings → Authorized domains'
-            : e.code === 'auth/popup-closed-by-user' ? 'Connexion annulée'
-            : (e.message || 'Erreur de connexion');
+    const m = Cloud.authErrorMessage(e);
     if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✗ ' + m; }
     if (btn) btn.disabled = false;
   }
