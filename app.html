@@ -1208,11 +1208,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <body>
 <div id="sm2-toast"></div>
 <aside id="publish-panel" class="publish-panel" role="status" aria-live="polite" hidden>
-  <h3>🚀 Publication du site</h3><p id="publish-message">Préparation…</p>
+  <h3>🚀 Publication du site</h3><p id="publish-message">Préparation…</p><small id="publish-elapsed">0 s écoulée</small>
   <div class="publish-track" role="progressbar" aria-label="Étapes terminées" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0" id="publish-progress"><div id="publish-progress-fill"></div></div>
   <ol class="publish-steps" id="publish-steps"><li data-phase="behance">○ Lecture des contenus publics</li><li data-phase="generate">○ Génération du site</li><li data-phase="commit">○ Envoi sur GitHub</li><li data-phase="pages">○ Vérification sur GitHub Pages</li></ol>
   <a id="publish-link" href="#" target="_blank" rel="noopener" hidden></a>
-  <div style="margin-top:12px"><button type="button" onclick="PublishUI.hide()" id="publish-hide">Continuer en arrière-plan</button></div>
+  <div style="margin-top:12px"><button type="button" onclick="PublishUI.hide()" id="publish-hide">Continuer en arrière-plan</button> <button type="button" onclick="PublishUI.retry()" id="publish-retry" hidden>Réessayer</button></div>
 </aside>
 <button type="button" class="publish-reopen" id="publish-reopen" onclick="PublishUI.show()" hidden>🚀 Voir la publication</button>
 <!-- Tiroir du DOSSIER CLIENT (js/client-workspace.js) : rempli à la demande -->

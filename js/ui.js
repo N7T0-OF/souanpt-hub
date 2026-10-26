@@ -6,12 +6,18 @@ const PublishUI = {
   show() { document.getElementById('publish-panel')?.removeAttribute('hidden'); document.getElementById('publish-reopen')?.setAttribute('hidden', ''); },
   hide() { document.getElementById('publish-panel')?.setAttribute('hidden', ''); document.getElementById('publish-reopen')?.removeAttribute('hidden'); },
   message(value) { const el = document.getElementById('publish-message'); if (el) el.textContent = value; },
-  start() {
+  tick() { const el = document.getElementById('publish-elapsed'); if (el) el.textContent = Math.floor((Date.now() - this.startedAt) / 1000) + ' s écoulées'; },
+  retry() { if (!this.busy && this.retryAction) this.retryAction(); },
+  start(retryAction) {
     if (this.busy) { this.show(); return false; }
     if (SiteAutoPublish.busy) { showToast('Synchronisation automatique en cours — attends sa fin.','#e4b24a',3000); return false; }
     this.busy = true;
+    this.retryAction = retryAction;
+    this.startedAt = Date.now(); clearInterval(this.clock); this.tick(); this.clock = setInterval(() => this.tick(), 1000);
+    const reopen = document.getElementById('publish-reopen'); if (reopen) reopen.textContent = '⟳ Publication en cours';
     this.show(); this.message('Lecture des contenus publics…');
     document.getElementById('publish-hide').textContent = 'Continuer en arrière-plan';
+    document.getElementById('publish-retry').hidden = true;
     const link = document.getElementById('publish-link'); if (link) link.hidden = true;
     document.querySelectorAll('#publish-steps li').forEach(el => { el.className = ''; el.textContent = '○ ' + el.textContent.replace(/^[○✓⟳✗]\s*/, ''); });
     this.progress();
@@ -31,18 +37,19 @@ const PublishUI = {
     this.progress();
   },
   finish(result) {
-    this.busy = false;
+    this.busy = false; clearInterval(this.clock); this.tick();
     this.message(result.verified ? 'Site publié et vérifié sur GitHub Pages.' : 'Commit envoyé. GitHub Pages n’a pas encore confirmé cette version.');
     const link = document.getElementById('publish-link'); if (link) { link.href = result.url; link.textContent = result.url; link.hidden = false; }
     document.getElementById('publish-hide').textContent = 'Fermer';
-    this.show();
+    const reopen = document.getElementById('publish-reopen'); if (reopen) reopen.textContent = result.verified ? '✓ Site à jour' : '◌ Publication en attente';
   },
   fail(error) {
-    this.busy = false; this.message('Échec : ' + (error?.message || 'erreur inconnue'));
+    this.busy = false; clearInterval(this.clock); this.tick(); this.message('Échec : ' + (error?.message || 'erreur inconnue'));
     const current = document.querySelector('#publish-steps li.active');
     if (current) { current.className = 'error'; current.textContent = current.textContent.replace(/^⟳/, '✗'); }
     document.getElementById('publish-hide').textContent = 'Fermer';
-    this.show();
+    document.getElementById('publish-retry').hidden = false;
+    const reopen = document.getElementById('publish-reopen'); if (reopen) reopen.textContent = '✗ Publication en erreur';
   },
 };
 
@@ -260,7 +267,7 @@ async function ghCreateRepo() {
 
 async function ghDeploy() {
   if (!Auth.ok()) { showToast('Connecte GitHub d\'abord','#c0392b'); return; }
-  if (!PublishUI.start()) return;
+  if (!PublishUI.start(ghDeploy)) return;
   const repoInp = document.getElementById('gh-repo-inp');
   if (repoInp?.value.trim()) SiteConfig.set('repo', repoInp.value.trim());
   const btn    = document.getElementById('gh-deploy-btn');
@@ -595,7 +602,7 @@ async function edDeploy() {
   // Keep the draft before checking GitHub: reconnecting must never discard edits.
   edSaveConfig(true);
   if (!Auth.ok()) { showToast('Reconnecte GitHub dans Paramètres → Intégrations, puis republie. Tes modifications sont sauvegardées.','#e4b24a',6000); showPage('github'); return; }
-  if (!PublishUI.start()) return;
+  if (!PublishUI.start(edDeploy)) return;
   const btn1=document.getElementById('ed-deploy-btn'); const btn2=document.getElementById('ed-deploy-btn2');
   const status=document.getElementById('ed-status');
   [btn1,btn2].forEach(b=>{if(b)b.disabled=true;});
