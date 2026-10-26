@@ -2270,7 +2270,15 @@ async function deployPortfolio(onLog, onStep) {
   else    onLog?.('  → Publication envoyée ; GitHub Pages ne confirme pas encore ce commit : ' + url, '#e4b24a');
   onStep?.('pages', ok ? 'done' : 'pending');
 
-  if (ok) SiteConfig.set('lastDeploy', { url, ts: Date.now(), repo: owner + '/' + repoName, sha: commitSha });
+  if (ok) {
+    SiteConfig.set('lastDeploy', { url, ts: Date.now(), repo: owner + '/' + repoName, sha: commitSha });
+    // Une première publication vérifiée active les futures mises à jour de
+    // contenu. Un choix explicite « Auto : désactivé » reste prioritaire.
+    if (SiteConfig.get().autoPublishChoice !== 'off' && !SiteConfig.get().autoPublish) {
+      SiteConfig.set('autoPublish', true);
+      if (typeof SiteAutoPublish !== 'undefined') SiteAutoPublish.refresh();
+    }
+  }
   SiteConfig.set('repo', owner + '/' + repoName);
 
   /* L'adresse du site publié doit remonter dans le PROFIL Firestore, pas
@@ -2292,13 +2300,15 @@ async function deployPortfolio(onLog, onStep) {
    projection: private quotes, client files and pending reviews stay out. */
 const SiteAutoPublish = {
   timer: null, busy: false, dirty: false, failures: 0,
-  label(value) { const b=document.getElementById('ed-auto-publish'); if(b)b.textContent=value; },
+  label(value) { const b=document.getElementById?.('ed-auto-publish'); if(b)b.textContent=value; },
   refresh() { this.label('Auto : ' + (SiteConfig.get().autoPublish ? 'activé' : 'désactivé')); },
   toggle() {
     const cfg=SiteConfig.get();
     if (!cfg.autoPublish && !cfg.lastDeploy?.url) return showToast?.('Publie ton site une première fois avant d’activer la synchronisation automatique.','#e4b24a',4000);
-    SiteConfig.set('autoPublish',!cfg.autoPublish);
-    if (!SiteConfig.get().autoPublish) { clearTimeout(this.timer); this.dirty=false; }
+    const enabled=!cfg.autoPublish;
+    SiteConfig.set('autoPublish',enabled);
+    SiteConfig.set('autoPublishChoice',enabled ? 'on' : 'off');
+    if (!enabled) { clearTimeout(this.timer); this.dirty=false; }
     this.refresh();
     showToast?.(SiteConfig.get().autoPublish?'Synchronisation automatique activée':'Synchronisation automatique désactivée','#2e9a63',2500);
   },
@@ -2703,7 +2713,7 @@ function portalRepo(cfg) {
  * Corrige le 404 : écrit .nojekyll, active Pages, commit atomique, PUIS
  * attend que le build Pages soit terminé avant de déclarer le lien actif.
  * onStatus(msg) : retour d'état facultatif pour l'UI.
- * → { url, built }
+ * → { url, built, sha, fileSha } ; built ne vaut true que pour CE commit.
  */
 async function publishPortal(p, onStatus) {
   const token = Auth.token(); if (!Auth.ok()) throw new Error('Connecte GitHub d\'abord');
@@ -2720,32 +2730,48 @@ async function publishPortal(p, onStatus) {
   const hasNojekyll = await GH.fileSha(token, owner, repo, '.nojekyll');
   if (!hasNojekyll) files.push({ path: '.nojekyll', content: '' });
   onStatus?.('Publication de la page…');
-  await GH.commitFiles(token, owner, repo, files, 'portal: ' + (p.mission || p.id));
+  const commitSha = await GH.commitFiles(token, owner, repo, files, 'portal: ' + (p.mission || p.id));
+  let fileSha = '';
+  try {
+    const file = await GH.api(token, `/repos/${owner}/${repo}/contents/p/${encodeURIComponent(p.id)}/index.html?ref=${encodeURIComponent(commitSha)}`);
+    fileSha = file.sha || '';
+  } catch (error) { console.warn('[portal] empreinte du fichier indisponible', error); }
 
   const url = `https://${owner.toLowerCase()}.github.io/${repo}/p/${p.id}/`;
-  // Attend la fin du build Pages (le lien est 404 tant que ce n'est pas "built")
+  // Un ancien build « built » peut encore être le dernier visible pendant que
+  // celui-ci est en file. Vérifier son SHA évite d'annoncer un portail périmé.
   onStatus?.('Construction GitHub Pages…');
   let built = false;
-  for (let i = 0; i < 18; i++) {
-    await new Promise(r => setTimeout(r, 5000));
+  for (let i = 0; i < 30; i++) {
+    if (i) await new Promise(r => setTimeout(r, 2000));
     const b = await GH.pagesLatestBuild(token, owner, repo);
-    if (b?.status === 'built') { built = true; break; }
-    if (b?.status === 'errored') { await GH.pagesRequestBuild(token, owner, repo); }
-    onStatus?.('Construction GitHub Pages… (' + ((i + 1) * 5) + 's)');
+    if (b?.commit === commitSha && b?.status === 'built') { built = true; break; }
+    if (b?.commit === commitSha && b?.status === 'errored') { await GH.pagesRequestBuild(token, owner, repo); }
+    onStatus?.('Construction GitHub Pages… (' + (i * 2) + 's)');
   }
-  return { url, built };
+  return { url, built, sha: commitSha, fileSha };
 }
 
 /** Vérifie qu'un portail est réellement en ligne (fichier + build Pages) */
 async function verifyPortal(id) {
   const token = Auth.token(); const owner = Auth.owner(); const cfg = SiteConfig.get();
   if (!Auth.ok() || !owner) return { ok: false, reason: 'Non connecté' };
+  const portal = (() => { try { return JSON.parse(localStorage.getItem('hub_portals') || '[]').find(p => p.id === id); } catch { return null; } })();
   const repo = portalRepo(cfg);
   const sha = await GH.fileSha(token, owner, repo, 'p/' + id + '/index.html');
   if (!sha) return { ok: false, reason: 'Page introuvable — clique Publier' };
   const b = await GH.pagesLatestBuild(token, owner, repo);
-  if (b?.status === 'built') return { ok: true };
-  if (b?.status === 'errored') return { ok: false, reason: 'Build Pages en erreur — republie' };
+  if (!portal?.deploySha) return { ok: false, reason: 'Version non vérifiable — republie ce portail pour confirmer son commit' };
+  if (b?.commit === portal.deploySha && b?.status === 'built') return { ok: true };
+  if (b?.commit === portal.deploySha && b?.status === 'errored') return { ok: false, reason: 'Build Pages en erreur — republie' };
+  // Un autre déploiement peut suivre sur la même branche. Vérifier que le
+  // fichier servi par son commit a la même empreinte que notre portail.
+  if (b?.status === 'built' && b?.commit && portal.deployFileSha) {
+    try {
+      const builtFile = await GH.api(token, `/repos/${owner}/${repo}/contents/p/${encodeURIComponent(id)}/index.html?ref=${encodeURIComponent(b.commit)}`);
+      if (builtFile.sha === portal.deployFileSha) return { ok: true };
+    } catch (error) { console.warn('[portal verify] fichier du build indisponible', error); }
+  }
   return { ok: false, reason: 'Build en cours — actif d\'ici ~1 min', pending: true };
 }
 

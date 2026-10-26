@@ -12,7 +12,7 @@ function loadCore() {
   const context = { console, setTimeout, localStorage, window: {}, document: {} };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync('js/core.js', 'utf8') +
-    ';globalThis.exported={GH,Auth,SiteConfig,generateSite,deployPortfolio,ensureReviewClient};', context);
+    ';globalThis.exported={GH,Auth,SiteConfig,SiteAutoPublish,generateSite,deployPortfolio,publishPortal,verifyPortal,ensureReviewClient};', context);
   return { ...context.exported, localStorage, context };
 }
 
@@ -142,6 +142,43 @@ test('publication waits for the build of its own commit and omits local deployme
   assert.equal(manifest.projectTags, undefined);
   assert.doesNotMatch(committed.find(f => f.path === 'index.html').content, /private phone|Unpublished draft/);
   assert.equal(JSON.parse(localStorage.getItem(SiteConfig._K)).lastDeploy.sha, 'new-sha');
+  assert.equal(SiteConfig.get().autoPublish, true, 'la première publication vérifiée active les futures mises à jour');
+});
+
+test('an explicit auto-publish opt-out survives a manual publication', async () => {
+  const { GH, Auth, SiteConfig, deployPortfolio } = loadCore();
+  Auth.ok = () => true; Auth.token = () => 'token'; Auth.owner = () => 'owner';
+  SiteConfig.save({ ...SiteConfig.defaults(), repo: 'owner/site', autoPublishChoice: 'off' });
+  GH.ensureRepo = async () => {}; GH.enablePages = async () => {};
+  GH.commitFiles = async () => 'manual-sha';
+  GH.pagesInfo = async () => ({ html_url: 'https://owner.github.io/site/' });
+  GH.pagesLatestBuild = async () => ({ status: 'built', commit: 'manual-sha' });
+  assert.equal((await deployPortfolio()).verified, true);
+  assert.equal(SiteConfig.get().autoPublish, false);
+});
+
+test('portal publication waits for its own Pages build and later builds still verify it', async () => {
+  const { GH, Auth, SiteConfig, publishPortal, verifyPortal, localStorage, context } = loadCore();
+  context.setTimeout = callback => { callback(); return 0; };
+  Auth.ok = () => true; Auth.token = () => 'token'; Auth.owner = () => 'owner';
+  SiteConfig.save({ ...SiteConfig.defaults(), repo: 'owner/site' });
+  GH.ensureRepo = async () => {}; GH.enablePages = async () => {};
+  GH.fileSha = async () => 'page-blob';
+  GH.commitFiles = async () => 'portal-sha';
+  GH.api = async () => ({ sha: 'portal-blob' });
+  let polls = 0;
+  GH.pagesLatestBuild = async () => (++polls === 1
+    ? { status: 'built', commit: 'older-sha' }
+    : { status: 'built', commit: 'portal-sha' });
+  const result = await publishPortal({ id: 'portal-1', mission: 'Logo', active: false });
+  assert.equal(result.built, true);
+  assert.equal(result.sha, 'portal-sha');
+  assert.equal(result.fileSha, 'portal-blob');
+  assert.equal(polls, 2);
+
+  localStorage.setItem('hub_portals', JSON.stringify([{ id: 'portal-1', deploySha: 'portal-sha', deployFileSha: 'portal-blob' }]));
+  GH.pagesLatestBuild = async () => ({ status: 'built', commit: 'newer-site-sha' });
+  assert.equal((await verifyPortal('portal-1')).ok, true);
 });
 
 test('project filters, branding and optional audio work in all three public themes', () => {

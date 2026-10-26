@@ -40,6 +40,8 @@
     _clientFormOpen: false,
     _clientDraft: { name: '', type: '' },
     _manualClientId: '',
+    expandedClientIds: new Set(),
+    setClientExpanded(id, open) { if (open) this.expandedClientIds.add(String(id)); else this.expandedClientIds.delete(String(id)); },
     sortMode: localStorage.getItem('cp_sort') === 'az' ? 'az' : 'recent',
 
     setSort() {
@@ -342,9 +344,11 @@
       if (!window.ClientWorkspace) return window.showToast?.('Dossier client indisponible', '#c0392b', 2500);
       let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
       let client = clients.find(c => String(c.name || '').trim().toLocaleLowerCase('fr') === clientName.toLocaleLowerCase('fr'));
+      let createdClient = false;
       if (!client) {
         client = { id: crypto.randomUUID(), name: clientName, type: '', status: 'active', progress: 0, revenue: 0, createdAt: Date.now() };
         clients.push(client); localStorage.setItem('hub_clients', JSON.stringify(clients));
+        createdClient = true;
       }
       const token = crypto.randomUUID().replace(/-/g, '').slice(0, 20);
       const w = ClientWorkspace.ensure(token, { clientId: client.id, clientName: client.name, projectName, projectType, stage: 'request' });
@@ -356,6 +360,7 @@
       this._links = this._mergeLinks(); this._view = 'clients';
       document.querySelectorAll('#cp-views button').forEach(b => b.classList.toggle('active', b.dataset.v === 'clients'));
       this._paint(); this._badge(); this.viewClient(client.id);
+      if (createdClient && typeof SiteAutoPublish !== 'undefined') SiteAutoPublish.queue();
       window.showToast?.('Projet créé dans ce navigateur ✓', '#2e9a63', 2500);
     },
 

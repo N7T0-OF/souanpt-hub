@@ -1744,7 +1744,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="section-header"><div class="section-title">Portails Clients</div><div class="section-line"></div>
         <button class="btn btn-accent" style="font-size:10px" onclick="portalOpenForm()">+ Nouveau portail</button>
       </div>
-      <div class="infobox">🔗 <strong>Un espace mission par client, sans qu'il ait de compte.</strong> Connecté avec Google, la publication est <strong>instantanée</strong> (via le cloud, aucun 404, aucune attente) et chaque modification est appliquée en direct. Tu envoies un <strong>lien privé</strong> ; le client y voit l'avancement, le suivi financier et les livrables — à ton image. Lecture seule (messagerie/validation 2 sens = étape suivante).</div>
+      <div class="infobox">🔗 <strong>Un espace mission par client, sans compte à créer pour lui.</strong> Le client voit l'avancement, le paiement et les livrables via un lien privé. Avec Firebase disponible, le portail se met à jour immédiatement ; avec GitHub Pages, sa publication demande une vérification du build. Lecture seule pour le client.</div>
       <div class="biz-kpis">
         <div class="kpi-card k1"><div class="kpi-label">Portails</div><div class="kpi-val" id="pt-count">0</div></div>
         <div class="kpi-card k4"><div class="kpi-label">Actifs</div><div class="kpi-val" id="pt-active">0</div></div>
@@ -1755,10 +1755,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="form-box portal-form" id="portal-form">
         <h3>Créer un espace client</h3><p class="portal-intro">Trois étapes courtes. Tu peux revenir en arrière sans perdre tes réponses.</p>
         <div class="portal-wizard-progress" id="pt-progress" aria-live="polite">Étape 1 sur 3 — Mission et client<div class="portal-wizard-track"><span id="pt-progress-bar"></span></div></div>
-        <div class="portal-step is-current"><h4><span>1</span> Mission et client</h4><p>Pour qui crées-tu cet espace, et comment s'appelle la mission ? Seul le nom de la mission est obligatoire.</p>
+        <div class="portal-step is-current"><h4><span>1</span> Mission et client</h4><p>Identifie le client et sa mission. Ces deux noms figureront dans son espace.</p>
         <div class="biz-form">
           <div><div class="prop-label">Nom de la mission *</div><input class="prop-input" id="pt-mission" placeholder="Identité visuelle Bloom Studio" required></div>
-          <div><div class="prop-label">Nom du client</div><input class="prop-input" id="pt-client" placeholder="Choisir un client ou saisir un nouveau nom" list="dl-clients"><div class="client-sub">Un nouveau nom créera automatiquement sa fiche client.</div></div>
+          <div><div class="prop-label">Nom du client *</div><input class="prop-input" id="pt-client" placeholder="Choisir un client ou saisir un nouveau nom" list="dl-clients" required><div class="client-sub">Un nouveau nom créera automatiquement sa fiche client.</div></div>
         </div>
         </div><div class="portal-step"><h4><span>2</span> Avancement et paiement</h4><p>Où en est la mission ? Indique les montants visibles par le client. Tu peux laisser les champs de paiement vides.</p>
         <div class="biz-form" style="margin-top:8px">
@@ -1778,6 +1778,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <div id="pt-deliv-list"></div>
           <button class="btn btn-ghost" style="font-size:9px;margin-top:6px" onclick="portalAddDelivRow()">+ Ajouter un livrable</button>
         </div>
+        <div class="hintbox" id="pt-summary" style="margin-top:12px" aria-live="polite"></div>
         </div>
         <div class="hintbox">💡 Le lien de paiement et les livrables sont de simples liens externes — Souanpt Hub ne stocke aucun fichier lourd et ne touche jamais à l'argent.</div>
         <div style="display:flex;gap:8px;margin-top:10px">
@@ -2976,7 +2977,7 @@ function renderClients() {
     const cr=reviews.filter(r=>mine(r,c,'author'));
     const types=[...new Set(cp.map(p=>p.projectType||p.type).filter(Boolean))];
     const progress=Math.max(0,Math.min(100,Number(c.progress)||0));
-    return `<details class="gc client-card" id="client-card-${esc(c.id)}" tabindex="-1"><summary><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div style="flex:1;min-width:0"><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Client')} · ${cp.length} projet${cp.length>1?'s':''} · ${cr.length} avis</div></div><span class="rstatus st-ok">${c.status==='active'?'Actif':'En cours'}</span></summary>
+    return `<details class="gc client-card" id="client-card-${esc(c.id)}" data-client-id="${esc(c.id)}" tabindex="-1"${CP.expandedClientIds.has(String(c.id))?' open':''} ontoggle="CP.setClientExpanded(this.dataset.clientId,this.open)"><summary><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div style="flex:1;min-width:0"><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Client')} · ${cp.length} projet${cp.length>1?'s':''} · ${cr.length} avis</div></div><span class="rstatus st-ok">${c.status==='active'?'Actif':'En cours'}</span></summary>
       <div class="client-extra"><div>Progression <b>${progress}%</b><div class="progress-bar-w" style="width:100%;margin-top:5px"><div class="progress-bar" style="width:${progress}%"></div></div></div>
       <h4>Projets (${cp.length})</h4>${cp.length?cp.map(p=>`<div class="client-item"><b>${esc(p.projectName||'Projet sans nom')}</b>${p.projectType?` · ${esc(p.projectType)}`:''}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="ClientWorkspace.open('${esc(p.token)}')">Ouvrir</button></div>`).join(''):'<div class="client-sub">Aucun projet lié.</div>'}
       ${types.length?`<div class="client-sub" style="margin-top:7px">Types : ${types.map(esc).join(', ')}</div>`:''}
@@ -3288,13 +3289,50 @@ function renderActivity(){
 let _ptEditId = null;
 let _ptWorkspaceId = '';
 let _ptStep = 0;
+function portalWizardValid(step) {
+  const fail = (id, message) => {
+    showToast(message, '#c0392b', 3000);
+    document.getElementById(id)?.focus();
+    return false;
+  };
+  if (step === 0) {
+    if (!document.getElementById('pt-mission')?.value.trim()) return fail('pt-mission', 'Indique le nom de la mission');
+    if (!document.getElementById('pt-client')?.value.trim()) return fail('pt-client', 'Choisis ou saisis un client');
+  }
+  if (step === 1) {
+    const total = document.getElementById('pt-total')?.value.trim() || '';
+    const deposit = document.getElementById('pt-acompte')?.value.trim() || '';
+    if (total && (!Number.isFinite(Number(total)) || Number(total) < 0)) return fail('pt-total', 'Le montant doit être positif');
+    if (deposit && (!Number.isFinite(Number(deposit)) || Number(deposit) < 0 || Number(deposit) > 100)) return fail('pt-acompte', 'L’acompte doit être entre 0 et 100 %');
+    const payment = document.getElementById('pt-pay')?.value.trim() || '';
+    if (payment) {
+      try { if (new URL(payment).protocol !== 'https:') return fail('pt-pay', 'Utilise un lien de paiement HTTPS'); }
+      catch { return fail('pt-pay', 'Vérifie le lien de paiement'); }
+    }
+  }
+  if (step === 2) {
+    for (const field of document.querySelectorAll('#pt-deliv-list .pt-dl-url')) {
+      const value = field.value.trim();
+      if (!value) continue;
+      try { if (new URL(value).protocol !== 'https:') throw new Error('https'); }
+      catch { showToast('Chaque livrable doit avoir un lien HTTPS valide', '#c0392b', 3000); field.focus(); return false; }
+    }
+  }
+  return true;
+}
+function portalWizardSummary() {
+  const box = document.getElementById('pt-summary'); if (!box) return;
+  const mission = document.getElementById('pt-mission')?.value.trim() || 'Mission sans nom';
+  const client = document.getElementById('pt-client')?.value.trim() || 'Client à choisir';
+  const amount = Number(document.getElementById('pt-total')?.value || 0);
+  const stage = document.getElementById('pt-step')?.selectedOptions[0]?.textContent || 'Production';
+  const files = [...document.querySelectorAll('#pt-deliv-list .pt-dl-url')].filter(el => el.value.trim()).length;
+  box.textContent = `Résumé : ${mission} · ${client} · ${amount.toLocaleString('fr-FR')} € · ${stage} · ${files} livrable${files > 1 ? 's' : ''}. Enregistrer prépare le portail ; « Publier » crée ou met à jour son lien.`;
+}
 function portalStep(delta) {
   const steps=[...document.querySelectorAll('#portal-form .portal-step')];
   if (!steps.length) return;
-  if (delta > 0 && _ptStep === 0 && !document.getElementById('pt-mission')?.value.trim()) {
-    showToast('Indique le nom de la mission', '#c0392b', 2500);
-    document.getElementById('pt-mission')?.focus(); return;
-  }
+  if (delta > 0 && !portalWizardValid(_ptStep)) return;
   _ptStep=Math.max(0,Math.min(steps.length-1,_ptStep+delta));
   steps.forEach((step,i)=>step.classList.toggle('is-current',i===_ptStep));
   const names=['Mission et client','Avancement et paiement','Message et livrables'];
@@ -3304,6 +3342,7 @@ function portalStep(delta) {
   document.getElementById('pt-back').hidden=_ptStep===0;
   document.getElementById('pt-next').hidden=_ptStep===steps.length-1;
   document.getElementById('pt-submit').hidden=_ptStep!==steps.length-1;
+  if (_ptStep === steps.length-1) portalWizardSummary();
   steps[_ptStep].scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function getPortals() { try { return JSON.parse(localStorage.getItem('hub_portals')||'[]'); } catch { return []; } }
@@ -3323,6 +3362,8 @@ function portalOpenForm(prefill) {
   if (prefill) { if(prefill.client) document.getElementById('pt-client').value=prefill.client; if(prefill.mission) document.getElementById('pt-mission').value=prefill.mission; if(prefill.total) document.getElementById('pt-total').value=prefill.total; }
   document.getElementById('pt-submit').textContent = 'Créer le portail';
   document.getElementById('portal-form').classList.add('visible');
+  const form = document.getElementById('portal-form');
+  if (!form.dataset.summaryBound) { form.addEventListener('input', portalWizardSummary); form.addEventListener('change', portalWizardSummary); form.dataset.summaryBound = '1'; }
   _ptStep=0; portalStep(0);
   refreshInvDatalists();
   document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
@@ -3334,6 +3375,7 @@ function portalAddDelivRow(label, url) {
   row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr auto;gap:6px;margin-bottom:6px';
   row.innerHTML = `<input class="prop-input pt-dl-label" placeholder="Logo final" value="${esc(label||'')}"><input class="prop-input pt-dl-url" placeholder="https://…" value="${esc(url||'')}"><button class="btn btn-ghost" style="font-size:11px" onclick="this.parentElement.remove()">✕</button>`;
   box.appendChild(row);
+  portalWizardSummary();
 }
 function portalCollectDeliv() {
   return [...document.querySelectorAll('#pt-deliv-list > div')].map(r=>({
@@ -3342,6 +3384,9 @@ function portalCollectDeliv() {
   })).filter(d=>d.url);
 }
 function portalSave() {
+  for (let step=0; step<3; step++) {
+    if (!portalWizardValid(step)) { _ptStep=step; portalStep(0); return; }
+  }
   const mission = document.getElementById('pt-mission')?.value.trim();
   if (!mission) { showToast('Nom de la mission requis','#c0392b',1500); return; }
   const client = document.getElementById('pt-client')?.value.trim()||'';
@@ -3372,6 +3417,7 @@ function portalSave() {
   }
   const portals = getPortals();
   let newPortal = null;
+  let clientAdded = false;
   if (_ptEditId) {
     const p = portals.find(x=>x.id===_ptEditId);
     if (p) Object.assign(p, data);
@@ -3380,14 +3426,16 @@ function portalSave() {
     portals.unshift(newPortal);
     // Client inconnu → créé dans Clients
     if (client) {
-      const cls=JSON.parse(localStorage.getItem('hub_clients')||'[]');
-      if(!cls.find(c=>(c.name||'').toLowerCase()===client.toLowerCase())){
+      let cls=[]; try{cls=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+      if(!Array.isArray(cls)) cls=[];
+      if(!cls.find(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===client.toLocaleLowerCase('fr'))){
         cls.push({id:Date.now().toString()+'c',name:client,type:'',status:'active',progress:0,revenue:0,createdAt:Date.now()});
-        localStorage.setItem('hub_clients',JSON.stringify(cls)); renderClients();
+        localStorage.setItem('hub_clients',JSON.stringify(cls)); clientAdded=true; renderClients();
       }
     }
   }
   setPortals(portals);
+  if (clientAdded) SiteAutoPublish.queue();
   // Dossier client : le portail créé à la main n'a pas de jeton → il se rattache
   // au seul projet de ce nom (si non ambigu), sinon il reste « à rattacher ».
   if (newPortal && window.ClientWorkspace) { try {
@@ -3395,8 +3443,16 @@ function portalSave() {
     else if (client) ClientWorkspace.bindByClient(client, newPortal.id, 'portal');
   } catch {} }
   const wasEditing=!!_ptEditId;
+  const savedPortal=wasEditing ? portals.find(p=>p.id===_ptEditId) : newPortal;
+  const updateOnline=wasEditing && !!savedPortal?.publishedAt &&
+    (portalCloud() || (SiteConfig.get().autoPublish && Auth.ok()));
   portalCloseForm(); renderPortals();
-  showToast(wasEditing?'Portail mis à jour ✓ — republie pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
+  if (updateOnline) {
+    showToast('Portail enregistré — mise à jour du lien en cours…','#2e9a63',3500);
+    portalPublish(savedPortal.id, { automatic:true });
+  } else {
+    showToast(wasEditing?'Portail mis à jour ✓ — clique « Republier » pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
+  }
 }
 function portalEdit(id) {
   const p = getPortals().find(x=>x.id===id); if(!p) return;
@@ -3410,6 +3466,8 @@ function portalEdit(id) {
   (p.deliverables||[]).forEach(d=>portalAddDelivRow(d.label,d.url)); if(!(p.deliverables||[]).length) portalAddDelivRow();
   document.getElementById('pt-submit').textContent='Enregistrer';
   document.getElementById('portal-form').classList.add('visible');
+  const form=document.getElementById('portal-form');
+  if (!form.dataset.summaryBound) { form.addEventListener('input', portalWizardSummary); form.addEventListener('change', portalWizardSummary); form.dataset.summaryBound='1'; }
   _ptStep=0; portalStep(0);
   document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
 }
@@ -3436,9 +3494,9 @@ function portalRegen(id) {
 async function portalToggleActive(id) {
   const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
   p.active=!p.active; setPortals(portals); renderPortals();
-  if(p.publishedAt) portalPublish(id); // répercute l'état en ligne
+  if(p.publishedAt) await portalPublish(id, { automatic:true }); // répercute l'état en ligne
 }
-async function portalPublish(id) {
+async function portalPublish(id, { automatic=false }={}) {
   const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
   const btn=document.getElementById('pub-'+id);
   const setBtn=t=>{if(btn)btn.textContent=t;};
@@ -3450,10 +3508,10 @@ async function portalPublish(id) {
       const cfg=SiteConfig.get();
       await Cloud.savePortalDoc({ ...p, siteName:cfg.siteName, accent:cfg.accentColor, theme:cfg.theme });
       const url=portalUrlFor(p.id);
-      p.publishedAt=Date.now(); p.url=url; setPortals(portals);
-      await navigator.clipboard.writeText(url).catch(()=>{});
+      p.publishedAt=Date.now(); p.url=url; p.deployVerified=true; setPortals(portals);
+      if (!automatic) await navigator.clipboard.writeText(url).catch(()=>{});
       renderPortals();
-      showToast('✓ Portail en ligne instantanément — lien copié !','#2e9a63',3500);
+      showToast(automatic?'✓ Portail mis à jour en ligne':'✓ Portail en ligne instantanément — lien copié !','#2e9a63',3500);
     } catch(e){ showToast('✗ '+e.message,'#c0392b',3500); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
     return;
   }
@@ -3462,12 +3520,12 @@ async function portalPublish(id) {
   if(!Auth.ok()){ showToast('Connecte-toi (Google) ou GitHub d\'abord','#e4b24a'); showPage('github'); return; }
   if(btn)btn.disabled=true; setBtn('⟳ Publication…');
   try {
-    const { url, built }=await publishPortal(p, setBtn);
-    p.publishedAt=Date.now(); p.url=url; setPortals(portals);
-    await navigator.clipboard.writeText(url).catch(()=>{});
+    const { url, built, sha, fileSha }=await publishPortal(p, setBtn);
+    p.publishedAt=Date.now(); p.url=url; p.deploySha=sha; p.deployFileSha=fileSha; p.deployVerified=built; setPortals(portals);
+    if (!automatic) await navigator.clipboard.writeText(url).catch(()=>{});
     renderPortals();
-    if(built) showToast('✓ Portail en ligne — lien copié !','#2e9a63',3500);
-    else showToast('✓ Publié — lien copié. Le portail sera actif d\'ici ~1 min (bouton « Vérifier »).','#e4b24a',5000);
+    if(built) showToast(automatic?'✓ Portail mis à jour en ligne':'✓ Portail en ligne — lien copié !','#2e9a63',3500);
+    else showToast(automatic?'Mise à jour envoyée — build Pages en attente':'Publication envoyée — lien copié. Vérifie le build Pages avant de partager.','#e4b24a',5000);
   } catch(e){ showToast('✗ '+e.message,'#c0392b',4000); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
 }
 async function portalVerify(id) {
@@ -3475,7 +3533,11 @@ async function portalVerify(id) {
   showToast('Vérification…','#666',1200);
   try {
     const r=await verifyPortal(id);
-    if(r.ok) showToast('✓ Portail en ligne et accessible','#2e9a63',3000);
+    if(r.ok) {
+      const portals=getPortals(), p=portals.find(x=>x.id===id);
+      if(p){p.deployVerified=true;setPortals(portals);renderPortals();}
+      showToast('✓ Portail en ligne et accessible','#2e9a63',3000);
+    }
     else showToast((r.pending?'⏳ ':'✗ ')+r.reason, r.pending?'#e4b24a':'#c0392b', 4000);
   } catch(e){ showToast('✗ '+e.message,'#c0392b',3000); }
 }
@@ -3498,17 +3560,17 @@ function renderPortals() {
   ct.innerHTML=portals.map(p=>{
     const t=Number(p.total)||0, a=Math.round(t*(Number(p.acomptePct)||0)/100), solde=t-a;
     const stepLbl=['Brief','Devis','Acompte','Production','Livraison','Terminé'][p.stepIndex]||'Brief';
-    const pub=p.publishedAt;
+    const pub=p.publishedAt, verified=!!pub && p.deployVerified===true;
     return `<div class="gc" style="padding:14px;${p.active===false?'opacity:.55':''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:160px">
           <div style="font-size:13px;font-weight:700">${esc(p.mission)}${(p.password||p.passwordHash)?' <span title="Protégé par mot de passe">🔒</span>':''}${p.active===false?' <span style="color:var(--red);font-size:9px">DÉSACTIVÉ</span>':''}</div>
           <div style="font-size:10px;color:var(--muted2)">${esc(p.client||'Sans client')} · ${stepLbl} · ${t.toLocaleString('fr')} € (solde ${solde.toLocaleString('fr')} €)</div>
         </div>
-        <span style="font-size:9px;padding:3px 9px;border-radius:10px;background:${pub?'var(--green-dim)':'var(--gold-dim)'};color:${pub?'var(--green)':'var(--gold-l)'};font-weight:700">${pub?'En ligne':'Non publié'}</span>
+        <span style="font-size:9px;padding:3px 9px;border-radius:10px;background:${verified?'var(--green-dim)':'var(--gold-dim)'};color:${verified?'var(--green)':'var(--gold-l)'};font-weight:700">${verified?'En ligne':pub?'Build à vérifier':'Non publié'}</span>
       </div>
       ${pub?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:7px 10px;background:var(--s2);border-radius:6px">
-        <span style="flex:1;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔗 Espace client · en ligne</span>
+        <span style="flex:1;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔗 Espace client · ${verified?'en ligne':'build à vérifier'}</span>
         <a class="btn btn-ghost" style="font-size:9px;padding:3px 8px" href="${esc(p.url)}" target="_blank">Ouvrir ↗</a>
         <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="portalCopy('${p.id}')">Partager</button>
         <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="showQR('${esc(p.url)}','${esc(p.mission)}')">⬡ QR</button>
