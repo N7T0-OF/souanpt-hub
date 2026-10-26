@@ -5,11 +5,14 @@
 - La clé Web versionnée dans `firebase-config.js` renvoie `API_KEY_INVALID` sur Identity Toolkit.
 - L'API Firestore renvoie `CONSUMER_INVALID` pour `souanpt-hub`.
 - Ces réponses ne permettent pas à elles seules de distinguer une clé supprimée, un projet supprimé ou une perte d'accès.
+- Le 26 octobre, les deux comptes Google connectés dans Codex ne listent pas `souanpt-hub` parmi leurs projets actifs ni parmi les ressources en attente de suppression. L'ouverture directe du projet affiche `resourcemanager.projects.get` manquante pour les deux comptes. Ce message d'autorisation ne prouve pas que le projet a été supprimé : il faut retrouver un compte propriétaire ou demander une récupération d'accès avant de conclure.
 - Le dépôt privé `N7T0-OF/n7t0-of-hub-data` contient une sauvegarde du 26 octobre 2026, commit `d91042f`. Son manifeste recense 10 projets, 22 clients, 4 avis, 5 factures, ainsi que la configuration du site. Les collections `portals`, `workspaces` et `estimates` y sont vides à cette date. Préserver ce dépôt et son historique.
 
 ## 1. Rechercher l'ancien projet avant toute migration
 
 Dans [Google Cloud → Gérer les ressources](https://console.cloud.google.com/cloud-resource-manager), vérifier chaque compte propriétaire potentiel et ouvrir **Ressources en attente de suppression**. Si `souanpt-hub` y apparaît, restaurer le projet dans sa fenêtre de récupération, puis vérifier Auth, Firestore, Storage et les clés API. Google documente une période de restauration de 30 jours ; certains services peuvent mettre plus longtemps à revenir. Si le projet existe dans Google Cloud mais manque dans Firebase, vérifier le label `firebase:enabled` et les autorisations IAM.
+
+Si aucun compte ne voit la ressource, récupérer l'identifiant exact du projet et la preuve du compte qui le voit, puis utiliser [l'aide Firebase pour un projet perdu](https://firebase.google.com/support/troubleshooter/access/project/lost) ou la demande officielle de récupération de compte et de ressource Google Cloud. Ne pas lancer une restauration, modifier les droits IAM, ni importer la sauvegarde dans un autre projet sur la seule base d'une URL contenant `project=souanpt-hub`.
 
 Sources : [restauration des projets Google Cloud](https://docs.cloud.google.com/resource-manager/docs/delete-restore-projects), [aide Firebase pour un projet introuvable](https://firebase.google.com/support/troubleshooter/access/project/lost).
 
