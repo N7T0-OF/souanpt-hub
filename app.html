@@ -3284,6 +3284,7 @@ function renderActivity(){
 
 /* ═══ PORTAILS CLIENTS ═══ */
 let _ptEditId = null;
+let _ptWorkspaceId = '';
 let _ptStep = 0;
 function portalStep(delta) {
   const steps=[...document.querySelectorAll('#portal-form .portal-step')];
@@ -3308,6 +3309,7 @@ function setPortals(p) { localStorage.setItem('hub_portals', JSON.stringify(p));
 
 function portalOpenForm(prefill) {
   _ptEditId = null;
+  _ptWorkspaceId = prefill?.workspaceId || '';
   ['pt-mission','pt-client','pt-total','pt-pay','pt-pw','pt-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pt-acompte').value = 50;
   document.getElementById('pt-step').value = 3;
@@ -3323,7 +3325,7 @@ function portalOpenForm(prefill) {
   refreshInvDatalists();
   document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
 }
-function portalCloseForm() { document.getElementById('portal-form').classList.remove('visible'); _ptEditId=null; }
+function portalCloseForm() { document.getElementById('portal-form').classList.remove('visible'); _ptEditId=null; _ptWorkspaceId=''; }
 function portalAddDelivRow(label, url) {
   const box = document.getElementById('pt-deliv-list'); if(!box) return;
   const row = document.createElement('div');
@@ -3341,6 +3343,10 @@ function portalSave() {
   const mission = document.getElementById('pt-mission')?.value.trim();
   if (!mission) { showToast('Nom de la mission requis','#c0392b',1500); return; }
   const client = document.getElementById('pt-client')?.value.trim()||'';
+  const linkedWorkspace = _ptWorkspaceId && window.ClientWorkspace ? ClientWorkspace.get(_ptWorkspaceId) : null;
+  if (linkedWorkspace?.clientName && linkedWorkspace.clientName.trim().toLocaleLowerCase('fr') !== client.toLocaleLowerCase('fr')) {
+    showToast('Ce portail est lié au dossier de « '+linkedWorkspace.clientName+' ». Garde ce client ou crée un autre dossier.','#c0392b',4000); return;
+  }
   const data = {
     mission, client,
     total: parseFloat(document.getElementById('pt-total')?.value)||0,
@@ -3382,7 +3388,10 @@ function portalSave() {
   setPortals(portals);
   // Dossier client : le portail créé à la main n'a pas de jeton → il se rattache
   // au seul projet de ce nom (si non ambigu), sinon il reste « à rattacher ».
-  if (newPortal && client && window.ClientWorkspace) { try { ClientWorkspace.bindByClient(client, newPortal.id, 'portal'); } catch {} }
+  if (newPortal && window.ClientWorkspace) { try {
+    if (_ptWorkspaceId) ClientWorkspace.attach(newPortal.id, _ptWorkspaceId, 'portal');
+    else if (client) ClientWorkspace.bindByClient(client, newPortal.id, 'portal');
+  } catch {} }
   const wasEditing=!!_ptEditId;
   portalCloseForm(); renderPortals();
   showToast(wasEditing?'Portail mis à jour ✓ — republie pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
@@ -3390,6 +3399,7 @@ function portalSave() {
 function portalEdit(id) {
   const p = getPortals().find(x=>x.id===id); if(!p) return;
   _ptEditId = id;
+  _ptWorkspaceId = p.workspaceId || '';
   const set=(i,v)=>{const el=document.getElementById(i);if(el)el.value=v??'';};
   set('pt-mission',p.mission); set('pt-client',p.client); set('pt-total',p.total);
   set('pt-acompte',p.acomptePct); set('pt-step',p.stepIndex); set('pt-pay',p.paymentLink);

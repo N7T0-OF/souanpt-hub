@@ -744,9 +744,12 @@
       else window.showPage?.('devis');
     },
     editPortal(id) {
+      const workspace = this._current?.w;
       this.close();
       window.showPage?.('portals');
-      setTimeout(() => { if (id && window.portalEdit) portalEdit(id); else window.portalOpenForm?.(); }, 150);
+      setTimeout(() => { if (id && window.portalEdit) portalEdit(id);
+        else window.portalOpenForm?.(workspace ? { mission: workspace.projectName, client: workspace.clientName, total: workspace.total, workspaceId: workspace.token } : undefined);
+      }, 150);
     },
   };
 

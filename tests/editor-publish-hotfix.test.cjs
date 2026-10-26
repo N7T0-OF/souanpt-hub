@@ -190,3 +190,26 @@ test('Clients & Projets keeps local workspaces visible without Firebase', async 
   assert.match(CP._actions(CP._links[0]), /Local/);
   assert.doesNotMatch(CP._actions(CP._links[0]), /Ouvrir le lien client/);
 });
+
+test('a portal launched from a client dossier keeps that exact project link', () => {
+  const data = new Map();
+  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
+  const calls = [];
+  const context = { console, localStorage, setTimeout: fn => fn(),
+    document: { getElementById: () => null, addEventListener: () => {} },
+    window: { showPage: page => calls.push(page), portalOpenForm: prefill => calls.push(prefill) } };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('js/client-workspace.js', 'utf8'), context);
+  const ClientWorkspace = context.window.ClientWorkspace;
+  ClientWorkspace.ensure('project-1', { clientName: 'Alice', projectName: 'Logo' });
+  ClientWorkspace.ensure('project-2', { clientName: 'Alice', projectName: 'Site' });
+  ClientWorkspace._current = { w: ClientWorkspace.get('project-2') };
+  ClientWorkspace.editPortal('');
+  assert.equal(calls[0], 'portals');
+  assert.equal(calls[1].workspaceId, 'project-2');
+  localStorage.setItem('hub_portals', JSON.stringify([{ id: 'portal-1', client: 'Alice' }]));
+  assert.equal(ClientWorkspace.attach('portal-1', 'project-2', 'portal'), true);
+  assert.equal(JSON.parse(localStorage.getItem('hub_portals'))[0].workspaceId, 'project-2');
+  assert.equal(ClientWorkspace.get('project-2').refs.portal, 'portal-1');
+  assert.equal(ClientWorkspace.get('project-1').refs.portal, undefined);
+});
