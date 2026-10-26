@@ -232,4 +232,7 @@ test('invalid legacy Firebase config leaves GitHub access available', () => {
   vm.runInContext(fs.readFileSync('js/cloud.js', 'utf8'), context);
   assert.equal(context.window.Cloud.enabled, false);
   assert.match(context.window.Cloud.unavailableReason, /Firebase est suspendu/);
+  context.document = { addEventListener: () => {} };
+  vm.runInContext(fs.readFileSync('js/analytics.js', 'utf8'), context);
+  assert.match(context.window.Analytics._emptyMsg(), /Statistiques cloud suspendues/);
 });

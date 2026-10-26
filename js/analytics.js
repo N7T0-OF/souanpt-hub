@@ -143,7 +143,9 @@ const Analytics = {
     // La décision « déconnecté » dépend UNIQUEMENT de Firebase Auth (Cloud.user()),
     // jamais des intégrations Google/Discord affichées ailleurs.
     const logged = !!(window.Cloud && Cloud.enabled && Cloud.user());
-    if (!logged) return '⚠️ <b>Connecte-toi avec Google ou Discord</b> pour activer les statistiques : elles sont rattachées à ton compte. Tout le reste est automatique.';
+    if (!logged) return window.Cloud?.unavailableReason
+      ? '⚠️ <b>Statistiques cloud suspendues</b> pendant la restauration Firebase. Tes données GitHub restent accessibles.'
+      : '⚠️ <b>Connecte-toi avec Google ou Discord</b> pour activer les statistiques : elles sont rattachées à ton compte. Tout le reste est automatique.';
     const btn = '<button class="btn btn-accent" style="margin-top:10px" onclick="Analytics.activate()">⚡ Activer les statistiques sur mon site</button>';
     // Site déjà publié → on propose de l'ouvrir / partager : sans visiteurs, pas de stats.
     const url = (typeof BubbleWidget !== 'undefined' && BubbleWidget.siteUrl) ? BubbleWidget.siteUrl() : '';
@@ -160,7 +162,7 @@ const Analytics = {
      Sûr même hors éditeur (edGetConfig renvoie SiteConfig tant que le formulaire
      n'a pas été chargé) → aucun risque de publier un site vide. */
   async activate() {
-    if (!(window.Cloud && Cloud.enabled && Cloud.user())) { showToast('Connecte-toi d\'abord (Google ou Discord)', '#e4b24a', 3500); return; }
+    if (!(window.Cloud && Cloud.enabled && Cloud.user())) { showToast(Cloud.unavailableReason || 'Connecte-toi d\'abord (Google ou Discord)', '#e4b24a', 3500); return; }
     // `Auth` vient d'un const → jamais présent sur window (voir core.js access())
     if (typeof Auth === 'undefined' || !Auth.ok()) { showToast('Connecte GitHub (Paramètres → Intégrations) pour publier', '#e4b24a', 4000); showPage('settings'); return; }
     try { SiteConfig.set('ownerUid', Cloud.user().uid); } catch (e) {}

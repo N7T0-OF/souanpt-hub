@@ -19,7 +19,7 @@ Créer **un nouveau projet Firebase** sous le compte qui en assurera la proprié
 
 Avant toute publication :
 
-1. Récupérer la nouvelle **configuration Web** depuis Paramètres du projet → Général. Mettre à jour `firebase/firebase-config.js` et `firebase/edge-config.js` ensemble. Ces clés Web identifient le projet ; elles ne donnent pas, à elles seules, accès aux données privées.
+1. Récupérer la nouvelle **configuration Web** depuis Paramètres du projet → Général. Mettre à jour `firebase/firebase-config.js` et `firebase/edge-config.js` ensemble. Retirer `disabled: true` de `firebase-config.js` seulement après validation de la nouvelle clé. Ces clés Web identifient le projet ; elles ne donnent pas, à elles seules, accès aux données privées.
 2. Publier et vérifier `firebase/firestore.rules` et `firebase/storage.rules` dans le nouveau projet. Les fichiers versionnés ne se déploient pas automatiquement.
 3. Reconfigurer les secrets `FIREBASE_CLIENT_EMAIL` et `FIREBASE_PRIVATE_KEY` des Workers Discord, notifications et analytics. Ne jamais les placer dans Git, dans un commentaire de PR ou dans une capture.
 4. Tester la connexion Google et Discord sur le domaine de production et sur un aperçu autorisé. Tester les lectures publiques `/c/<token>` et `/u/<pseudo>` après création de données de test non sensibles.
