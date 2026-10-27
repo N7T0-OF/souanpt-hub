@@ -718,11 +718,16 @@ const BubbleWidget = {
   async backupNow(){
     const btn=document.getElementById('sp-bk-btn2');
     if(btn){btn.textContent='⟳';btn.disabled=true;}
-    await autoBackup();
+    const result = await autoBackup({ force: true });
+    if(result?.blocked){
+      if(btn){btn.textContent='↑ Sauver';btn.disabled=false;}
+      showToast('⚠ Sauvegarde arrêtée : conflit entre appareils. Tes deux versions sont protégées.','#e4b24a',8000);
+      return;
+    }
     const ts=localStorage.getItem('souanpt_last_backup');
     const bkt=document.getElementById('sp-bk-time2'); if(bkt&&ts)bkt.textContent='À l\'instant';
     if(btn){btn.textContent='↑ Sauver';btn.disabled=false;}
-    showToast('Backup effectué ✓','#2e9a63');
+    showToast(result ? 'Backup effectué ✓' : 'Sauvegarde impossible — réessaie plus tard',result ? '#2e9a63' : '#c0392b');
   },
   exportJSON(){
     const data=JSON.stringify({auth:{user:Auth.user()},config:SiteConfig.get()},null,2);

@@ -3026,10 +3026,18 @@ async function autoBackup(opts) {
   const token = Auth.token(); const user = Auth.user();
   if (!Auth.ok() || !user) return null;
   if (_backupRunning) return null;                        // pas de 2 sauvegardes simultanées
-  // Le tirage GitHub (hub-sync.js) doit finir AVANT toute écriture : sinon on
-  // pousserait une copie locale périmée par-dessus la sauvegarde d'un autre
-  // appareil. C'est la seule règle d'ordonnancement du système.
-  if (window.HubSync && HubSync.pending) { try { await HubSync.pending; } catch {} }
+  // Un tirage incomplet ou un conflit interdit TOUTE écriture, y compris le
+  // commit du manifeste et la suppression de fichiers. Ne jamais supposer
+  // qu'une lecture GitHub ratée signifie « dépôt vierge ».
+  if (window.HubSync) {
+    const sync = await HubSync.boot();
+    const blocked = HubSync.blocked(user.login);
+    if (sync?.error || sync?.legacy || blocked) {
+      return { pushed: 0, deleted: 0, blocked: true,
+        reason: blocked?.reason || (sync?.legacy ? 'legacy' : 'read'),
+        conflicts: blocked?.conflicts || sync?.conflicts || [] };
+    }
+  }
   const force = !!(opts && opts.force);
   if (!force) {
     const last = parseInt(localStorage.getItem('souanpt_last_backup') || '0', 10);
@@ -3046,16 +3054,21 @@ async function autoBackup(opts) {
 
     // 1 lecture : l'état réel du dépôt (le manifeste = table des matières sha256)
     let remote = null;
-    try { remote = (await GH.loadFile(token, owner, repo, 'data/manifest.json')).data; } catch {}
+    try {
+      const response = await GH.api(token, `/repos/${owner}/${repo}/contents/data/manifest.json`);
+      if (typeof response?.content !== 'string') throw new Error('GitHub manifest has no content');
+      remote = GH.b64dec(response.content);
+    } catch (error) {
+      if (error.status !== 404) throw error;
+    }
     if (remote === null) await GH.ensureRepo(token, owner, repo, true);  // 1re fois / dépôt recréé
     const remoteMap = new Map();
     let remoteVersion = null;
     if (remote) {
-      try {
-        const m = JSON.parse(remote);
-        remoteVersion = (m.version === undefined ? null : m.version);
-        (m.files || []).forEach(f => remoteMap.set(f.path, f.sha256));
-      } catch {}
+      const m = JSON.parse(remote);
+      if (m.hub !== 'souanpt-hub' || !Array.isArray(m.files)) throw new Error('Invalid GitHub backup manifest');
+      remoteVersion = (m.version === undefined ? null : m.version);
+      m.files.forEach(f => remoteMap.set(f.path, f.sha256));
     }
 
     // Le manifeste ne peut pas contenir son propre sha256 (référence circulaire) :
