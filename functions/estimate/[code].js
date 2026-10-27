@@ -12,9 +12,7 @@
  * une contre-offre ne peut donc pas s'auto-accepter.
  */
 
-const PROJECT  = 'souanpt-hub';
-const API_KEY  = 'AIzaSyCBe6IUWsTBJ0H29KNxw5qU3YiC32Nenvk';   // clé Web publique par conception
-const DOCS     = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
+import { DOCS, WEB_API_KEY as API_KEY } from '../../firebase/edge-config.js';
 
 const esc = s => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

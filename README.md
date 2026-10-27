@@ -26,18 +26,24 @@ GitHub  (optionnel)
 
 ## Déployer le hub — 2 modes
 
-**Mode A — Déploiement direct Cloudflare (officiel, sans GitHub)**
-Double-clique sur `deploy-cloudflare.ps1` → le site part directement sur Cloudflare Pages.
+**Mode A — Déploiement direct Cloudflare (manuel)**
+`deploy-cloudflare.ps1` téléverse une archive publique allowlistée vers Cloudflare Pages et contrôle `build-info.json` après publication. Ce script direct ne déploie pas le Worker Analytics.
 Prérequis une seule fois : installer Node.js LTS (nodejs.org) + autoriser l'outil au
-premier lancement. ⚠ Nécessite un projet Pages en mode **Direct Upload** (un projet
-Pages « connecté à Git » n'accepte pas l'upload direct — crée un nouveau projet
-« Upload assets » si besoin, l'URL .pages.dev change alors).
+premier lancement. Le projet Pages existant peut rester connecté à Git : désactive
+les déploiements automatiques de `main` dans **Branch control** avant tout
+téléversement direct pour éviter une publication concurrente. Garde les aperçus
+des branches activés si tu souhaites voir les PR.
 
-**Mode B — Via GitHub (automatique si le projet Pages est connecté au repo)**
-`git push` → Cloudflare détecte le commit → rebuild automatique. Simple et sans
-installation ; GitHub sert alors de déclencheur, pas d'hébergeur.
+**Mode B — Via GitHub Actions**
+Après fusion sur `main`, la CI valide tests et artefacts, puis publie
+automatiquement sur GitHub Pages et vérifie le commit servi. Cloudflare reste
+un déploiement manuel séparé : son workflow publie le Worker Analytics puis
+Pages et exige `CLOUDFLARE_API_TOKEN`. N'active pas en même temps un build Git
+natif Cloudflare pour `main`, afin d'éviter deux déploiements concurrents.
 
-Dans les deux cas, garder GitHub à jour reste recommandé : c'est la sauvegarde du code.
+Le mode direct sert au téléversement manuel de Pages uniquement; pour le Worker,
+utilise le workflow contrôlé et configure ses secrets selon
+[la procédure de livraison](docs/migration/02-delivery-and-security.md).
 
 ## Architecture (2 repos)
 
@@ -193,12 +199,12 @@ déploiement manuelles : `docs/audits/t5-github-auth.md`.
 | Cible | Mise à jour |
 |---|---|
 | `n7t0-of.github.io/souanpt-hub` | **automatique** — `.github/workflows/deploy.yml`, à chaque push sur `main` |
-| `souanptjub.pages.dev/app` | projet Cloudflare Pages **`souanpthub`** — connexion Git, **ou** secret `CLOUDFLARE_API_TOKEN` qui active `.github/workflows/deploy-cloudflare.yml`, **ou** manuel `deploy-cloudflare.ps1` |
+| `souanptjub.pages.dev/app` | projet Cloudflare Pages **`souanpthub`** — connexion Git conservée pour les aperçus de PR; production publiée par `.github/workflows/deploy-cloudflare.yml` après désactivation des builds Git de production et configuration de `CLOUDFLARE_API_TOKEN` |
 
-⚠ Tant qu'une des deux dernières options n'est pas faite, **seul GitHub Pages
-suit les versions** et `souanptjub.pages.dev` reste bloqué sur son dernier
-upload manuel. Diagnostic, preuves et étapes une-fois : 
-`docs/audits/deploy-cloudflare-v3.8.2.md`.
+Le workflow Cloudflare vérifie le réglage de déploiement Git via l'API avant
+toute publication. La procédure de bascule et les critères de release sont dans
+`docs/migration/02-delivery-and-security.md`. L'historique du déploiement Git
+initial est conservé dans `docs/audits/deploy-cloudflare-v3.8.2.md`.
 
 ## Behance — sans clé API
 

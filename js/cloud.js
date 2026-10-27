@@ -12,6 +12,10 @@ const Cloud = {
   init() {
     try {
       const cfg = window.FIREBASE_CONFIG;
+      if (cfg?.disabled) {
+        this.unavailableReason = 'Firebase est suspendu : l’ancienne clé Web est invalide. Connecte GitHub pour accéder au Hub pendant la restauration.';
+        return;
+      }
       if (!cfg || !cfg.apiKey || String(cfg.apiKey).startsWith('TON_')) return; // placeholder → local
       if (typeof firebase === 'undefined' || !firebase.initializeApp) { console.warn('[cloud] SDK Firebase absent — mode local'); return; }
       firebase.initializeApp(cfg);
@@ -36,6 +40,17 @@ const Cloud = {
     if (this._resolved) { try { cb(this._user); } catch (e) { console.error(e); } }
   },
   user() { return this._user || null; },
+
+  authErrorMessage(error) {
+    const code = error?.code || '';
+    if (code.startsWith('auth/api-key-not-valid') || code === 'auth/invalid-api-key' || /api-key-not-valid|invalid-api-key/i.test(error?.message || ''))
+      return 'Configuration Firebase invalide. Le propriétaire doit remplacer la configuration Web dans Paramètres du projet Firebase → Général.';
+    if (code === 'auth/unauthorized-domain')
+      return 'Ce domaine doit être ajouté dans Firebase → Authentication → Paramètres → Domaines autorisés.';
+    if (code === 'auth/popup-blocked') return 'Fenêtre Google bloquée : autorise les pop-ups pour ce site.';
+    if (code === 'auth/popup-closed-by-user') return 'Connexion annulée.';
+    return error?.message || 'Connexion impossible pour le moment.';
+  },
 
   async signInGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -68,7 +83,7 @@ const Cloud = {
     const token = decodeURIComponent(m[1]);
     history.replaceState(null, '', location.pathname + location.search); // nettoie l'URL
     try { await this._auth.signInWithCustomToken(token); return true; }
-    catch (e) { console.error('[cloud] discord token', e); showToast?.('Connexion Discord échouée', '#c0392b', 3000); return false; }
+    catch (e) { console.error('[cloud] discord token', e); showToast?.('Connexion Discord : ' + this.authErrorMessage(e), '#c0392b', 6000); return false; }
   },
 
   // ── Profil utilisateur (users/{uid}) ──
@@ -182,9 +197,18 @@ const Cloud = {
       const snaps = await Promise.all(names.map(n => col.doc(n).get().catch(() => null)));
       const g = s => (s && s.exists ? s.data() : {}) || {};
       const [sum, daily, dev, co, pr] = snaps.map(g);
+      let ingestEnabled = false;
+      try {
+        const statusUrl = window.HUB_ANALYTICS_STATUS_URL;
+        if (statusUrl) {
+          const status = await fetch(statusUrl, { cache: 'no-store' });
+          if (status.ok) ingestEnabled = (await status.json()).enabled === true;
+        }
+      } catch {}
       return {
         summary: sum || {}, days: daily.days || {},
         devices: dev.map || {}, countries: co.map || {}, projects: pr.map || {},
+        ingestEnabled,
       };
     } catch (e) { console.warn('[cloud] loadAnalytics', e); return null; }
   },

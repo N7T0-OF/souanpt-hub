@@ -8,3 +8,26 @@
 name = "souanpt-analytics"
 main = "analytics-worker.js"
 compatibility_date = "2026-07-01"
+
+# Safe by default. Enable only after adding the rate-limit binding below and
+# setting the required Worker secrets in Cloudflare.
+[vars]
+ANALYTICS_INGEST_ENABLED = "false"
+ANALYTICS_BUILD_SHA = "local"
+
+[[durable_objects.bindings]]
+name = "ANALYTICS_GUARD"
+class_name = "AnalyticsGuard"
+
+[[migrations]]
+tag = "v1-analytics-guard"
+new_sqlite_classes = ["AnalyticsGuard"]
+
+# Required before enabling writes. Choose an unused positive namespace_id from
+# this Cloudflare account; do not copy an example ID from documentation.
+# [[ratelimits]]
+# name = "ANALYTICS_RATE_LIMITER"
+# namespace_id = "<ACCOUNT-ASSIGNED-UNUSED-ID>"
+# [ratelimits.simple]
+# limit = 100
+# period = 60

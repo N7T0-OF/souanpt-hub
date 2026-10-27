@@ -16,10 +16,7 @@
  * qu'elle est ouverte, jamais à toucher un prix, un statut ou un autre dossier.
  */
 
-const PROJECT = 'souanpt-hub';
-const API_KEY = 'AIzaSyCBe6IUWsTBJ0H29KNxw5qU3YiC32Nenvk';   // clé Web publique par conception
-const DOCS    = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
-const STORAGE_BUCKET = 'souanpt-hub.firebasestorage.app';
+import { PROJECT_ID, DOCS, WEB_API_KEY as API_KEY, STORAGE_BUCKET } from '../../firebase/edge-config.js';
 
 // Limites (côté client + revalidées par les règles Storage/Firestore).
 const MAX_FILES = 10, MAX_MB = 20;
@@ -39,6 +36,39 @@ function val(v) {
   if (v.arrayValue) return (v.arrayValue.values || []).map(val);
   if (v.mapValue) { const o = {}; const f = v.mapValue.fields || {}; for (const k in f) o[k] = val(f[k]); return o; }
   return undefined;
+}
+
+// Firestore Rules ne filtrent pas les résultats d'une liste : la requête doit
+// prouver que chaque question retournée est destinée au client.
+export async function loadPublicQuestions(token, fetchImpl = fetch) {
+  const query = {
+    structuredQuery: {
+      from: [{ collectionId: 'questions' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'internal' },
+          op: 'EQUAL',
+          value: { booleanValue: false },
+        },
+      },
+      limit: 40,
+    },
+  };
+  const response = await fetchImpl(`${DOCS}/requests/${encodeURIComponent(token)}:runQuery?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(query),
+  });
+  if (!response.ok) throw new Error(`Public questions query failed (${response.status})`);
+  const rows = await response.json();
+  if (!Array.isArray(rows)) throw new Error('Invalid public questions response');
+  return rows.filter(row => row.document).map(row => {
+    const doc = row.document;
+    const question = { id: String(doc.name || '').split('/').pop() };
+    for (const key in (doc.fields || {})) question[key] = val(doc.fields[key]);
+    return question;
+  }).filter(question => question.internal === false && question.status !== 'cancelled')
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 }
 
 /* ── Registre du questionnaire : UNE source, pas dupliquée par service. ── */
@@ -225,7 +255,7 @@ function answerScript(token, pending) {
   var storage=null;
   if(NEEDS_FILE){ try{
     if(!(window.firebase&&firebase.apps&&firebase.apps.length))
-      firebase.initializeApp({apiKey:KEY,projectId:'souanpt-hub',storageBucket:${JSON.stringify(STORAGE_BUCKET)}});
+      firebase.initializeApp({apiKey:KEY,projectId:${JSON.stringify(PROJECT_ID)},storageBucket:${JSON.stringify(STORAGE_BUCKET)}});
     storage=firebase.storage();
   }catch(e){ storage=null; } }
 
@@ -380,16 +410,7 @@ export async function onRequestGet(ctx) {
   // ── Questions complémentaires (jamais les notes internes du créateur) ──
   let questions = [];
   try {
-    const qr = await fetch(`${DOCS}/requests/${encodeURIComponent(token)}/questions?key=${API_KEY}&pageSize=40`);
-    if (qr.ok) {
-      const j = await qr.json();
-      questions = (j.documents || []).map(doc => {
-        const o = { id: String(doc.name || '').split('/').pop() };
-        for (const k in (doc.fields || {})) o[k] = val(doc.fields[k]);
-        return o;
-      }).filter(q => !q.internal && q.status !== 'cancelled')
-        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-    }
+    questions = await loadPublicQuestions(token);
   } catch (e) {}
   const nowTs = Date.now();
   const pendingQ = questions.filter(q => q.status === 'pending' && !(q.expiresAt && nowTs > Number(q.expiresAt)));
@@ -511,7 +532,7 @@ export async function onRequestGet(ctx) {
 
   // Firebase Storage — activé si le projet l'a configuré. Sinon, dépôt par lien.
   try {
-    firebase.initializeApp({ apiKey:KEY, projectId:'souanpt-hub', storageBucket:BUCKET });
+    firebase.initializeApp({ apiKey:KEY, projectId:${JSON.stringify(PROJECT_ID)}, storageBucket:BUCKET });
     storage=firebase.storage(); storageReady=true;
   } catch(e){ storageReady=false; }
   if(!storageReady) el('q-upnote').textContent='Dépôt de fichiers indisponible ici — ajoute plutôt un lien vers tes références.';

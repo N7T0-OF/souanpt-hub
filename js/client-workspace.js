@@ -81,7 +81,7 @@
       const now = Date.now();
       if (!w) { w = { token, stage: 'request', status: 'active', refs: {}, createdAt: now }; list.unshift(w); }
       if (patch.stage && this._rank(patch.stage) >= this._rank(w.stage)) w.stage = patch.stage;
-      for (const k of ['clientName', 'projectName', 'total', 'currency'])
+      for (const k of ['clientId', 'clientName', 'projectName', 'projectType', 'total', 'currency'])
         if (patch[k] != null && patch[k] !== '') w[k] = patch[k];
       if (patch.status && ['active', 'inactive', 'archived', 'trashed'].includes(patch.status)) {
         if (!w.status || patch.status !== 'active' || w.status === 'active') w.status = patch.status;
@@ -187,7 +187,7 @@
         });
         // Empreinte = l'état EXACT lu dans le cloud : si le dossier local est
         // identique, rien n'y sera renvoyé (économie de quota Spark).
-        if (w) w._cloudSig = this._sig(l);
+        if (w) { w._cloudSig = this._sig(l); w.localOnly = false; }
       });
 
       /* 2 — les devis locaux : leur `code` EST le jeton (/c/<code>) */
@@ -242,13 +242,14 @@
       /* 5 — pousser VERS le pivot public ce qui a changé (étape monotone) */
       if (this._cloudOk() && window.Registry) {
         for (const w of list) {
-          if (!w.token || w._cloudSig === this._sig(w)) continue;   // rien à écrire
+          if (!w.token || w.localOnly || w._cloudSig === this._sig(w)) continue;   // dossier manuel privé ou rien à écrire
           try {
             await Registry.register(w.token, {
               stage: w.stage, clientName: w.clientName, projectName: w.projectName,
               total: w.total, currency: w.currency,
             });
             w._cloudSig = this._sig(w);
+            w.localOnly = false;
             rep.cloud++;
           } catch { /* dégradation douce */ }
         }
@@ -705,8 +706,7 @@
           <div class="cw-title">${esc(w.projectName) || '<span style="opacity:.5">Projet sans nom</span>'}</div>
           <div class="cw-sub">${w.clientName ? '👤 ' + esc(w.clientName) : '<span style="opacity:.5">Client non renseigné</span>'} · ${this._money(w.total, w.currency)}</div>
           <div class="cw-act">
-            <button class="cw-btn" onclick="ClientWorkspace.copyLink('${esc(w.token)}')" title="Copier le lien client">📋 Copier</button>
-            <button class="cw-btn" onclick="ClientWorkspace.showLink('${esc(w.token)}')" title="Ouvrir /c/">🔗 Ouvrir</button>
+            ${w.localOnly ? '<span class="cw-via">Projet interne — crée un devis ou un portail pour obtenir un lien client</span>' : `<button class="cw-btn" onclick="ClientWorkspace.copyLink('${esc(w.token)}')" title="Copier le lien client">📋 Copier</button><button class="cw-btn" onclick="ClientWorkspace.showLink('${esc(w.token)}')" title="Ouvrir /c/">🔗 Ouvrir</button>`}
             ${closed
               ? `<button class="cw-btn" onclick="ClientWorkspace.reopen('${esc(w.token)}')">↺ Rouvrir</button>`
               : `<button class="cw-btn go" onclick="ClientWorkspace.closeMission('${esc(w.token)}')" title="Passe le dossier en Terminé — rien n'est supprimé">✅ Terminer</button>`}
@@ -744,9 +744,12 @@
       else window.showPage?.('devis');
     },
     editPortal(id) {
+      const workspace = this._current?.w;
       this.close();
       window.showPage?.('portals');
-      setTimeout(() => { if (id && window.portalEdit) portalEdit(id); else window.portalOpenForm?.(); }, 150);
+      setTimeout(() => { if (id && window.portalEdit) portalEdit(id);
+        else window.portalOpenForm?.(workspace ? { mission: workspace.projectName, client: workspace.clientName, total: workspace.total, workspaceId: workspace.token } : undefined);
+      }, 150);
     },
   };
 
