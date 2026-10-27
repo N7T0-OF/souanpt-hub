@@ -28,9 +28,30 @@
  */
 const HubSync = {
   KEY: 'souanpt_sync_hashes',
+  BLOCK_KEY: 'souanpt_sync_blocked',
   pending: null,          // promesse du tirage en cours — autoBackup l'attend
   _done: false,           // 1 tirage automatique par session
+  _owner: null,
   _hold: new Set(),       // chemins SANS accord : leur baseline ne bouge pas
+
+  blocked(owner) {
+    try {
+      const state = JSON.parse(localStorage.getItem(this.BLOCK_KEY) || 'null');
+      return state && state.owner === String(owner || '').toLowerCase() ? state : null;
+    } catch { return null; }
+  },
+  _block(owner, reason, conflicts = []) {
+    localStorage.setItem(this.BLOCK_KEY, JSON.stringify({
+      owner: String(owner || '').toLowerCase(), reason, conflicts,
+    }));
+  },
+  _unblock() { localStorage.removeItem(this.BLOCK_KEY); },
+
+  async _remoteFile(token, owner, repo, path) {
+    const file = await GH.api(token, `/repos/${owner}/${repo}/contents/${path}`);
+    if (typeof file?.content !== 'string') throw new Error('GitHub file has no content: ' + path);
+    return GH.b64dec(file.content);
+  },
 
   /* ─────────── baseline (accord local ↔ distant) ─────────── */
   hashes() {
@@ -88,10 +109,26 @@ const HubSync = {
     const owner = user.login;
     const repo  = owner.toLowerCase() + REPO_DATA_SUFFIX;
 
-    const manifestRaw = await GH.rawFile(token, owner, repo, 'data/manifest.json');
-    if (!manifestRaw) return { none: true };          // dépôt vierge → autoBackup initialisera
-    let manifest = null;
-    try { manifest = JSON.parse(manifestRaw); } catch { return { none: true }; }
+    let manifestRaw;
+    try { manifestRaw = await this._remoteFile(token, owner, repo, 'data/manifest.json'); }
+    catch (error) {
+      if (error.status !== 404) throw error;
+      // Un ancien backup.json ne doit jamais être remplacé par un dépôt vide.
+      try {
+        await this._remoteFile(token, owner, repo, 'backup.json');
+        this._block(owner, 'legacy');
+        return { legacy: true };
+      } catch (legacyError) {
+        if (legacyError.status !== 404) throw legacyError;
+      }
+      this._unblock();
+      return { none: true };
+    }
+    let manifest;
+    try { manifest = JSON.parse(manifestRaw); } catch { throw new Error('Invalid GitHub backup manifest'); }
+    if (manifest?.hub !== 'souanpt-hub' || !Array.isArray(manifest.files)) {
+      throw new Error('Invalid GitHub backup manifest');
+    }
 
     const localFiles = await HubData.buildFiles();
     const last = this.hashes();
@@ -107,7 +144,14 @@ const HubSync = {
       });
       return m;
     };
-    const remoteFiles = (manifest.files || []).filter(f => f && f.path && f.sha256);
+    const remoteFiles = manifest.files;
+    const seen = new Set();
+    for (const f of remoteFiles) {
+      if (!f || !this._entryOfPath(f.path) || !/^[a-f0-9]{64}$/i.test(f.sha256 || '') || seen.has(f.path)) {
+        throw new Error('Invalid GitHub backup file list');
+      }
+      seen.add(f.path);
+    }
     const L = byEntry(localFiles);
     const R = byEntry(remoteFiles);
 
@@ -125,7 +169,12 @@ const HubSync = {
 
       const lastSig = this._lastSig(localGroup, last);
       if (lastSig === null)      { pull.push(e); continue; }     // local vide → GitHub gagne
-      if (lastSig === undefined) { conflicts.push(e); addHold(e); continue; } // 1re synchro, remplis
+      if (lastSig === undefined) {
+        const value = HubData.read(e);
+        if (value === null || (Array.isArray(value) && !value.length)) pull.push(e);
+        else { conflicts.push(e); addHold(e); }
+        continue;
+      }
       if (lastSig === localSig)  { pull.push(e); continue; }     // seul GitHub a bougé → tiré = accord
       if (lastSig === remoteSig) { addHold(e); continue; }       // seul le local : la poussée tranchera
       conflicts.push(e); addHold(e);                             // les 2 ont bougé
@@ -139,6 +188,8 @@ const HubSync = {
     if (!pull.length) {
       this._hold = hold;
       this.record(localFiles, true);
+      if (conflictKeys.length) this._block(owner, 'conflict', conflictKeys);
+      else this._unblock();
       localStorage.setItem('souanpt_last_pull', Date.now().toString());
       return { pulled: [], conflicts: conflictKeys };
     }
@@ -148,11 +199,15 @@ const HubSync = {
     const map = {};
     for (const e of pull) {
       for (const f of (R.get(e) || [])) {
-        const c = await GH.rawFile(token, owner, repo, f.path);
-        if (c !== null) map[f.path] = c;
+        const c = await this._remoteFile(token, owner, repo, f.path);
+        if (await HubData._sha256(c) !== f.sha256) throw new Error('GitHub backup checksum mismatch: ' + f.path);
+        const parsed = JSON.parse(c);
+        if (e.type === 'array' && !Array.isArray(parsed)) throw new Error('Invalid GitHub backup collection: ' + f.path);
+        map[f.path] = c;
       }
     }
-    const restored = Object.keys(map).length ? HubData.applyFiles(map) : [];
+    const restored = HubData.applyFiles(map);
+    if (restored.length !== pull.length) throw new Error('GitHub backup restoration was incomplete');
 
     // Nouvelle baseline = ce qui vient d'être écrit (accord rétabli), sauf les
     // chemins en `hold` (conflit / à pousser) qui gardent leur ancienne baseline.
@@ -163,6 +218,8 @@ const HubSync = {
     if (restored.length && Object.keys(map).length >= expected) {
       this.record(await HubData.buildFiles(), true);
     }
+    if (conflictKeys.length) this._block(owner, 'conflict', conflictKeys);
+    else this._unblock();
     localStorage.setItem('souanpt_last_pull', Date.now().toString());
     return { pulled: restored, conflicts: conflictKeys };
   },
@@ -173,6 +230,8 @@ const HubSync = {
    */
   boot(opts) {
     if (typeof Auth === 'undefined' || !Auth.ok()) return Promise.resolve({ skipped: 'auth' });
+    const owner = Auth.user()?.login;
+    if (this._owner !== owner) { this._owner = owner; this._done = false; }
     if (this.pending) return this.pending;
     if (this._done && !(opts && opts.force)) return Promise.resolve({ skipped: 'done' });
 
@@ -187,12 +246,18 @@ const HubSync = {
         }
         if (res && res.conflicts && res.conflicts.length) {
           toast('⚠ ' + res.conflicts.length + ' donnée(s) modifiées sur 2 appareils : ' +
-                'la version de cet appareil est conservée (' + res.conflicts.join(', ') + ')',
-                '#e4b24a', 6000);
+                'sauvegarde automatique arrêtée pour protéger les deux versions (' + res.conflicts.join(', ') + ')',
+                '#e4b24a', 8000);
         }
+        if (res?.legacy) toast('⚠ Ancienne sauvegarde détectée : sauvegarde automatique arrêtée avant restauration', '#e4b24a', 8000);
         return res;
       })
-      .catch(e => { console.warn('[sync]', e); return { error: String(e && e.message || e) }; })
+      .catch(e => {
+        console.warn('[sync]', e);
+        this._block(owner, 'read');
+        this._done = false;
+        return { error: String(e && e.message || e) };
+      })
       .finally(() => { this.pending = null; });
     return this.pending;
   },

@@ -2460,6 +2460,10 @@ async function intBackupNow() {
   const r = await autoBackup({ force: true });
   renderIntegrations();
   if (!r) { showToast('✗ Sauvegarde impossible (GitHub injoignable)', '#c0392b', 3500); return; }
+  if (r.blocked) {
+    showToast('⚠ Sauvegarde arrêtée : des versions différentes existent. Aucune donnée distante n’a été écrasée.', '#e4b24a', 8000);
+    return;
+  }
   let msg;
   if (r.skipped) {
     msg = '✓ Rien n\'avait changé : ta sauvegarde GitHub est déjà à jour';
