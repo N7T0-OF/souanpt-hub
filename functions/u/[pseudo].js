@@ -24,8 +24,7 @@
  * restent pleinement fonctionnels.
  */
 
-const FIRESTORE = 'https://firestore.googleapis.com/v1/projects/souanpt-hub/databases/(default)/documents:runQuery';
-const API_KEY   = 'AIzaSyCBe6IUWsTBJ0H29KNxw5qU3YiC32Nenvk';   // clé Web publique par conception
+import { FIRESTORE_QUERY as FIRESTORE, WEB_API_KEY as API_KEY } from '../../firebase/edge-config.js';
 
 // `sandbox` seul : aucune restriction de ressource (pas de default-src), donc
 // polices, images et scripts distants du site relayé continuent de charger.

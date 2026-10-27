@@ -27,6 +27,7 @@ const EdCanvas = {
   },
   _save(blocks) {
     SiteConfig.set('blocks', blocks);      // → localStorage → miroir Firestore (debounce)
+    SiteAutoPublish.queue();
     this._status('Sauvegarde…');
     clearTimeout(this._saveT);
     this._saveT = setTimeout(() => this._status('Sauvegardé'), 800);
@@ -159,7 +160,7 @@ const EdCanvas = {
     this.commit(blocks); this.rerender();
     showToast?.('Bloc collé ✓', '#2e9a63', 1600);
   },
-  _ui(t) { return !!(t && t.closest && t.closest('#ed-tb,.ed-rz,.ed-h,.ed-ctx')); },
+  _ui(t) { return !!(t && t.closest && t.closest('#ed-tb,.ed-rz,.ed-h,.ed-ctx,.ed-navtools')); },
 
   _css(doc) {
     if (doc.getElementById('ed-canvas-css')) return;
@@ -237,6 +238,11 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 /* La bulle « + » n'existe que pendant l'ÉDITION : en Aperçu elle disparaît
    totalement (comme sur le site publié, où elle n'est même pas générée). */
 body:not(.ed-on) [data-add]{display:none!important}
+.ed-navtools{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.ed-navtools button{background:rgba(200,255,0,.1);color:#c8ff00;border:1px solid rgba(200,255,0,.38);border-radius:8px;padding:8px 11px;font:700 11px system-ui;cursor:pointer}
+.ed-navtools button:hover{background:#c8ff00;color:#0b0b0b}
+.sb-nav .ed-navtools{display:grid;margin:12px 6px 0}.sb-nav .ed-navtools button{width:100%;text-align:left}
+body:not(.ed-on) .ed-navtools{display:none!important}
 /* Fantôme laissé à l'ancienne place */
 .ed-ph{border:1px dashed rgba(200,255,0,.5)!important;border-radius:14px;background:rgba(200,255,0,.05)!important;pointer-events:none}
 /* Retour visuel dès le pointerdown (avant décollage) : léger enfoncement + grab,
@@ -254,6 +260,19 @@ body:not(.ed-on) [data-add]{display:none!important}
 
   /* poignée ⋮⋮ sur chaque bloc (le drag ne part QUE de là → pas de conflit avec les textes/liens) */
   _decorate(doc) {
+    // Commands live in the site's own navigation for every layout. They are
+    // inserted only into the editor iframe and never into published HTML.
+    const nav = doc.querySelector('.sb-nav') || doc.querySelector('.navwrap nav');
+    if (nav && !nav.querySelector('.ed-navtools')) {
+      const tools = doc.createElement('div'); tools.className = 'ed-navtools';
+      const sections = doc.createElement('button'); sections.type = 'button'; sections.textContent = '☰ Sections';
+      sections.onclick = e => { e.preventDefault(); e.stopPropagation(); edWinSections(null); };
+      const add = doc.createElement('button'); add.type = 'button'; add.textContent = '＋ Ajouter un bloc';
+      add.onclick = e => { e.preventDefault(); e.stopPropagation(); edAddBlock(); };
+      const tags = doc.createElement('button'); tags.type = 'button'; tags.textContent = '🏷 Tags';
+      tags.onclick = e => { e.preventDefault(); e.stopPropagation(); edWinTags(); };
+      tools.append(sections, add, tags); nav.appendChild(tools);
+    }
     // Repère discret : dans l'éditeur, le clic sélectionne le bloc, donc rien
     // ne laisse deviner que la bannière est cliquable sur le site publié.
     const hero = doc.querySelector('.sb-hero-link');
@@ -878,7 +897,78 @@ window.EdWin = EdWin;
 
 const _eesc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 /** applique une clé de config + rafraîchit (debounce pour les saisies continues) */
-function edSet(k, v, live) { SiteConfig.set(k, v); live ? edUpdatePreview() : edRefreshPreview(); }
+function edSet(k, v, live) { SiteConfig.set(k, v); SiteAutoPublish.queue(); live ? edUpdatePreview() : edRefreshPreview(); }
+
+async function edUploadSiteAsset(file, kind) {
+  if (!file) return '';
+  const isAudio = kind === 'audio';
+  if (!(isAudio ? /^audio\// : /^image\//).test(file.type)) throw new Error(isAudio ? 'Choisis un fichier audio.' : 'Choisis une image.');
+  if (file.size > (isAudio ? 15 : 4) * 1024 * 1024) throw new Error('Fichier trop lourd pour le site public.');
+  if (!Auth.ok()) throw new Error('Connecte GitHub pour importer ce fichier.');
+  const cfg = SiteConfig.get(), owner = Auth.owner();
+  const repo = (cfg.repo || '').split('/')[1] || SITE_REPO_NAME;
+  await GH.ensureRepo(Auth.token(), owner, repo, false);
+  const meta = await HubFiles.upload(file, { visibility: 'public', folder: 'site-assets' });
+  return HubFiles.publicUrl(meta);
+}
+function edWinBrand() {
+  const c = SiteConfig.get();
+  EdWin.open(null, '✳ Identité du site', `
+    <div class="edw-l">Logo personnalisé du site</div>
+    <input class="edw-in" id="brand-logo" type="url" placeholder="https://…/logo.png" value="${_eesc(c.siteLogo || '')}"><input type="file" id="brand-logo-file" accept="image/*">
+    <div class="edw-l">Affichage dans la navigation</div>
+    <select class="edw-in" id="brand-mode"><option value="auto">Automatique — logo si présent, sinon nom</option><option value="image">Logo seul</option><option value="both">Logo et nom</option><option value="text">Nom seul</option></select>
+    <div class="edw-l">Taille du logo (20 à 64 px)</div><input class="edw-in" id="brand-size" type="number" min="20" max="64" value="${Math.max(20,Math.min(64,Number(c.brandSize)||32))}">
+    <div class="edw-l">Icône de l'onglet (favicon)</div>
+    <input class="edw-in" id="brand-icon" type="url" placeholder="https://…/favicon.png" value="${_eesc(c.favicon || '')}"><input type="file" id="brand-icon-file" accept="image/*">
+    <div class="edw-l">Effet du nom sur le site</div>
+    <select class="edw-in" id="brand-effect"><option value="none">Aucun</option><option value="glow">Lueur</option><option value="gradient">Dégradé</option><option value="float">Flottement doux</option></select>
+    <p class="edw-hint">Le logo et l'icône importés sont publics. Les animations respectent la préférence de mouvement réduit.</p><button class="edw-ok" id="brand-save">Enregistrer</button>`, w => {
+    w.querySelector('#brand-effect').value = c.titleEffect || 'none';
+    w.querySelector('#brand-mode').value = c.brandMode || 'auto';
+    [['brand-logo-file','brand-logo'],['brand-icon-file','brand-icon']].forEach(([fileId,urlId]) => {
+      w.querySelector('#'+fileId).onchange = async e => {
+        const input = w.querySelector('#'+urlId); input.placeholder = 'Import en cours…';
+        try { input.value = await edUploadSiteAsset(e.target.files[0], 'image'); showToast?.('Image envoyée dans le site public ✓','#2e9a63',2500); }
+        catch(err) { showToast?.(err.message,'#c0392b',4000); }
+        input.placeholder = 'https://…';
+      };
+    });
+    w.querySelector('#brand-save').onclick = () => {
+      const logo = w.querySelector('#brand-logo').value.trim(), icon = w.querySelector('#brand-icon').value.trim();
+      if ((logo && !publicMediaUrl(logo)) || (icon && !publicMediaUrl(icon))) return showToast?.('Utilise une URL HTTPS valide pour les images','#c0392b',3000);
+      SiteConfig.set('siteLogo',logo);SiteConfig.set('brandMode',w.querySelector('#brand-mode').value);
+      SiteConfig.set('brandSize',Math.max(20,Math.min(64,Number(w.querySelector('#brand-size').value)||32)));
+      SiteConfig.set('favicon',icon);SiteConfig.set('titleEffect',w.querySelector('#brand-effect').value);
+      SiteAutoPublish.queue();
+      EdWin.close();edRefreshPreview();
+    };
+  });
+}
+function edWinAudio() {
+  const c = SiteConfig.get();
+  EdWin.open(null, '🔊 Son du site', `
+    <div class="edw-l">Musique de fond</div><input class="edw-in" id="audio-music" type="url" placeholder="https://…/musique.mp3" value="${_eesc(c.backgroundMusic || '')}"><input type="file" id="audio-music-file" accept="audio/*">
+    <div class="edw-l">Son de clic (optionnel)</div><input class="edw-in" id="audio-click" type="url" placeholder="https://…/clic.mp3" value="${_eesc(c.clickSound || '')}"><input type="file" id="audio-click-file" accept="audio/*">
+    <p class="edw-hint">Le visiteur active le son avec 🔇 près du badge Souanpt HUB. La musique démarre en fondu, tourne en boucle et se coupe sur connexion lente ou économie de données.</p><button class="edw-ok" id="audio-save">Enregistrer</button>`, w => {
+    [['audio-music-file','audio-music'],['audio-click-file','audio-click']].forEach(([fileId,urlId]) => {
+      w.querySelector('#'+fileId).onchange = async e => {
+        const input = w.querySelector('#'+urlId); input.placeholder = 'Import en cours…';
+        try { input.value = await edUploadSiteAsset(e.target.files[0], 'audio'); showToast?.('Audio envoyé dans le site public ✓','#2e9a63',2500); }
+        catch(err) { showToast?.(err.message,'#c0392b',4000); }
+        input.placeholder = 'https://…';
+      };
+    });
+    w.querySelector('#audio-save').onclick = () => {
+      const music = w.querySelector('#audio-music').value.trim(), click = w.querySelector('#audio-click').value.trim();
+      if ((music && !publicMediaUrl(music)) || (click && !publicMediaUrl(click))) return showToast?.('Utilise une URL HTTPS valide pour les sons','#c0392b',3000);
+      SiteConfig.set('backgroundMusic',music);SiteConfig.set('clickSound',click);
+      SiteAutoPublish.queue();
+      EdWin.close();edRefreshPreview();
+    };
+  });
+}
+window.edWinBrand = edWinBrand; window.edWinAudio = edWinAudio;
 
 /* ── 🎨 Thème (ex-groupe « Thème » du panneau) ── */
 function edWinTheme(btn) {
@@ -1356,6 +1446,7 @@ function edWinSections(btn) {
         ls[i] = { ...old, platform: p.id, title: t || old.title || p.label,
                   url: p.buildUrl(h), handle: det.handle || String(h).replace(/^@/, ''), inContact: ck };
         localStorage.setItem('hub_links', JSON.stringify(ls));
+        SiteAutoPublish.queue();
         _socEdit = null; redraw();
         showToast?.('Réseau mis à jour ✓', '#2e9a63', 1600);
       });
@@ -1724,9 +1815,53 @@ function edWinEdit(blockId) {
       check();
     }
     const ok = w.querySelector('#edw-save');
-    if (ok) ok.onclick = () => { save(w); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
+    if (ok) ok.onclick = () => { save(w); SiteAutoPublish.queue(); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
   });
 }
+/* ── Catalogue de tags et affectation aux projets ── */
+function edTagCatalog() {
+  const cfg = SiteConfig.get();
+  const all = [...(Array.isArray(cfg.projectTags) ? cfg.projectTags : []), ...getProjects().flatMap(p => p.tags || [])];
+  return [...new Map(all.map(t => [String(t).trim().toLocaleLowerCase('fr'), String(t).trim()]).filter(x => x[0])).values()];
+}
+function edWinTags() {
+  const html = `<div class="edw-l">Créer un tag</div><div class="edw-add"><input class="edw-in" id="tag-new" maxlength="40" placeholder="Ex. Motion"><button class="edw-sec-rst" id="tag-add">Ajouter</button></div><div id="tag-projects"></div>`;
+  EdWin.open(null, '🏷 Tags des projets', html, w => {
+    const render = () => {
+      const tags = edTagCatalog(), projects = getProjects(), box = w.querySelector('#tag-projects');
+      box.innerHTML = `<div class="edw-l" style="margin-top:16px">Tags créés</div><div class="edw-row" style="flex-wrap:wrap">${tags.map(t => `<span class="edw-tog">${_eesc(t)} <button type="button" data-remove-tag="${_eesc(t)}" title="Supprimer ce tag">×</button></span>`).join('') || '<span class="edw-hint">Aucun tag.</span>'}</div>` + (projects.length ? projects.map(p => `<div class="edw-l" style="margin-top:16px">${_eesc(p.title || 'Projet')}</div><div class="edw-row" style="flex-wrap:wrap">${tags.map(t => `<label class="edw-tog"><input type="checkbox" data-project="${_eesc(p.id)}" data-tag="${_eesc(t)}"${(p.tags || []).some(x => String(x).toLocaleLowerCase('fr') === t.toLocaleLowerCase('fr')) ? ' checked' : ''}> ${_eesc(t)}</label>`).join('') || '<span class="edw-hint">Crée un tag ci-dessus.</span>'}</div>`).join('') : '<p class="edw-hint">Ajoute d’abord un projet pour lui attribuer des tags.</p>');
+      box.querySelectorAll('[data-remove-tag]').forEach(button => button.onclick = () => {
+        const tag = button.dataset.removeTag;
+        if (!confirm('Supprimer « ' + tag + ' » de tous les projets ?')) return;
+        SiteConfig.set('projectTags', edTagCatalog().filter(t => t.toLocaleLowerCase('fr') !== tag.toLocaleLowerCase('fr')));
+        const ps = getProjects(); ps.forEach(p => p.tags = (p.tags || []).filter(t => String(t).toLocaleLowerCase('fr') !== tag.toLocaleLowerCase('fr')));
+        localStorage.setItem('hub_projects', JSON.stringify(ps)); SiteAutoPublish.queue(); edUpdatePreview(); render();
+      });
+      box.querySelectorAll('input[data-project]').forEach(input => input.onchange = () => {
+        const ps = getProjects(), project = ps.find(p => String(p.id) === input.dataset.project);
+        if (!project) return;
+        const tag = input.dataset.tag;
+        project.tags = input.checked ? [...new Set([...(project.tags || []), tag])]
+          : (project.tags || []).filter(t => String(t).toLocaleLowerCase('fr') !== tag.toLocaleLowerCase('fr'));
+        localStorage.setItem('hub_projects', JSON.stringify(ps));
+        SiteAutoPublish.queue();
+        edUpdatePreview();
+      });
+    };
+    const add = () => {
+      const input = w.querySelector('#tag-new'), name = input.value.trim().replace(/\s+/g, ' ');
+      if (!name) return;
+      const tags = edTagCatalog();
+      if (tags.some(t => t.toLocaleLowerCase('fr') === name.toLocaleLowerCase('fr'))) return showToast?.('Ce tag existe déjà', '#e4b24a', 2000);
+      tags.push(name); SiteConfig.set('projectTags', tags); input.value = ''; render();
+    };
+    w.querySelector('#tag-add').onclick = add;
+    w.querySelector('#tag-new').onkeydown = e => { if (e.key === 'Enter') add(); };
+    render();
+  });
+}
+window.edWinTags = edWinTags;
+
 /* ── ＋ Ajouter un projet (remplace toute l'ancienne page Portfolio) ── */
 function edAddProject() {
   const projs = getProjects();
@@ -1744,6 +1879,7 @@ function edAddProject() {
     <input class="edw-in" id="ap-title" placeholder="Nom du projet">
     <div class="edw-l">Tags (séparés par une virgule)</div>
     <input class="edw-in" id="ap-tags" placeholder="branding, motion">
+    <div class="edw-row" style="flex-wrap:wrap;margin-top:6px">${edTagCatalog().map(t => `<label class="edw-tog"><input type="checkbox" class="ap-tag" value="${_eesc(t)}"> ${_eesc(t)}</label>`).join('')}</div>
     <div class="edw-l">Lien du projet</div>
     <input class="edw-in" id="ap-link" placeholder="https://behance.net/…">
     ${projs.length ? `<div class="edw-l">…ou dupliquer un projet existant</div>
@@ -1788,8 +1924,11 @@ function edAddProject() {
       const title = w.querySelector('#ap-title').value.trim();
       if (!title) return showToast?.('Donne un titre au projet', '#c0392b', 2000);
       const src = cover || w.querySelector('#ap-url').value.trim();
+      const tags = [...new Map([...w.querySelector('#ap-tags').value.split(','), ...[...w.querySelectorAll('.ap-tag:checked')].map(x => x.value)]
+        .map(t => [t.trim().toLocaleLowerCase('fr'), t.trim()]).filter(x => x[0])).values()];
+      SiteConfig.set('projectTags', [...new Map([...edTagCatalog(), ...tags].map(t => [t.toLocaleLowerCase('fr'), t])).values()]);
       const p = { id: Date.now().toString(), title,
-        tags: w.querySelector('#ap-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+        tags,
         url: w.querySelector('#ap-link').value.trim(), cover: src, coverFile: coverFile || '',
         views: 0, createdAt: Date.now() };
       const ps = getProjects(); ps.push(p);
@@ -1800,6 +1939,7 @@ function edAddProject() {
       if (typeof renderProjects === 'function') renderProjects();
       if (typeof syncKPIs === 'function') syncKPIs();
       edRefreshPreview();
+      SiteAutoPublish.queue();
       showToast?.('Projet « ' + title + ' » ajouté ✓', '#2e9a63', 2200);
       // T4 : couverture complète → dépôt privé, miniature conservée ici
       if (!p.coverFile && window.HubImages) {

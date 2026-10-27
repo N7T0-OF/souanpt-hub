@@ -1,6 +1,58 @@
 'use strict';
 /* ui.js — dépend de core.js */
 
+const PublishUI = {
+  busy: false,
+  show() { document.getElementById('publish-panel')?.removeAttribute('hidden'); document.getElementById('publish-reopen')?.setAttribute('hidden', ''); },
+  hide() { document.getElementById('publish-panel')?.setAttribute('hidden', ''); document.getElementById('publish-reopen')?.removeAttribute('hidden'); },
+  message(value) { const el = document.getElementById('publish-message'); if (el) el.textContent = value; },
+  tick() { const el = document.getElementById('publish-elapsed'); if (el) el.textContent = Math.floor((Date.now() - this.startedAt) / 1000) + ' s écoulées'; },
+  retry() { if (!this.busy && this.retryAction) this.retryAction(); },
+  start(retryAction) {
+    if (this.busy) { this.show(); return false; }
+    if (SiteAutoPublish.busy) { showToast('Synchronisation automatique en cours — attends sa fin.','#e4b24a',3000); return false; }
+    this.busy = true;
+    this.retryAction = retryAction;
+    this.startedAt = Date.now(); clearInterval(this.clock); this.tick(); this.clock = setInterval(() => this.tick(), 1000);
+    const reopen = document.getElementById('publish-reopen'); if (reopen) reopen.textContent = '⟳ Publication en cours';
+    this.show(); this.message('Lecture des contenus publics…');
+    document.getElementById('publish-hide').textContent = 'Continuer en arrière-plan';
+    document.getElementById('publish-retry').hidden = true;
+    const link = document.getElementById('publish-link'); if (link) link.hidden = true;
+    document.querySelectorAll('#publish-steps li').forEach(el => { el.className = ''; el.textContent = '○ ' + el.textContent.replace(/^[○✓⟳✗]\s*/, ''); });
+    this.progress();
+    return true;
+  },
+  progress() {
+    const count = document.querySelectorAll('#publish-steps li.done').length;
+    const bar = document.getElementById('publish-progress');
+    if (bar) bar.setAttribute('aria-valuenow', String(count));
+    const fill = document.getElementById('publish-progress-fill'); if (fill) fill.style.width = count * 25 + '%';
+  },
+  step(phase, state) {
+    const el = document.querySelector('#publish-steps li[data-phase="' + phase + '"]'); if (!el) return;
+    el.className = state === 'pending' ? 'active' : state;
+    el.textContent = (state === 'done' ? '✓' : state === 'active' || state === 'pending' ? '⟳' : '○') + ' ' + el.textContent.replace(/^[○✓⟳✗]\s*/, '');
+    if (state === 'active') this.message(el.textContent.replace(/^⟳\s*/, '') + '…');
+    this.progress();
+  },
+  finish(result) {
+    this.busy = false; clearInterval(this.clock); this.tick();
+    this.message(result.verified ? 'Site publié et vérifié sur GitHub Pages.' : 'Commit envoyé. GitHub Pages n’a pas encore confirmé cette version.');
+    const link = document.getElementById('publish-link'); if (link) { link.href = result.url; link.textContent = result.url; link.hidden = false; }
+    document.getElementById('publish-hide').textContent = 'Fermer';
+    const reopen = document.getElementById('publish-reopen'); if (reopen) reopen.textContent = result.verified ? '✓ Site à jour' : '◌ Publication en attente';
+  },
+  fail(error) {
+    this.busy = false; clearInterval(this.clock); this.tick(); this.message('Échec : ' + (error?.message || 'erreur inconnue'));
+    const current = document.querySelector('#publish-steps li.active');
+    if (current) { current.className = 'error'; current.textContent = current.textContent.replace(/^⟳/, '✗'); }
+    document.getElementById('publish-hide').textContent = 'Fermer';
+    document.getElementById('publish-retry').hidden = false;
+    const reopen = document.getElementById('publish-reopen'); if (reopen) reopen.textContent = '✗ Publication en erreur';
+  },
+};
+
 /* ══════════════════════════════════════════════════════
    GITHUB PAGE
 ══════════════════════════════════════════════════════ */
@@ -215,6 +267,7 @@ async function ghCreateRepo() {
 
 async function ghDeploy() {
   if (!Auth.ok()) { showToast('Connecte GitHub d\'abord','#c0392b'); return; }
+  if (!PublishUI.start(ghDeploy)) return;
   const repoInp = document.getElementById('gh-repo-inp');
   if (repoInp?.value.trim()) SiteConfig.set('repo', repoInp.value.trim());
   const btn    = document.getElementById('gh-deploy-btn');
@@ -225,16 +278,19 @@ async function ghDeploy() {
   if (logEl)  { logEl.innerHTML=''; logEl.style.display=''; }
   GHPage.resetPipeline();
   try {
-    const url = await deployPortfolio(
-      (m,c) => GHPage.appendLog(m,c),
-      (s,st) => GHPage.pipelineStep(s,st)
+    const resultData = await deployPortfolio(
+      (m,c) => { GHPage.appendLog(m,c); PublishUI.message(m); },
+      (s,st) => { GHPage.pipelineStep(s,st); PublishUI.step(s,st); }
     );
-    if (result) result.innerHTML='✓ Déployé — <a href="'+url+'" target="_blank" style="color:var(--accent3)">'+url+'</a>';
-    showToast('✓ Portfolio déployé !','#2e9a63');
+    const url = resultData.url;
+    PublishUI.finish(resultData);
+    if (result) result.innerHTML=(resultData.verified ? '✓ Déployé — ' : '⟳ En attente de Pages — ') + '<a href="'+url+'" target="_blank" style="color:var(--accent3)">'+url+'</a>';
+    showToast(resultData.verified ? '✓ Portfolio déployé !' : 'Publication envoyée, Pages en cours', resultData.verified ? '#2e9a63' : '#e4b24a');
     setTimeout(()=>GHPage.loadRuns(),3000);
     const pd=document.getElementById('gh-pages-display'); const pl=document.getElementById('gh-pages-link');
     if(pd)pd.style.display=''; if(pl){pl.href=url;pl.textContent=url;}
   } catch(e) {
+    PublishUI.fail(e);
     GHPage.appendLog('✗ '+e.message,'#c0392b');
     if (result) result.innerHTML='<span style="color:#c0392b">✗ '+e.message+'</span>';
     showToast('✗ '+e.message,'#c0392b');
@@ -288,6 +344,7 @@ function edLoad() {
   _edOrder = (Array.isArray(cfg.sectionOrder)&&cfg.sectionOrder.length?cfg.sectionOrder.slice():SK.slice()).filter(k=>SK.includes(k));
   SK.forEach(k=>{ if(!_edOrder.includes(k)) _edOrder.push(k); });
   edRenderBlocks();
+  SiteAutoPublish.refresh();
   set('ep-about', cfg.about||'');
   set('ep-avis-mode', cfg.avisMode||'defile');
   set('ep-layout-style', cfg.layoutStyle||'float');
@@ -443,6 +500,7 @@ function edSetSectionVisible(k, on) {
   const s = { ...(SiteConfig.get().sections || {}) };
   s[k] = !!on;
   SiteConfig.set('sections', s);
+  SiteAutoPublish.queue();
   edUpdatePreview();
 }
 window.edSetSectionVisible = edSetSectionVisible;
@@ -483,6 +541,7 @@ function edSaveConfig(silent) {
   const el=document.getElementById('ed-last-save');
   if (el) el.textContent=(silent?'Auto-sauvegardé à ':'Sauvegardé à ')+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   if (!silent) showToast('Config sauvegardée ✓','#2e9a63');
+  if (!silent) SiteAutoPublish.queue();
 }
 
 /* Aperçu par appareil (PC / tablette / mobile) */
@@ -543,15 +602,18 @@ async function edDeploy() {
   // Keep the draft before checking GitHub: reconnecting must never discard edits.
   edSaveConfig(true);
   if (!Auth.ok()) { showToast('Reconnecte GitHub dans Paramètres → Intégrations, puis republie. Tes modifications sont sauvegardées.','#e4b24a',6000); showPage('github'); return; }
+  if (!PublishUI.start(edDeploy)) return;
   const btn1=document.getElementById('ed-deploy-btn'); const btn2=document.getElementById('ed-deploy-btn2');
   const status=document.getElementById('ed-status');
   [btn1,btn2].forEach(b=>{if(b)b.disabled=true;});
   if (status) status.textContent='Déploiement…';
   try {
-    const url=await deployPortfolio((m)=>{if(status)status.textContent=m;});
-    if(status)status.innerHTML='✓ <a href="'+url+'" target="_blank" style="color:var(--accent3)">'+url+'</a>';
-    showToast('✓ Déployé !','#2e9a63');
+    const resultData=await deployPortfolio((m)=>{if(status)status.textContent=m;PublishUI.message(m);},(s,st)=>PublishUI.step(s,st));
+    PublishUI.finish(resultData);
+    if(status)status.innerHTML=(resultData.verified?'✓ ':'⟳ En attente de Pages · ')+'<a href="'+resultData.url+'" target="_blank" style="color:var(--accent3)">'+resultData.url+'</a>';
+    showToast(resultData.verified?'✓ Déployé !':'Publication envoyée, Pages en cours',resultData.verified?'#2e9a63':'#e4b24a');
   } catch(e) {
+    PublishUI.fail(e);
     if(status)status.textContent='✗ '+e.message;
     showToast('✗ '+e.message,'#c0392b',6000);
     if (e.code === 'GITHUB_AUTH_EXPIRED') showPage('github');

@@ -4,6 +4,9 @@
  * La sécurité vient des règles Firestore/Storage (chacun ne lit/écrit que ses données).
  */
 window.FIREBASE_CONFIG = {
+  // Ancienne clé rejetée (API_KEY_INVALID le 26/10/2026). Réactiver seulement
+  // après restauration du projet ou validation d'une nouvelle config Web.
+  disabled:          true,
   apiKey:            "AIzaSyCBe6IUWsTBJ0H29KNxw5qU3YiC32Nenvk",
   authDomain:        "souanpt-hub.firebaseapp.com",
   projectId:         "souanpt-hub",

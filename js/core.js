@@ -868,6 +868,8 @@ const SiteConfig = {
     // l'ancien rendu (icône + texte) → aucun site publié ne change d'apparence.
     socialsStyle: 'ic-texte',      // ic-texte · ic-seules · boutons · cartes · barre
     animLevel: 'smooth', smoothWheel: false,
+    siteLogo: '', brandMode: 'auto', brandSize: 32, favicon: '', titleEffect: 'none', autoPublish: false,
+    backgroundMusic: '', clickSound: '',
     fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
@@ -881,6 +883,10 @@ const SiteConfig = {
 function esc(str) {
   if (str === undefined || str === null) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function publicMediaUrl(value) {
+  const url = String(value || '').trim();
+  return /^https:\/\//i.test(url) && !/[\s<>"']/.test(url) ? url : '';
 }
 function getProjects() { try { return JSON.parse(localStorage.getItem('hub_projects') || '[]'); } catch { return []; } }
 function getReviews()  { try { return JSON.parse(localStorage.getItem('hub_reviews')  || '[]'); } catch { return []; } }
@@ -1285,7 +1291,7 @@ const CONTACT_KINDS = {
 const CONTACT_ORDER = ['email', 'discord', 'whatsapp', 'phone', 'telegram'];
 
 function renderBentoGrid(blocks, ctx) {
-  const { cfg, projects, links, approved, GRADS, editor } = ctx;
+  const { cfg, projects, links, approved, GRADS, editor, siteLogo, titleEffect } = ctx;
   // Bento n'a pas de <section> : ce sont les BLOCS qui portent les titres. On
   // reçoit quand même le résolveur de noms de sections pour que renommer
   // « Portfolio » dans ☰ Sections se voie AUSSI ici, et pas seulement dans
@@ -1308,9 +1314,9 @@ function renderBentoGrid(blocks, ctx) {
   const shown = blocks.filter(b => editor || !bHidden(b));
   const parts = shown.map(b => {
     if (b.type === 'profile')
-      return cell(b, `<div class="bn-av">${esc(String(cfg.siteName || 'S')[0].toUpperCase())}</div>
+      return cell(b, `<div class="bn-av">${siteLogo ? `<img src="${esc(siteLogo)}" alt="" class="brand-img">` : esc(String(cfg.siteName || 'S')[0].toUpperCase())}</div>
         ${cfg.heroText ? `<div class="bn-htag">${esc(cfg.heroText)}</div>` : ''}
-        <h1 class="bn-name">${esc(cfg.siteName || '')}</h1>
+        <h1 class="bn-name title-fx-${titleEffect}">${esc(cfg.siteName || '')}</h1>
         ${cfg.bio ? `<p class="bn-bio">${esc(cfg.bio)}</p>` : ''}`);
     if (b.type === 'text') {
       const pr = bProps(b);
@@ -1328,7 +1334,7 @@ function renderBentoGrid(blocks, ctx) {
       const i = Math.max(0, projects.indexOf(p));
       return cell(b, `<div class="bn-cov" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(b))}/cover` : `background:${GRADS[i % 6]}`}"></div>
         <div class="bn-pb"><div class="bn-t">${esc(p.title || 'Projet')}</div><div class="ptags">${(p.tags || []).slice(0, 2).map(t => `<span class="ptag">${esc(t)}</span>`).join('')}</div></div>`,
-        ` data-p="${esc(String(p.id ?? ''))}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')"` : ''}`);
+        ` data-p="${esc(String(p.id ?? ''))}" data-tags="${esc(JSON.stringify((p.tags||[]).map(t=>String(t).trim().toLocaleLowerCase('fr'))))}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')"` : ''}`);
     }
     if (b.type === 'reviews') {
       if (!approved.length) return '';
@@ -1410,6 +1416,16 @@ function generateSite(cfg, projects, reviews, opts) {
   const links       = getLinks();
   const blocks      = getBlocks(cfg, projects, links);   // même modèle pour tous les styles
   const heroImage   = String(cfg.heroImage || '').trim();
+  const siteLogo = publicMediaUrl(cfg.siteLogo);
+  const favicon = publicMediaUrl(cfg.favicon);
+  const musicUrl = publicMediaUrl(cfg.backgroundMusic);
+  const clickSoundUrl = publicMediaUrl(cfg.clickSound);
+  const titleEffect = ['glow','gradient','float'].includes(cfg.titleEffect) ? cfg.titleEffect : 'none';
+  const brandMode = ['auto','image','both','text'].includes(cfg.brandMode) ? cfg.brandMode : 'auto';
+  const brandSize = Math.max(20, Math.min(64, Number(cfg.brandSize) || 32));
+  const brandHasImage = !!siteLogo && brandMode !== 'text';
+  const brandHasName = !brandHasImage || brandMode === 'both';
+  const brandIcon = brandHasImage ? `<img src="${esc(siteLogo)}" alt="" class="brand-img" style="width:${brandSize}px;height:${brandSize}px">` : brandMode === 'text' ? '' : '<span class="ic">✳</span>';
   /* Section « Réseaux » : les blocs Lien VISIBLES, dans l'ordre des blocs —
      la même source que la grille Bento, donc un lien masqué disparaît aussi
      d'ici (aucun lien mort ni fuite d'un lien désactivé). */
@@ -1486,7 +1502,7 @@ function generateSite(cfg, projects, reviews, opts) {
   const blkOf = p => blocks.find(b => b.type === 'project' && String(bRef(b)) === String(p.id)) || null;
   const pHid  = p => { const b = blkOf(p); return b ? bHidden(b) : false; };
   const cards = projects.filter(p => editor || !pHid(p)).map((p, i) => `
-    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(String(p.id ?? ''))}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
+    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${esc(JSON.stringify((p.tags||[]).map(t=>String(t).trim().toLocaleLowerCase('fr'))))}" data-p="${esc(String(p.id ?? ''))}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(blkOf(p)))}/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
@@ -1612,10 +1628,11 @@ function generateSite(cfg, projects, reviews, opts) {
   // Compat : le reste du générateur lit encore ces tables.
   const SEC_LABELS = {}; const SEC_ICONS = {};
   SEC_KEYS.forEach(k => { SEC_LABELS[k] = secTitle(k); SEC_ICONS[k] = secIcon(k); });
-  const tagList = [...new Set(projects.flatMap(p => (p.tags || []).slice(0, 3)).filter(Boolean))].slice(0, 8);
+  const tagList = [...new Map(projects.filter(p=>editor||!pHid(p)).flatMap(p => p.tags || []).map(t=>[String(t).trim().toLocaleLowerCase('fr'),String(t).trim()]).filter(x=>x[0])).values()];
+  const tagFilters = tagList.length && secLive('projects') ? `<div class="tag-filters" role="group" aria-label="Filtrer les projets par tag"><button type="button" class="on" data-tag="" aria-pressed="true" onclick="return filterTag('')">Tout</button>${tagList.map(t=>`<button type="button" data-tag="${esc(t.toLocaleLowerCase('fr'))}" aria-pressed="false" onclick="return filterTag(this.dataset.tag)">${esc(t)}</button>`).join('')}</div>` : '';
   const secHtml = {
     about: `<section id="about" class="rev" style="max-width:760px">${secHead('about')}<p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,
-    projects: `<section id="projects" class="rev"><div class="prow"><div>${secHead('projects')}</div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div><div class="pg" style="margin-top:20px">${cards}</div></section>`,
+    projects: `<section id="projects" class="rev"><div class="prow"><div>${secHead('projects')}</div>${hiddenCount?`<button class="seeall" onclick="document.querySelectorAll('.pc-hidden').forEach(function(e){e.classList.remove('pc-hidden')});this.remove()">Voir tout (+${hiddenCount}) →</button>`:''}</div>${tagFilters}<div class="pg" style="margin-top:20px">${cards}</div></section>`,
     avis: `<section id="avis" class="rev">${secHead('avis')}
   ${avisDisplay}
   <div class="leave">
@@ -1734,6 +1751,7 @@ function generateSite(cfg, projects, reviews, opts) {
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="description" content="${esc(cfg.bio)}">
 <title>${esc(cfg.siteName)} — Portfolio</title>
+${favicon ? `<link rel="icon" href="${esc(favicon)}">` : ''}
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--a:${cfg.accentColor};--bg:${cfg.theme};--t:${textC};--m:${mutedC};--s:${sfcC};--b:${brdC};--cols:${cols}}
@@ -1748,6 +1766,13 @@ html{scroll-behavior:smooth;scroll-padding-top:92px}
 nav{display:flex;align-items:center;gap:4px;width:100%;max-width:900px;padding:8px 8px 8px 16px;border-radius:999px;background:${navBg};border:1px solid var(--b);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 10px 40px rgba(0,0,0,.3)}
 .logo{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;letter-spacing:-.4px;margin-right:6px;white-space:nowrap}
 .logo .ic{width:24px;height:24px;border-radius:8px;background:var(--a);display:inline-flex;align-items:center;justify-content:center;color:#060606;font-size:13px;font-weight:800}
+.brand-img{width:32px;height:32px;object-fit:contain;border-radius:7px;flex-shrink:0}
+.logo .brand-img{width:24px;height:24px}
+.title-fx-glow{filter:drop-shadow(0 0 16px var(--a))}
+.title-fx-gradient{background:linear-gradient(90deg,var(--t),var(--a));background-clip:text;-webkit-background-clip:text;color:transparent!important}
+.title-fx-float{animation:titleFloat 3.5s ease-in-out infinite}
+@keyframes titleFloat{50%{transform:translateY(-5px)}}
+@media(prefers-reduced-motion:reduce){.title-fx-float{animation:none}}
 .logo span.d{color:var(--a)}
 .nl{display:flex;gap:2px;margin:0 auto}
 .nl a{padding:8px 14px;border-radius:999px;font-size:12px;color:var(--m);transition:.2s;white-space:nowrap}
@@ -1825,6 +1850,9 @@ h2{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:24px}
 .prow .ssub{margin:6px 0 0}
 /* ── PROJETS ── */
 .pg{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:16px}
+.tag-filters{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 4px}
+.tag-filters button{border:1px solid var(--b);background:var(--s);color:var(--m);border-radius:999px;padding:7px 13px;font:600 12px system-ui;cursor:pointer}
+.tag-filters button:hover,.tag-filters button.on{background:var(--a);color:#080808;border-color:var(--a)}
 .pc{background:var(--s);border:1px solid var(--b);border-radius:14px;overflow:hidden;cursor:pointer;transition:all .25s;position:relative}
 .pc:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.3);border-color:var(--a)}
 .pt{aspect-ratio:16/10;background:var(--s);position:relative;display:flex;align-items:flex-end;justify-content:flex-end}
@@ -1858,7 +1886,10 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--b);font-size:10
 .made:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.45)}
 .made .mic{width:18px;height:18px;border-radius:5px;background:var(--a);display:inline-flex;align-items:center;justify-content:center;color:#060606;font-size:11px;flex-shrink:0}
 .made b{color:var(--a)}
+.site-sound{position:fixed;bottom:16px;right:190px;z-index:201;min-width:37px;height:37px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(10,10,10,.82);color:#f0ece4;cursor:pointer;font-size:16px;backdrop-filter:blur(14px)}
+.site-sound:hover{color:var(--a);border-color:var(--a)}
 @media(max-width:640px){.made{bottom:12px;right:12px;padding:6px 10px 6px 8px;font-size:10px}}
+@media(max-width:640px){.site-sound{bottom:12px;right:167px}}
 @keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fuo{from{opacity:0}to{opacity:1}}
 ${animLevel==='none'?'':`.pc{animation:${fx.tilt?'fuo':'fu'} ${revDur*.7}s ease both}${projects.slice(0,12).map((_,i)=>`.pc:nth-child(${i+1}){animation-delay:${i*.05}s}`).join('')}`}
@@ -1991,36 +2022,37 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 ${layoutStyle === 'bento' ? `
 <div class="bn-page">
   <div class="navwrap"><nav>
-    <a href="#" class="logo"><span class="ic">✳</span>${esc(cfg.siteName)}<span class="d">.</span></a>
+    <a href="#" class="logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${brandHasName ? esc(cfg.siteName) + '<span class="d">.</span>' : ''}</a>
     <div class="nl">${bentoNav}</div>
     ${cfg.email ? `<a class="ncta" href="mailto:${esc(cfg.email)}">Me contacter</a>` : ''}
   </nav></div>
-  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor, secTitle, secTitleOr, contactList })}
+  ${tagFilters}
+  ${renderBentoGrid(blocks, { cfg, projects, links, approved, GRADS, editor, secTitle, secTitleOr, contactList, siteLogo, titleEffect })}
   ${extraSections}
   <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
 </div>` : layoutStyle === 'sidebar' ? `
 <div class="sb-wrap" id="sbw">
   <aside class="sb-side">
-    <a href="#" class="sb-logo"><span class="ic">✳</span>${esc(cfg.siteName)}</a>
+    <a href="#" class="sb-logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${brandHasName ? esc(cfg.siteName) : ''}</a>
     <nav class="sb-nav">
       ${order.filter(k=>secLive(k)).map(k=>`<a href="#${k}"><span class="sbi">${SEC_ICONS[k]||'•'}</span>${SEC_LABELS[k]}</a>`).join('')}
       ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank"><span class="sbi">↗</span>Behance</a>`:''}
     </nav>
-    ${tagList.length&&secLive('projects')?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(t=>`<a href="#projects" onclick="return filterTag('${esc(t.toLowerCase())}')" data-t="${esc(t.toLowerCase())}">${esc(t)}</a>`).join('')}</div>`:''}
+    ${tagList.length&&secLive('projects')?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(t=>`<a href="#projects" onclick="return filterTag(this.dataset.t)" data-t="${esc(t.toLocaleLowerCase('fr'))}">${esc(t)}</a>`).join('')}</div>`:''}
     ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
   </aside>
   <main class="sb-main">
     ${!heroShow ? '' : `<${heroHref ? 'a' : 'div'} class="sb-hero${heroHref ? ' sb-hero-link' : ''}${heroCls}" data-b="b_profile" data-no-drag${
         heroHref ? ` href="${esc(heroHref)}"${heroBlank ? ' target="_blank" rel="noopener noreferrer"' : ''}` : ''
       } style="${heroImage?`background:url('${esc(heroImage)}')center/cover`:`background:${GRADS[0]}`}">
-      <div class="sb-hero-in"><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}</h1><p class="hsub">${esc(cfg.bio)}</p></div>
+      <div class="sb-hero-in"><div class="htag">${esc(cfg.heroText)}</div><h1 class="title-fx-${titleEffect}">${esc(cfg.siteName)}</h1><p class="hsub">${esc(cfg.bio)}</p></div>
     </${heroHref ? 'a' : 'div'}>`}
     ${bodySections}
     <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>
   </main>
 </div>` : `
 <div class="navwrap"><nav>
-  <a href="#" class="logo"><span class="ic">✳</span>${esc(cfg.siteName)}<span class="d">.</span></a>
+  <a href="#" class="logo" aria-label="${esc(cfg.siteName)}">${brandIcon}${brandHasName ? esc(cfg.siteName) + '<span class="d">.</span>' : ''}</a>
   <div class="nl">
     ${navLinks}
     ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
@@ -2033,7 +2065,7 @@ ${layoutStyle === 'bento' ? `
   ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank" style="color:#4a8cff">Behance ↗</a>`:''}
   ${cfg.email?`<a href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
 </div>
-${!heroShow ? '' : `<${heroHref ? 'a' : 'div'} class="hero${heroCls}${heroImage ? ' hero-img' : ''}"${heroHref ? ` href="${esc(heroHref)}"${heroBlank ? ' target="_blank" rel="noopener noreferrer"' : ''}` : ''} data-b="b_profile" data-no-drag${heroImage ? ` style="background:url('${esc(heroImage)}') center/cover"` : ''}><div class="htag">${esc(cfg.heroText)}</div><h1>${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
+${!heroShow ? '' : `<${heroHref ? 'a' : 'div'} class="hero${heroCls}${heroImage ? ' hero-img' : ''}"${heroHref ? ` href="${esc(heroHref)}"${heroBlank ? ' target="_blank" rel="noopener noreferrer"' : ''}` : ''} data-b="b_profile" data-no-drag${heroImage ? ` style="background:url('${esc(heroImage)}') center/cover"` : ''}><div class="htag">${esc(cfg.heroText)}</div><h1 class="title-fx-${titleEffect}">${esc(cfg.siteName)}<span>.</span></h1><p class="hsub">${esc(cfg.bio)}</p>
 ${heroHref
   // Bannière cliquable : UN seul app à l'action (jamais d'<a> dans un <a>).
   ? `<div class="ctas"><span class="bp">${esc(String((cfg.heroLink || {}).label || 'Découvrir →'))} →</span></div>`
@@ -2041,7 +2073,25 @@ ${heroHref
 ${bodySections}
 <footer>© ${new Date().getFullYear()} ${esc(cfg.siteName)} · <span style="color:var(--a)">●</span> souanpt.hub</footer>`}
 <a class="made" href="${HUB_HOME_URL}" target="_blank" rel="noopener" title="Créé avec Souanpt HUB — clique pour découvrir"><span class="mic">✳</span>Made by <b>Souanpt&nbsp;HUB</b></a>
+${musicUrl || clickSoundUrl ? '<button type="button" class="site-sound" id="site-sound" aria-label="Activer le son" aria-pressed="false" title="Son désactivé — cliquer pour activer">🔇</button>' : ''}
 <script>
+${musicUrl || clickSoundUrl ? `(function(){
+  var musicUrl=${JSON.stringify(musicUrl)},clickUrl=${JSON.stringify(clickSoundUrl)};
+  var button=document.getElementById('site-sound'),enabled=false,music=null,clickSound=null,fadeId=0,lastClickAt=0;
+  var connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  function goodConnection(){return !(connection&&(connection.saveData||/^(slow-2g|2g|3g)$/.test(connection.effectiveType||'')));}
+  function label(){button.textContent=enabled?'🔊':'🔇';button.setAttribute('aria-pressed',enabled?'true':'false');button.setAttribute('aria-label',enabled?'Désactiver le son':'Activer le son');button.title=enabled?'Son activé — cliquer pour désactiver':'Son désactivé — cliquer pour activer';}
+  function fade(to,done){if(!music){if(done)done();return;}cancelAnimationFrame(fadeId);var from=music.volume,start=performance.now();function frame(now){var p=Math.min(1,(now-start)/650);music.volume=Math.max(0,Math.min(1,from+(to-from)*p));if(p<1)fadeId=requestAnimationFrame(frame);else if(done)done();}fadeId=requestAnimationFrame(frame);}
+  button.addEventListener('click',function(){if(enabled){enabled=false;fade(0,function(){music&&music.pause();});label();return;}if(!goodConnection()){button.title='Son indisponible sur connexion lente ou en économie de données';button.setAttribute('aria-label',button.title);return;}enabled=true;label();if(musicUrl){if(!music){music=new Audio(musicUrl);music.loop=true;music.preload='none';music.volume=0;}music.play().then(function(){fade(.45);}).catch(function(){enabled=false;label();button.title='Lecture bloquée par le navigateur';});}});
+  document.addEventListener('click',function(e){
+    if(!enabled||!clickUrl||e.target===button||button.contains(e.target)||!goodConnection()||!e.target.closest('a,button,[role="button"]'))return;
+    var now=performance.now();if(now-lastClickAt<180)return;lastClickAt=now;
+    if(!clickSound){clickSound=new Audio(clickUrl);clickSound.preload='none';clickSound.volume=.2;}
+    clickSound.pause();clickSound.currentTime=0;clickSound.play().catch(function(){});
+  });
+  if(connection&&connection.addEventListener)connection.addEventListener('change',function(){if(enabled&&!goodConnection()){enabled=false;if(music)fade(0,function(){music.pause();});label();}});
+  addEventListener('pagehide',function(){if(music)music.pause();});
+})();` : ''}
 ${cfg.smoothWheel ? `(function(){
   if (!window.matchMedia || !matchMedia('(hover:hover) and (pointer:fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var root=document.scrollingElement||document.documentElement, target=root.scrollTop, frame=0, prior='';
@@ -2088,9 +2138,10 @@ function revMail(){
 }
 function filterTag(t){
   document.querySelectorAll('.sb-tags a').forEach(function(a){a.classList.toggle('on',(a.getAttribute('data-t')||'')===t);});
-  document.querySelectorAll('.pc').forEach(function(c){
-    var tags=(c.getAttribute('data-tags')||'');
-    var show = !t || tags.split('|').indexOf(t)>-1;
+  document.querySelectorAll('.tag-filters button').forEach(function(b){var on=(b.getAttribute('data-tag')||'')===t;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on?'true':'false');});
+  document.querySelectorAll('.pc,.bn-project').forEach(function(c){
+    var tags=[];try{tags=JSON.parse(c.getAttribute('data-tags')||'[]');}catch(e){}
+    var show = !t || tags.indexOf(t)>-1;
     c.classList.remove('pc-hidden');
     c.style.display = show ? '' : 'none';
   });
@@ -2192,11 +2243,14 @@ async function deployPortfolio(onLog, onStep, options = {}) {
   onStep?.('behance', 'done');
 
   onStep?.('generate', 'active'); onLog?.('Génération du HTML…');
-  const cfgToUse = { ...cfg, ownerUid: publisherUid || '', repo: owner + '/' + repoName };
+  // lastDeploy is local bookkeeping. Publishing it made every repeat publish
+  // produce a different tree and an unnecessary GitHub Pages build.
+  const { lastDeploy: _previousDeploy, ...publicCfg } = cfg;
+  const cfgToUse = { ...publicCfg, ownerUid: publisherUid || '', repo: owner + '/' + repoName };
   /* Les images vivent sur GitHub (media/) : localStorage ne garde qu'une
      miniature. Avant de générer, on remet le PLEIN FORMAT en mémoire — sinon
-     le site publié recevrait les miniatures. `site-config.json` (lui, reste en
-     miniature) reçoit `cfgToUse`, jamais l'objet résolu. */
+     le site publié recevrait les miniatures. Le manifeste JSON public reste
+     volontairement minimal : les réglages masqués et brouillons restent privés. */
   let pubProjects = projects, pubCfg = cfgToUse;
   if (window.HubImages) {
     try {
@@ -2210,6 +2264,11 @@ async function deployPortfolio(onLog, onStep, options = {}) {
     if (options.requireAnalyticsManifest) throw new Error(analyticsManifest.error);
     onLog?.('⚠ ' + analyticsManifest.error + ' Les pages vues restent disponibles.', '#e4b24a');
   }
+  const siteManifest = {
+    siteName: cfgToUse.siteName, repo: cfgToUse.repo,
+    layoutStyle: cfgToUse.layoutStyle, theme: cfgToUse.theme,
+    accentColor: cfgToUse.accentColor,
+  };
   onLog?.(`  → ${Math.round(siteHTML.length/1024)} KB`);
   onStep?.('generate', 'done');
 
@@ -2218,40 +2277,49 @@ async function deployPortfolio(onLog, onStep, options = {}) {
   await GH.enablePages(token, owner, repoName); // activer Pages AVANT le push
   const commitSha = await GH.commitFiles(token, owner, repoName, [
     { path: 'index.html',       content: siteHTML },
-    { path: 'site-config.json', content: JSON.stringify(cfgToUse, null, 2) },
+    { path: 'site-config.json', content: JSON.stringify(siteManifest, null, 2) },
     { path: '.nojekyll',        content: '' },
   ], 'deploy: ' + new Date().toISOString().slice(0,16).replace('T',' '));
-  onLog?.('  → 1 commit (index.html + config)'); onStep?.('commit', 'done');
+  onLog?.('  → commit ' + commitSha.slice(0, 7) + ' (index.html + config)'); onStep?.('commit', 'done');
 
   onStep?.('pages', 'active'); onLog?.('Vérification GitHub Pages…');
   const pages = await GH.pagesInfo(token, owner, repoName);
   const url = pages?.html_url || `https://${owner.toLowerCase()}.github.io/${repoName}/`;
 
-  // Poll du build Pages (max ~75s) — retry auto si erreur
+  // Pages may still report an older successful build. Only the build for this
+  // exact commit can confirm that the new content is live.
   let ok = false, retried = false;
-  for (let i = 0; i < 15; i++) {
-    await new Promise(r => setTimeout(r, 5000));
+  for (let i = 0; i < 30; i++) {
+    if (i) await new Promise(r => setTimeout(r, 2000));
     const b = await GH.pagesLatestBuild(token, owner, repoName);
     if (!pagesBuildForCommit(b, commitSha)) {
       if (i % 3 === 0) onLog?.('  → attente du build de la nouvelle version…');
       continue;
     }
     const st = b?.status || 'queued';
-    if (st === 'built')  { ok = true; break; }
-    if (st === 'errored') {
+    if (st === 'built' && b?.commit === commitSha) { ok = true; break; }
+    if (st === 'errored' && b?.commit === commitSha) {
       if (!retried) { retried = true; onLog?.('  → build en erreur, nouvelle tentative…', '#e4b24a'); await GH.pagesRequestBuild(token, owner, repoName); }
       else throw new Error('Build Pages en erreur : ' + (b?.error?.message || 'réessaie dans 1 min'));
-    } else {
-      onLog?.('  → build ' + st + '…');
+    } else if (i % 5 === 0) {
+      onLog?.('  → ' + (b?.commit && b.commit !== commitSha ? 'ancien build visible' : 'build ' + st) + '…');
     }
   }
   if (ok) onLog?.('  → ✓ Site en ligne : ' + url);
-  else    onLog?.('  → Build en cours — le site sera visible d\'ici 1-2 min : ' + url, '#e4b24a');
-  onStep?.('pages', 'done');
+  else    onLog?.('  → Publication envoyée ; GitHub Pages ne confirme pas encore ce commit : ' + url, '#e4b24a');
+  onStep?.('pages', ok ? 'done' : 'pending');
   if (!ok && options.requireAnalyticsManifest)
     throw new Error('Publication GitHub Pages non confirmée : réessaie l’activation quand le site est en ligne.');
 
-  SiteConfig.set('lastDeploy', { url, ts: Date.now(), repo: owner + '/' + repoName });
+  if (ok) {
+    SiteConfig.set('lastDeploy', { url, ts: Date.now(), repo: owner + '/' + repoName, sha: commitSha });
+    // Une première publication vérifiée active les futures mises à jour de
+    // contenu. Un choix explicite « Auto : désactivé » reste prioritaire.
+    if (SiteConfig.get().autoPublishChoice !== 'off' && !SiteConfig.get().autoPublish) {
+      SiteConfig.set('autoPublish', true);
+      if (typeof SiteAutoPublish !== 'undefined') SiteAutoPublish.refresh();
+    }
+  }
   SiteConfig.set('repo', owner + '/' + repoName);
 
   /* L'adresse du site publié doit remonter dans le PROFIL Firestore, pas
@@ -2259,13 +2327,15 @@ async function deployPortfolio(onLog, onStep, options = {}) {
      le site : /u/<pseudo> répondait « site non publié » et le classement
      renvoyait vers « # ». Ces deux fonctionnalités lisent `siteUrl`/`repo`. */
   try {
-    if (!publisherUid || !(window.Cloud && Cloud.enabled && Cloud.user() && Cloud.user().uid === publisherUid)) {
-      if (options.requireAnalyticsManifest) throw new Error('Session Firebase expirée pendant la publication.');
-    } else {
-      await Cloud.saveProfile(publisherUid, {
+    if (ok && publisherUid) {
+      if (!(window.Cloud && Cloud.enabled && Cloud.user() && Cloud.user().uid === publisherUid)) {
+        if (options.requireAnalyticsManifest) throw new Error('Session Firebase expirée pendant la publication.');
+      } else {
+        await Cloud.saveProfile(publisherUid, {
         siteUrl: url, repo: owner + '/' + repoName, lastPublishedAt: Date.now(),
         analyticsProjects: analyticsManifest.entries,
-      });
+        });
+      }
     }
   } catch (e) {
     console.warn('[deploy] profil non mis à jour', e);
@@ -2273,8 +2343,53 @@ async function deployPortfolio(onLog, onStep, options = {}) {
       throw new Error('Site publié, mais manifeste des projets non enregistré : ' + (e.message || 'réessaie.'));
   }
 
-  return url;
+  return { url, verified: ok, sha: commitSha };
 }
+
+/* One opt-in queue for public content. Only deployPortfolio builds the public
+   projection: private quotes, client files and pending reviews stay out. */
+const SiteAutoPublish = {
+  timer: null, busy: false, dirty: false, failures: 0,
+  label(value) { const b=document.getElementById?.('ed-auto-publish'); if(b)b.textContent=value; },
+  refresh() { this.label('Auto : ' + (SiteConfig.get().autoPublish ? 'activé' : 'désactivé')); },
+  toggle() {
+    const cfg=SiteConfig.get();
+    if (!cfg.autoPublish && !cfg.lastDeploy?.url) return showToast?.('Publie ton site une première fois avant d’activer la synchronisation automatique.','#e4b24a',4000);
+    const enabled=!cfg.autoPublish;
+    SiteConfig.set('autoPublish',enabled);
+    SiteConfig.set('autoPublishChoice',enabled ? 'on' : 'off');
+    if (!enabled) { clearTimeout(this.timer); this.dirty=false; }
+    this.refresh();
+    showToast?.(SiteConfig.get().autoPublish?'Synchronisation automatique activée':'Synchronisation automatique désactivée','#2e9a63',2500);
+  },
+  queue() {
+    const cfg=SiteConfig.get();
+    if (!cfg.autoPublish || !cfg.lastDeploy?.url) return;
+    this.dirty=true; this.failures=0; clearTimeout(this.timer); this.label('Auto : modification en attente');
+    this.timer=setTimeout(()=>this.flush(),4000);
+  },
+  async flush() {
+    if (!this.dirty || this.busy) return;
+    if (!Auth.ok() || !navigator.onLine || (typeof PublishUI !== 'undefined' && PublishUI.busy)) {
+      this.timer=setTimeout(()=>this.flush(),10000); return;
+    }
+    this.busy=true; this.dirty=false; this.label('Auto : publication…');
+    try {
+      const result=await deployPortfolio();
+      this.failures=0;
+      this.label(result.verified ? 'Auto : site à jour' : 'Auto : GitHub Pages en attente');
+    } catch (error) {
+      this.failures++;
+      this.label(this.failures < 3 ? 'Auto : nouvel essai en attente' : 'Auto : échec — republier manuellement');
+      console.warn('[auto-publish]',error);
+      this.dirty=this.failures < 3;
+    } finally {
+      this.busy=false;
+      if (this.dirty) this.timer=setTimeout(()=>this.flush(),this.failures ? 15000 * this.failures : 4000);
+    }
+  },
+};
+window.addEventListener?.('online',()=>{if(SiteAutoPublish.dirty)SiteAutoPublish.flush();});
 
 /* ══════════════════════════════════════════════════════
    PORTAIL CLIENT — page mission autonome, lien privé sans compte
@@ -2648,7 +2763,7 @@ function portalRepo(cfg) {
  * Corrige le 404 : écrit .nojekyll, active Pages, commit atomique, PUIS
  * attend que le build Pages soit terminé avant de déclarer le lien actif.
  * onStatus(msg) : retour d'état facultatif pour l'UI.
- * → { url, built }
+ * → { url, built, sha, fileSha } ; built ne vaut true que pour CE commit.
  */
 async function publishPortal(p, onStatus) {
   const token = Auth.token(); if (!Auth.ok()) throw new Error('Connecte GitHub d\'abord');
@@ -2665,32 +2780,48 @@ async function publishPortal(p, onStatus) {
   const hasNojekyll = await GH.fileSha(token, owner, repo, '.nojekyll');
   if (!hasNojekyll) files.push({ path: '.nojekyll', content: '' });
   onStatus?.('Publication de la page…');
-  await GH.commitFiles(token, owner, repo, files, 'portal: ' + (p.mission || p.id));
+  const commitSha = await GH.commitFiles(token, owner, repo, files, 'portal: ' + (p.mission || p.id));
+  let fileSha = '';
+  try {
+    const file = await GH.api(token, `/repos/${owner}/${repo}/contents/p/${encodeURIComponent(p.id)}/index.html?ref=${encodeURIComponent(commitSha)}`);
+    fileSha = file.sha || '';
+  } catch (error) { console.warn('[portal] empreinte du fichier indisponible', error); }
 
   const url = `https://${owner.toLowerCase()}.github.io/${repo}/p/${p.id}/`;
-  // Attend la fin du build Pages (le lien est 404 tant que ce n'est pas "built")
+  // Un ancien build « built » peut encore être le dernier visible pendant que
+  // celui-ci est en file. Vérifier son SHA évite d'annoncer un portail périmé.
   onStatus?.('Construction GitHub Pages…');
   let built = false;
-  for (let i = 0; i < 18; i++) {
-    await new Promise(r => setTimeout(r, 5000));
+  for (let i = 0; i < 30; i++) {
+    if (i) await new Promise(r => setTimeout(r, 2000));
     const b = await GH.pagesLatestBuild(token, owner, repo);
-    if (b?.status === 'built') { built = true; break; }
-    if (b?.status === 'errored') { await GH.pagesRequestBuild(token, owner, repo); }
-    onStatus?.('Construction GitHub Pages… (' + ((i + 1) * 5) + 's)');
+    if (b?.commit === commitSha && b?.status === 'built') { built = true; break; }
+    if (b?.commit === commitSha && b?.status === 'errored') { await GH.pagesRequestBuild(token, owner, repo); }
+    onStatus?.('Construction GitHub Pages… (' + (i * 2) + 's)');
   }
-  return { url, built };
+  return { url, built, sha: commitSha, fileSha };
 }
 
 /** Vérifie qu'un portail est réellement en ligne (fichier + build Pages) */
 async function verifyPortal(id) {
   const token = Auth.token(); const owner = Auth.owner(); const cfg = SiteConfig.get();
   if (!Auth.ok() || !owner) return { ok: false, reason: 'Non connecté' };
+  const portal = (() => { try { return JSON.parse(localStorage.getItem('hub_portals') || '[]').find(p => p.id === id); } catch { return null; } })();
   const repo = portalRepo(cfg);
   const sha = await GH.fileSha(token, owner, repo, 'p/' + id + '/index.html');
   if (!sha) return { ok: false, reason: 'Page introuvable — clique Publier' };
   const b = await GH.pagesLatestBuild(token, owner, repo);
-  if (b?.status === 'built') return { ok: true };
-  if (b?.status === 'errored') return { ok: false, reason: 'Build Pages en erreur — republie' };
+  if (!portal?.deploySha) return { ok: false, reason: 'Version non vérifiable — republie ce portail pour confirmer son commit' };
+  if (b?.commit === portal.deploySha && b?.status === 'built') return { ok: true };
+  if (b?.commit === portal.deploySha && b?.status === 'errored') return { ok: false, reason: 'Build Pages en erreur — republie' };
+  // Un autre déploiement peut suivre sur la même branche. Vérifier que le
+  // fichier servi par son commit a la même empreinte que notre portail.
+  if (b?.status === 'built' && b?.commit && portal.deployFileSha) {
+    try {
+      const builtFile = await GH.api(token, `/repos/${owner}/${repo}/contents/p/${encodeURIComponent(id)}/index.html?ref=${encodeURIComponent(b.commit)}`);
+      if (builtFile.sha === portal.deployFileSha) return { ok: true };
+    } catch (error) { console.warn('[portal verify] fichier du build indisponible', error); }
+  }
   return { ok: false, reason: 'Build en cours — actif d\'ici ~1 min', pending: true };
 }
 

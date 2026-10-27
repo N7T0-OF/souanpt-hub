@@ -1031,6 +1031,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cp-roster-sub{font-size:9.5px;color:var(--muted);font-weight:400}
 .cp-roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
 @media(max-width:640px){.cp-roster-grid{grid-template-columns:1fr}}
+.client-card summary{display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none}
+.client-card summary::-webkit-details-marker{display:none}
+.client-card summary:after{content:'⌄';font-size:16px;color:var(--muted2);margin-left:4px;transition:transform .18s}
+.client-card[open] summary:after{transform:rotate(180deg)}
+.client-card .client-extra{border-top:1px solid var(--border);padding-top:11px;margin-top:11px;font-size:11px}
+.client-card .client-extra h4{font-size:10px;color:var(--muted2);margin:10px 0 5px;text-transform:uppercase;letter-spacing:.08em}
+.client-card .client-extra .client-item{padding:7px 8px;background:var(--s2);border:1px solid var(--border);border-radius:7px;margin-top:5px;line-height:1.45}
+.client-card .client-extra .client-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
 /* Communs */
 .cp-badge{font-size:9px;font-weight:800;border:1px solid;border-radius:20px;padding:2px 8px;white-space:nowrap;flex-shrink:0}
 .cp-a{background:var(--s3);border:1px solid var(--border);border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1;color:var(--text);transition:border-color .15s}
@@ -1188,10 +1196,39 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cw-warn{margin-top:7px;font-size:9px;color:var(--gold-l);line-height:1.9}
 .cw-warn .cw-mini-btn{margin-left:4px}
 @media(max-width:560px){.cw-drawer{width:100%;max-width:none}}
+.publish-panel{position:fixed;right:18px;bottom:18px;width:min(380px,calc(100vw - 36px));padding:18px;background:#111;border:1px solid #394319;border-radius:12px;box-shadow:0 18px 55px #000b;z-index:10000;color:#f5f5ed;font-size:12px}
+.publish-panel[hidden],.publish-reopen[hidden]{display:none}
+.publish-panel h3{margin:0 0 5px;font-size:15px}
+.publish-panel p{margin:0 0 12px;color:#b4b9aa;line-height:1.5}
+.publish-track{height:8px;background:#333;border-radius:9px;overflow:hidden;margin:8px 0 14px}
+.publish-track>div{height:100%;width:0;background:#c8ff00;transition:width .25s}
+.publish-steps{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:8px}
+.publish-steps li{color:#898f84}.publish-steps li.active{color:#c8ff00}.publish-steps li.done{color:#f5f5ed}.publish-steps li.error{color:#f26f60}
+.publish-panel a{color:#c8ff00;overflow-wrap:anywhere}.publish-panel button,.publish-reopen{border:1px solid #505846;background:#1c2115;color:#e8f2da;border-radius:7px;padding:7px 11px;cursor:pointer}
+.publish-reopen{position:fixed;right:18px;bottom:18px;z-index:9999;box-shadow:0 8px 25px #0008}
+.portal-form{max-width:900px;margin:16px auto;padding:22px!important}
+.portal-form h3{font-size:16px;margin:0 0 6px}.portal-form .portal-intro{color:var(--muted2);font-size:11px;line-height:1.6;margin:0 0 18px}
+.portal-step{border:1px solid var(--border);border-radius:12px;padding:17px;margin:13px 0;background:var(--s1)}
+.portal-step h4{display:flex;align-items:center;gap:8px;font-size:12px;margin:0 0 5px}.portal-step h4 span{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#080808;display:inline-grid;place-items:center}
+.portal-step p{font-size:10px;color:var(--muted2);margin:0 0 12px;line-height:1.5}
+.portal-form .portal-step{display:none}
+.portal-form .portal-step.is-current{display:block}
+.portal-form [hidden]{display:none!important}
+.portal-wizard-progress{font-size:10px;color:var(--muted2);margin:11px 0}
+.portal-wizard-track{height:5px;border-radius:9px;background:var(--s3);overflow:hidden;margin-top:7px}
+.portal-wizard-track span{display:block;height:100%;width:33.33%;background:var(--accent);transition:width .2s}
 </style>
 </head>
 <body>
 <div id="sm2-toast"></div>
+<aside id="publish-panel" class="publish-panel" role="status" aria-live="polite" hidden>
+  <h3>🚀 Publication du site</h3><p id="publish-message">Préparation…</p><small id="publish-elapsed">0 s écoulée</small>
+  <div class="publish-track" role="progressbar" aria-label="Étapes terminées" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0" id="publish-progress"><div id="publish-progress-fill"></div></div>
+  <ol class="publish-steps" id="publish-steps"><li data-phase="behance">○ Lecture des contenus publics</li><li data-phase="generate">○ Génération du site</li><li data-phase="commit">○ Envoi sur GitHub</li><li data-phase="pages">○ Vérification sur GitHub Pages</li></ol>
+  <a id="publish-link" href="#" target="_blank" rel="noopener" hidden></a>
+  <div style="margin-top:12px"><button type="button" onclick="PublishUI.hide()" id="publish-hide">Continuer en arrière-plan</button> <button type="button" onclick="PublishUI.retry()" id="publish-retry" hidden>Réessayer</button></div>
+</aside>
+<button type="button" class="publish-reopen" id="publish-reopen" onclick="PublishUI.show()" hidden>🚀 Voir la publication</button>
 <!-- Tiroir du DOSSIER CLIENT (js/client-workspace.js) : rempli à la demande -->
 <div id="cw-root" aria-hidden="true"></div>
 
@@ -1200,6 +1237,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   <div class="gate-box">
     <div class="gate-logo"><div class="logo-icon"><svg viewBox="0 0 16 16" fill="#000" width="15" height="15"><path d="M8 1L2 5v9h4V9h4v5h4V5L8 1z"/></svg></div><div class="logo-text">souanpt<span>.hub</span></div></div>
     <div class="gate-title">Connexion</div>
+    <div class="gate-sub" id="gate-cloud-outage" style="display:none"></div>
     <div class="gate-sub" id="gate-sub-google" style="display:none">Connecte-toi en un clic pour accéder à ton espace.</div>
     <button class="gate-google" id="gate-google" style="display:none" onclick="gateGoogle()">
       <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.2-8l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.2 5.3C40.9 36 44 30.6 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
@@ -1483,9 +1521,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
     <!-- ══ PAGE: ÉDITEUR ══ -->
     <div class="page" id="page-editor" style="padding:0;height:calc(100vh - 52px);overflow:hidden">
-      <!-- Topbar : RÉGLAGES GLOBAUX uniquement (la structure = colonne « Blocs »).
-           v3.10 : « ☰ Sections » a été déplacé en « Blocs ✏️ » — un seul accès,
-           et la barre reste lisible même étroite (libellés masqués avant les icônes). -->
+      <!-- Commandes globales ; les commandes de structure sont aussi injectées
+           dans la navigation réelle de l'aperçu par EdCanvas. -->
       <div class="edtb">
         <div class="edperf">
           <span class="edperf-ic">⚡</span>
@@ -1501,6 +1538,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button class="btn btn-ghost edtb-b" onclick="edWinTheme(this)" title="Style, couleurs, colonnes — raccourci T">🎨<span class="edtb-t"> Thème</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinFx(this)" title="Animations & effets — raccourci E">⚡<span class="edtb-t"> Effets</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinBanner(this)" title="Image, accroche et action de la bannière principale — raccourci B">🖼<span class="edtb-t"> Bannière</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinSections(this)" title="Nom, ordre et visibilité des sections — raccourci S">☰<span class="edtb-t"> Sections</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edAddBlock()" title="Ajouter un bloc au site">＋<span class="edtb-t"> Bloc</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinTags()" title="Créer des tags et classer les projets">🏷<span class="edtb-t"> Tags</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinBrand()" title="Logo, favicon et effet du nom">✳<span class="edtb-t"> Identité</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinAudio()" title="Musique de fond et son de clic">🔊<span class="edtb-t"> Son</span></button>
+          <button class="btn btn-ghost edtb-b" id="ed-auto-publish" onclick="SiteAutoPublish.toggle()" title="Publier automatiquement les contenus publics après leur sauvegarde">Auto : désactivé</button>
           <span class="edtb-sep"></span>
           <button class="btn btn-ghost edtb-b" id="ed-undo" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" disabled>↶</button>
           <button class="btn btn-ghost edtb-b" id="ed-redo" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" disabled>↷</button>
@@ -1517,20 +1560,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       </div>
       <!-- Body -->
       <div style="display:flex;flex:1;height:calc(100% - 42px);overflow:hidden">
-        <!-- Blocks -->
-        <div style="width:180px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--s1);flex-shrink:0">
-          <!-- v3.10 : LA configuration des sections vit ici (l'accès principal),
-               plus dans la topbar. Le ✏️ ouvre ☰ Sections (nom, ordre, activation,
-               Chiffres clés, Réseaux). -->
-          <div class="ed-blocks-h">
-            <span>Blocs</span>
-            <button class="ed-blocks-go" onclick="edWinSections(this)" title="Configurer les sections : nom, ordre, Chiffres clés, Réseaux — raccourci S">✏️</button>
-          </div>
-          <div style="flex:1;overflow-y:auto;padding:7px" id="ed-blocks-list">
-            <div style="font-size:9px;color:var(--muted2);padding:8px">Chargement…</div>
-          </div>
-          <div style="padding:8px 10px;border-top:1px solid var(--border);font-size:8px;color:var(--muted2);line-height:1.7">⋮⋮ glisser pour réordonner<br>👁 afficher / masquer</div>
-        </div>
         <!-- Preview iframe -->
         <div style="flex:1;display:flex;flex-direction:column;background:#050505;position:relative">
           <div style="display:flex;align-items:center;gap:7px;padding:5px 10px;background:#030303;border-bottom:1px solid #111;flex-shrink:0">
@@ -1561,6 +1590,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button data-v="list" onclick="CP.setView('list')">Liste</button>
           <button data-v="clients" onclick="CP.setView('clients')">Clients</button>
         </div>
+        <button class="btn btn-ghost" id="cp-sort" style="font-size:10px" onclick="CP.setSort()">Trier : Plus récent</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="openClientForm()">+ Client</button>
         <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau projet</button>
       </div>
@@ -1692,12 +1722,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     <div class="page" id="page-avis">
       <div class="section-header"><div class="section-title">Avis clients</div><div class="section-line"></div>
         <button class="btn btn-accent" style="font-size:10px" id="avis-check-btn" onclick="checkAvis()">📥 Relever les avis</button>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="toggleForm('add-review-form')">+ Manuel</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="toggleForm('add-review-form');populateReviewClientSelect()">+ Manuel</button>
       </div>
       <div class="infobox">⭐ <strong>Comment ça marche :</strong> les visiteurs laissent leur avis <strong>directement sur ton site publié</strong> (bouton « ✎ Laisser un avis »). Ils arrivent ici automatiquement — toi tu <strong>approuves ou refuses</strong>, c'est tout. Les avis approuvés s'affichent sur le site au prochain déploiement 🚀. Relève auto toutes les 5 min · <span id="avis-last-check" style="color:var(--muted2)">jamais relevé</span></div>
       <div class="form-box" id="add-review-form">
         <div class="biz-form">
-          <div><div class="prop-label">Auteur</div><input class="prop-input" id="rv-author" placeholder="Prénom NOM"></div>
+          <div><div class="prop-label">Auteur</div><select class="prop-input" id="rv-client" onchange="reviewPickClient()"><option value="">Choisir un client existant ou saisir un nom</option></select><input class="prop-input" id="rv-author" placeholder="Prénom NOM" style="margin-top:6px" oninput="document.getElementById('rv-client').value=''"></div>
           <div><div class="prop-label">Projet</div><input class="prop-input" id="rv-project" placeholder="Nom du projet"></div>
           <div><div class="prop-label">Note /5</div><input class="prop-input" id="rv-rating" type="number" min="1" max="5" value="5"></div>
         </div>
@@ -1715,7 +1745,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <div class="section-header"><div class="section-title">Portails Clients</div><div class="section-line"></div>
         <button class="btn btn-accent" style="font-size:10px" onclick="portalOpenForm()">+ Nouveau portail</button>
       </div>
-      <div class="infobox">🔗 <strong>Un espace mission par client, sans qu'il ait de compte.</strong> Connecté avec Google, la publication est <strong>instantanée</strong> (via le cloud, aucun 404, aucune attente) et chaque modification est appliquée en direct. Tu envoies un <strong>lien privé</strong> ; le client y voit l'avancement, le suivi financier et les livrables — à ton image. Lecture seule (messagerie/validation 2 sens = étape suivante).</div>
+      <div class="infobox">🔗 <strong>Un espace mission par client, sans compte à créer pour lui.</strong> Le client voit l'avancement, le paiement et les livrables via un lien privé. Avec Firebase disponible, le portail se met à jour immédiatement ; avec GitHub Pages, sa publication demande une vérification du build. Lecture seule pour le client.</div>
       <div class="biz-kpis">
         <div class="kpi-card k1"><div class="kpi-label">Portails</div><div class="kpi-val" id="pt-count">0</div></div>
         <div class="kpi-card k4"><div class="kpi-label">Actifs</div><div class="kpi-val" id="pt-active">0</div></div>
@@ -1723,30 +1753,39 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div class="kpi-card k2"><div class="kpi-label">Publiés</div><div class="kpi-val" id="pt-published">0</div></div>
       </div>
 
-      <div class="form-box" id="portal-form">
+      <div class="form-box portal-form" id="portal-form">
+        <h3>Créer un espace client</h3><p class="portal-intro">Trois étapes courtes. Tu peux revenir en arrière sans perdre tes réponses.</p>
+        <div class="portal-wizard-progress" id="pt-progress" aria-live="polite">Étape 1 sur 3 — Mission et client<div class="portal-wizard-track"><span id="pt-progress-bar"></span></div></div>
+        <div class="portal-step is-current"><h4><span>1</span> Mission et client</h4><p>Identifie le client et sa mission. Ces deux noms figureront dans son espace.</p>
         <div class="biz-form">
-          <div><div class="prop-label">Nom de la mission</div><input class="prop-input" id="pt-mission" placeholder="Identité visuelle Bloom Studio"></div>
-          <div><div class="prop-label">Client</div><input class="prop-input" id="pt-client" placeholder="Choisir ou créer…" list="dl-clients"></div>
+          <div><div class="prop-label">Nom de la mission *</div><input class="prop-input" id="pt-mission" placeholder="Identité visuelle Bloom Studio" required></div>
+          <div><div class="prop-label">Nom du client *</div><input class="prop-input" id="pt-client" placeholder="Choisir un client ou saisir un nouveau nom" list="dl-clients" required><div class="client-sub">Un nouveau nom créera automatiquement sa fiche client.</div></div>
         </div>
+        </div><div class="portal-step"><h4><span>2</span> Avancement et paiement</h4><p>Où en est la mission ? Indique les montants visibles par le client. Tu peux laisser les champs de paiement vides.</p>
         <div class="biz-form" style="margin-top:8px">
-          <div><div class="prop-label">Montant total (€)</div><input class="prop-input" id="pt-total" type="number" placeholder="2400"></div>
-          <div><div class="prop-label">Acompte %</div><input class="prop-input" id="pt-acompte" type="number" value="50"></div>
+          <div><div class="prop-label">Montant total (€)</div><input class="prop-input" id="pt-total" type="number" min="0" step="0.01" placeholder="2400"></div>
+          <div><div class="prop-label">Acompte %</div><input class="prop-input" id="pt-acompte" type="number" min="0" max="100" value="50"></div>
           <div><div class="prop-label">Étape actuelle</div><select class="prop-input prop-select" id="pt-step">
             <option value="0">Brief</option><option value="1">Devis</option><option value="2">Acompte</option><option value="3" selected>Production</option><option value="4">Livraison</option><option value="5">Terminé</option>
           </select></div>
         </div>
         <div class="biz-form" style="margin-top:8px">
           <div><div class="prop-label">Lien de paiement (Stripe, PayPal, SumUp…)</div><input class="prop-input" id="pt-pay" placeholder="https://buy.stripe.com/…"></div>
-          <div><div class="prop-label">Mot de passe (optionnel)</div><input class="prop-input" id="pt-pw" placeholder="laisser vide = aucun"></div>
+          <div><div class="prop-label">Mot de passe (optionnel)</div><input class="prop-input" id="pt-pw" type="password" autocomplete="new-password" placeholder="laisser vide = aucun"></div>
         </div>
+        </div><div class="portal-step"><h4><span>3</span> Message et livrables</h4><p>Quel est le prochain message pour ton client ? Ajoute les liens à livrer maintenant ou plus tard.</p>
         <div style="margin-top:8px"><div class="prop-label">Note pour le client (optionnel)</div><input class="prop-input" id="pt-note" placeholder="Prochaine étape : validation des maquettes"></div>
         <div style="margin-top:10px"><div class="prop-label">Livrables — liens (Drive, WeTransfer, GitHub Release…)</div>
           <div id="pt-deliv-list"></div>
           <button class="btn btn-ghost" style="font-size:9px;margin-top:6px" onclick="portalAddDelivRow()">+ Ajouter un livrable</button>
         </div>
+        <div class="hintbox" id="pt-summary" style="margin-top:12px" aria-live="polite"></div>
+        </div>
         <div class="hintbox">💡 Le lien de paiement et les livrables sont de simples liens externes — Souanpt Hub ne stocke aucun fichier lourd et ne touche jamais à l'argent.</div>
         <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-accent" id="pt-submit" onclick="portalSave()">Créer le portail</button>
+          <button class="btn btn-ghost" id="pt-back" onclick="portalStep(-1)" hidden>← Retour</button>
+          <button class="btn btn-accent" id="pt-next" onclick="portalStep(1)">Continuer →</button>
+          <button class="btn btn-accent" id="pt-submit" onclick="portalSave()" hidden>Créer le portail</button>
           <button class="btn btn-ghost" onclick="portalCloseForm()">Annuler</button>
         </div>
       </div>
@@ -2380,12 +2419,13 @@ function renderIntegrations() {
   const set = (id, txt, on) => { const el = document.getElementById('int-st-' + id); if (!el) return; el.textContent = txt; el.classList.toggle('on', !!on); };
   set('github', Auth.ok() ? '✓ Connecté' : 'Non connecté', Auth.ok());
   const g = window.Cloud && Cloud.enabled && Cloud.user();
-  set('google', g ? '✓ Connecté' : 'Non connecté', g);
+  const cloudOutage = !!(window.Cloud && Cloud.unavailableReason);
+  set('google', cloudOutage ? 'Suspendu' : g ? '✓ Connecté' : 'Non connecté', g);
   const dReady = window.Cloud && Cloud.discordReady && Cloud.discordReady();
-  set('discord', dReady ? 'Prêt' : 'Bientôt', dReady);
+  set('discord', cloudOutage ? 'Suspendu' : dReady ? 'Prêt' : 'Bientôt', dReady);
   const dBtn = document.getElementById('int-discord-btn'); if (dBtn) dBtn.style.display = dReady ? '' : 'none';
   const dHint = document.getElementById('int-discord-hint');
-  if (dHint) dHint.innerHTML = dReady
+  if (dHint) dHint.innerHTML = cloudOutage ? 'Connexion Discord suspendue pendant la restauration Firebase. GitHub reste disponible pour accéder au Hub.' : dReady
     ? '✓ Relais Cloudflare en ligne (<code style="color:var(--accent)">souanpt-discord</code>). Si la connexion affiche une erreur : recolle la dernière version du code dans le Worker (Edit code) et vérifie les <strong style="color:var(--text)">5 secrets</strong> — guide <code style="color:var(--accent)">cloudflare/README.md</code>.'
     : 'La connexion Discord passe par un petit relais gratuit (Cloudflare Worker) à déployer une fois — guide : <code style="color:var(--accent)">cloudflare/README.md</code>. Dès qu\'il est en ligne, le bouton Discord apparaît sur la porte de connexion.';
   const cfg = SiteConfig.get();
@@ -2399,14 +2439,14 @@ function renderIntegrations() {
   const pp = document.getElementById('int-paypal-inp'); if (pp && !pp.value) pp.value = cfg.paypalLink || '';
   const si = document.getElementById('int-stripe-inp'); if (si && !si.value) si.value = cfg.stripeLink || '';
   const gname = document.getElementById('int-google-name');
-  if (gname) gname.textContent = g ? '✓ Connecté en tant que ' + (Cloud.user().displayName || Cloud.user().email || '') : 'Connexion en 1 clic — synchronise ton hub dans le cloud.';
-  const gbtn = document.getElementById('int-google-btn'); if (gbtn) gbtn.textContent = g ? 'Se déconnecter' : 'Se connecter avec Google';
+  if (gname) gname.textContent = cloudOutage ? Cloud.unavailableReason : g ? '✓ Connecté en tant que ' + (Cloud.user().displayName || Cloud.user().email || '') : 'Connexion en 1 clic — synchronise ton hub dans le cloud.';
+  const gbtn = document.getElementById('int-google-btn'); if (gbtn) { gbtn.textContent = cloudOutage ? 'En attente de Firebase' : g ? 'Se déconnecter' : 'Se connecter avec Google'; gbtn.disabled = cloudOutage; }
 }
 async function intGoogleConnect() {
   if (!(window.Cloud && Cloud.enabled)) { showToast('Cloud non configuré', '#e4b24a', 2500); return; }
   if (Cloud.user()) { hubSignOut(); return; }
   try { await Cloud.signInGoogle(); renderIntegrations(); }
-  catch (e) { showToast('✗ ' + (e.message || 'Connexion annulée'), '#c0392b', 3000); }
+  catch (e) { showToast('✗ ' + Cloud.authErrorMessage(e), '#c0392b', 6000); }
 }
 async function intBackupNow() {
   if (!Auth.ok()) { showToast('Connecte GitHub d\'abord (carte GitHub, juste au-dessus)', '#e4b24a', 3000); intOpen('github'); return; }
@@ -2694,13 +2734,14 @@ function addProject() {
     }
     try { localStorage.setItem('hub_projects', JSON.stringify(projs)); }
     catch { showToast('⚠ Image trop lourde — utilise une URL d\'image à la place','#c0392b',3500); return; }
+    SiteAutoPublish.queue();
     const target = wasEdit ? _editingId : newId;      // avant reset (qui efface _editingId)
     resetProjectForm(); renderProjects(); syncKPIs();
     showToast(wasEdit ? 'Projet mis à jour ✓' : 'Projet ajouté ✓','#2e9a63');
     // T4 : la couverture quitte le navigateur dès qu'on est connecté (1 commit,
     // miniature conservée). Silencieux si échec → le base64 reste en local.
     if (target && window.HubImages) {
-      HubImages.offloadProject(target).then(p => { if (p) { renderProjects(); syncKPIs(); } });
+      HubImages.offloadProject(target).then(p => { if (p) { renderProjects(); syncKPIs(); SiteAutoPublish.queue(); } });
     }
   };
   // Couverture collée en data: (ex : champ URL) non-WebP → on compresse avant de stocker
@@ -2777,6 +2818,7 @@ function editProject(id) {
 }
 function deleteProject(id) {
   localStorage.setItem('hub_projects', JSON.stringify(getProjects().filter(p=>p.id!==id)));
+  SiteAutoPublish.queue();
   renderProjects(); syncKPIs();
 }
 function renderProjects() {
@@ -2874,6 +2916,7 @@ function addLink() {
   const links = JSON.parse(localStorage.getItem('hub_links')||'[]');
   links.push({ id:Date.now().toString(), title:t, url:u, clicks:0 });
   localStorage.setItem('hub_links', JSON.stringify(links));
+  SiteAutoPublish.queue();
   renderLinks();
   document.getElementById('add-link-form')?.classList.remove('visible');
   ['new-link-title','new-link-url'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -2884,23 +2927,28 @@ function renderLinks() {
   if (!links.length) { ct.innerHTML = '<div class="empty"><div class="empty-title">Aucun lien</div><div class="empty-sub">Ajoute ton premier lien</div></div>'; return; }
   ct.innerHTML = links.map(l => `<div class="link-row"><div class="link-thumb" style="background:rgba(200,255,0,.08)">🔗</div><div style="flex:1"><div style="font-size:11px;font-weight:600">${l.title}</div><div style="font-size:9px;color:var(--muted2)">${l.url}</div></div><div style="font-size:11px;font-weight:700;color:var(--accent3)">${l.clicks} clics</div><button onclick='deleteLink("${l.id}")' style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:13px">✕</button></div>`).join('');
 }
-function deleteLink(id) { localStorage.setItem('hub_links', JSON.stringify(JSON.parse(localStorage.getItem('hub_links')||'[]').filter(l=>l.id!==id))); renderLinks(); }
+function deleteLink(id) { localStorage.setItem('hub_links', JSON.stringify(JSON.parse(localStorage.getItem('hub_links')||'[]').filter(l=>l.id!==id))); SiteAutoPublish.queue(); renderLinks(); }
 
 function addClient() {
   const name=document.getElementById('cl-name')?.value.trim(); if(!name) return;
   let cl; try { cl=JSON.parse(localStorage.getItem('hub_clients')||'[]'); } catch { cl=[]; }
   if(!Array.isArray(cl)) cl=[];
-  if(cl.some(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===name.toLocaleLowerCase('fr'))){showToast('Ce client existe déjà','#e4b24a',2200);return;}
-  cl.push({ id:Date.now().toString(36)+Math.random().toString(36).slice(2,7), name, type:document.getElementById('cl-type')?.value||'', status:'active', progress:0, revenue:0, createdAt:Date.now() });
+  const existing=cl.find(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===name.toLocaleLowerCase('fr'));
+  if(existing){CP.checkClientDuplicate();showToast('Ce client existe déjà — utilise « Voir la fiche »','#e4b24a',3500);return;}
+  const newClient={ id:Date.now().toString(36)+Math.random().toString(36).slice(2,7), name, type:document.getElementById('cl-type')?.value||'', status:'active', progress:0, revenue:0, createdAt:Date.now() };
+  cl.push(newClient);
   localStorage.setItem('hub_clients', JSON.stringify(cl));
+  SiteAutoPublish.queue();
   renderClients();
   CP._clientFormOpen=false; CP._clientDraft={name:'',type:''};
   document.getElementById('add-client-form')?.classList.remove('visible');
+  CP.viewClient(newClient.id);
   showToast('Client ajouté ✓','#2e9a63',1800);
 }
-function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); renderClients(); }
+function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); SiteAutoPublish.queue(); renderClients(); }
 function renderClients() {
-  const cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');
+  let cl=[]; try{cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+  if(!Array.isArray(cl)) cl=[];
   const ct=document.getElementById('clients-list'); if(!ct) return;
   // Accès au DOSSIER client depuis l'annuaire — fonctionne aussi hors-ligne
   // (le dossier lit le cache local, pas le registre public).
@@ -2920,7 +2968,38 @@ function renderClients() {
   const cols=['rgba(201,146,42,.12)','rgba(46,154,99,.1)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
   if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
-  ct.innerHTML=cl.map((c,i)=>`<div class="gc client-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Nouveau')}</div></div><span class="rstatus st-ok" style="margin-left:auto">${c.status==='active'?'Actif':'En cours'}</span></div><div style="display:flex;align-items:center;gap:6px;font-size:9px"><span style="color:var(--muted2)">Progression</span><div class="progress-bar-w"><div class="progress-bar" style="width:${Math.max(0,Math.min(100,Number(c.progress)||0))}%"></div></div><span>${Math.max(0,Math.min(100,Number(c.progress)||0))}%</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">${cwBtn(c.name)}<button onclick="deleteClient('${esc(c.id)}')" style="background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--muted2);font-size:10px;padding:3px 8px;font-family:inherit">Supprimer</button></div></div>`).join('');
+  const sorted=cl.slice().sort((a,b)=>CP.sortMode==='az' ? String(a.name||'').localeCompare(String(b.name||''),'fr') : (Number(b.createdAt)||0)-(Number(a.createdAt)||0));
+  let reviews=[]; try{reviews=JSON.parse(localStorage.getItem('hub_reviews')||'[]');}catch{}
+  if(!Array.isArray(reviews)) reviews=[];
+  const projects=(window.CP&&Array.isArray(CP._links)?CP._links:[]);
+  const norm=s=>String(s||'').trim().toLocaleLowerCase('fr');
+  const uniqueName=c=>cl.filter(x=>norm(x.name)===norm(c.name)).length===1;
+  const mine=(entry,c,field)=>entry.clientId ? entry.clientId===c.id : uniqueName(c)&&norm(entry[field])===norm(c.name);
+  ct.innerHTML=sorted.map((c,i)=>{
+    const cp=projects.filter(p=>mine(p,c,'clientName'));
+    const cr=reviews.filter(r=>mine(r,c,'author'));
+    const types=[...new Set(cp.map(p=>p.projectType||p.type).filter(Boolean))];
+    const progress=Math.max(0,Math.min(100,Number(c.progress)||0));
+    return `<details class="gc client-card" id="client-card-${esc(c.id)}" data-client-id="${esc(c.id)}" tabindex="-1"${CP.expandedClientIds.has(String(c.id))?' open':''} ontoggle="CP.setClientExpanded(this.dataset.clientId,this.open)"><summary><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div style="flex:1;min-width:0"><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Client')} · ${cp.length} projet${cp.length>1?'s':''} · ${cr.length} avis</div></div><span class="rstatus st-ok">${c.status==='active'?'Actif':'En cours'}</span></summary>
+      <div class="client-extra"><div>Progression <b>${progress}%</b><div class="progress-bar-w" style="width:100%;margin-top:5px"><div class="progress-bar" style="width:${progress}%"></div></div></div>
+      <h4>Projets (${cp.length})</h4>${cp.length?cp.map(p=>`<div class="client-item"><b>${esc(p.projectName||'Projet sans nom')}</b>${p.projectType?` · ${esc(p.projectType)}`:''}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="ClientWorkspace.open('${esc(p.token)}')">Ouvrir</button></div>`).join(''):'<div class="client-sub">Aucun projet lié.</div>'}
+      ${types.length?`<div class="client-sub" style="margin-top:7px">Types : ${types.map(esc).join(', ')}</div>`:''}
+      <h4>Avis (${cr.length})</h4>${cr.length?cr.map(r=>`<div class="client-item"><span style="color:var(--gold-l)">${'★'.repeat(Math.max(0,Math.min(5,Number(r.rating)||0)))}</span> ${esc(String(r.text||'').slice(0,100))}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="clientReviewJump('${esc(r.id)}')">Voir</button></div>`).join(''):'<div class="client-sub">Aucun avis lié.</div>'}
+      <div class="client-actions"><button class="btn btn-accent" style="font-size:10px" onclick="CP.startManual('${esc(c.id)}')">+ Projet manuel</button><button class="btn btn-ghost" style="font-size:10px" onclick="openClientReview('${esc(c.id)}')">+ Avis</button>${cwBtn(c.name)}<button class="btn btn-ghost" style="font-size:10px" onclick="deleteClient('${esc(c.id)}')">Supprimer</button></div></div></details>`;
+  }).join('');
+}
+function clientReviewJump(id){showPage('avis');setTimeout(()=>{const card=document.getElementById('review-card-'+id);card?.scrollIntoView({behavior:'smooth',block:'center'});card?.focus({preventScroll:true});},80);}
+function openClientReview(id){
+  let clients=[]; try{clients=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+  const client=Array.isArray(clients)?clients.find(c=>String(c.id)===String(id)):null;
+  if(!client) return;
+  showPage('avis'); populateReviewClientSelect();
+  const select=document.getElementById('rv-client'), author=document.getElementById('rv-author');
+  if(select) select.value=String(client.id);
+  if(author) author.value=client.name;
+  const form=document.getElementById('add-review-form');
+  form?.classList.add('visible'); form?.scrollIntoView({behavior:'smooth',block:'center'});
+  document.getElementById('rv-text')?.focus();
 }
 
 /* ═══ FACTURATION V2 — recherche, pagination, catalogue, statuts, CSV ═══ */
@@ -3055,22 +3134,37 @@ function exportInvoicesCSV() {
   showToast('Export CSV téléchargé ✓ (compatible Excel)','#2e9a63',2500);
 }
 
+function populateReviewClientSelect() {
+  const select=document.getElementById('rv-client'); if(!select) return;
+  let clients=[]; try{clients=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+  select.replaceChildren(new Option('Choisir un client existant ou saisir un nom',''));
+  clients.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'fr')).forEach(c=>select.add(new Option(c.name,c.id)));
+}
+function reviewPickClient() {
+  const select=document.getElementById('rv-client'), author=document.getElementById('rv-author');
+  if(select?.value&&author) author.value=select.selectedOptions[0].textContent;
+}
 function addReview() {
   const author=document.getElementById('rv-author')?.value.trim(), text=document.getElementById('rv-text')?.value.trim();
   if(!author||!text) return;
+  if (ensureReviewClient(author)) SiteAutoPublish.queue();
+  let clients=[]; try{clients=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+  const selectedId=document.getElementById('rv-client')?.value;
+  const client=clients.find(c=>c.id===selectedId)||clients.find(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===author.toLocaleLowerCase('fr'));
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
-  rv.push({ id:Date.now().toString(), author, text, rating:parseInt(document.getElementById('rv-rating')?.value)||5, status:'pending', project:document.getElementById('rv-project')?.value||'', createdAt:Date.now() });
+  rv.push({ id:Date.now().toString(), author, clientId:client?.id||'', text, rating:parseInt(document.getElementById('rv-rating')?.value)||5, status:'pending', project:document.getElementById('rv-project')?.value||'', createdAt:Date.now() });
   localStorage.setItem('hub_reviews', JSON.stringify(rv));
-  ensureReviewClient(author);
   renderReviews();
   document.getElementById('add-review-form').classList.remove('visible');
 }
 function reviewAction(id, action) {
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
+  const wasApproved=rv.find(r=>r.id===id)?.status==='approved';
   if(action==='delete'){localStorage.setItem('hub_reviews',JSON.stringify(rv.filter(r=>r.id!==id)));}
   else{const r=rv.find(r=>r.id===id);if(r)r.status=action;localStorage.setItem('hub_reviews',JSON.stringify(rv));}
+  if (action==='approved' || wasApproved) SiteAutoPublish.queue();
   renderReviews();
-  if(action==='approved') showToast('Approuvé ✓ — clique 🚀 Publier pour l\'afficher sur le site','#2e9a63',3500);
+  if(action==='approved') showToast(SiteConfig.get().autoPublish?'Approuvé ✓ — mise à jour publique programmée':'Approuvé ✓ — clique 🚀 Publier pour l\'afficher sur le site','#2e9a63',3500);
 }
 function renderReviews() {
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
@@ -3079,7 +3173,7 @@ function renderReviews() {
   const badge=document.getElementById('avis-badge');
   if(badge){badge.textContent=wt||'';badge.style.display=wt?'':'none';}
   if(!rv.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun avis</div><div class="empty-sub">Relève ceux laissés sur ton site publié, ou ajoute-les à la main</div></div>';return;}
-  ct.innerHTML=rv.map(r=>`<div class="gc rcard"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${r.ghIssue?' <span style="font-size:8px;color:var(--accent3)">via le site</span>':''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${esc(r.text)}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
+  ct.innerHTML=rv.map(r=>`<div class="gc rcard" id="review-card-${esc(r.id)}" tabindex="-1"><div class="rhead"><div class="rav" style="background:var(--gold-dim);color:var(--gold-l)">${esc((r.author||'?')[0].toUpperCase())}</div><div><div class="rname">${esc(r.author)}${r.ghIssue?' <span style="font-size:8px;color:var(--accent3)">via le site</span>':''}</div><div class="rdate">${new Date(r.createdAt).toLocaleDateString('fr-FR')}</div></div><div class="stars" style="margin-left:auto">${'★'.repeat(r.rating||5)}${'☆'.repeat(5-(r.rating||5))}</div><span class="rstatus ${r.status==='approved'?'st-ok':r.status==='refused'?'st-no':'st-w'}">${r.status==='approved'?'Approuvé':r.status==='refused'?'Refusé':'En attente'}</span></div><div class="rtext">${esc(r.text)}</div>${r.status==='pending'?`<div class="modbtns"><button class="mbtn mb-ok" onclick="reviewAction('${r.id}','approved')">Approuver</button><button class="mbtn mb-no" onclick="reviewAction('${r.id}','refused')">Refuser</button><button class="mbtn mb-del" onclick="reviewAction('${r.id}','delete')">Supprimer</button></div>`:''}</div>`).join('');
 }
 
 /* Partage le site publié en QR (ou invite à déployer) */
@@ -3208,11 +3302,70 @@ function renderActivity(){
 
 /* ═══ PORTAILS CLIENTS ═══ */
 let _ptEditId = null;
+let _ptWorkspaceId = '';
+let _ptStep = 0;
+function portalWizardValid(step) {
+  const fail = (id, message) => {
+    showToast(message, '#c0392b', 3000);
+    document.getElementById(id)?.focus();
+    return false;
+  };
+  if (step === 0) {
+    if (!document.getElementById('pt-mission')?.value.trim()) return fail('pt-mission', 'Indique le nom de la mission');
+    if (!document.getElementById('pt-client')?.value.trim()) return fail('pt-client', 'Choisis ou saisis un client');
+  }
+  if (step === 1) {
+    const total = document.getElementById('pt-total')?.value.trim() || '';
+    const deposit = document.getElementById('pt-acompte')?.value.trim() || '';
+    if (total && (!Number.isFinite(Number(total)) || Number(total) < 0)) return fail('pt-total', 'Le montant doit être positif');
+    if (deposit && (!Number.isFinite(Number(deposit)) || Number(deposit) < 0 || Number(deposit) > 100)) return fail('pt-acompte', 'L’acompte doit être entre 0 et 100 %');
+    const payment = document.getElementById('pt-pay')?.value.trim() || '';
+    if (payment) {
+      try { if (new URL(payment).protocol !== 'https:') return fail('pt-pay', 'Utilise un lien de paiement HTTPS'); }
+      catch { return fail('pt-pay', 'Vérifie le lien de paiement'); }
+    }
+  }
+  if (step === 2) {
+    for (const field of document.querySelectorAll('#pt-deliv-list .pt-dl-url')) {
+      const value = field.value.trim();
+      if (!value) continue;
+      try { if (new URL(value).protocol !== 'https:') throw new Error('https'); }
+      catch { showToast('Chaque livrable doit avoir un lien HTTPS valide', '#c0392b', 3000); field.focus(); return false; }
+    }
+  }
+  return true;
+}
+function portalWizardSummary() {
+  const box = document.getElementById('pt-summary'); if (!box) return;
+  const mission = document.getElementById('pt-mission')?.value.trim() || 'Mission sans nom';
+  const client = document.getElementById('pt-client')?.value.trim() || 'Client à choisir';
+  const amount = Number(document.getElementById('pt-total')?.value || 0);
+  const stage = document.getElementById('pt-step')?.selectedOptions[0]?.textContent || 'Production';
+  const files = [...document.querySelectorAll('#pt-deliv-list .pt-dl-url')].filter(el => el.value.trim()).length;
+  box.textContent = `Résumé : ${mission} · ${client} · ${amount.toLocaleString('fr-FR')} € · ${stage} · ${files} livrable${files > 1 ? 's' : ''}. Enregistrer prépare le portail ; « Publier » crée ou met à jour son lien.`;
+}
+function portalStep(delta) {
+  const steps=[...document.querySelectorAll('#portal-form .portal-step')];
+  if (!steps.length) return;
+  if (delta > 0 && !portalWizardValid(_ptStep)) return;
+  _ptStep=Math.max(0,Math.min(steps.length-1,_ptStep+delta));
+  steps.forEach((step,i)=>step.classList.toggle('is-current',i===_ptStep));
+  const names=['Mission et client','Avancement et paiement','Message et livrables'];
+  const progress=document.getElementById('pt-progress');
+  if(progress) progress.firstChild.textContent=`Étape ${_ptStep+1} sur ${steps.length} — ${names[_ptStep]}`;
+  const bar=document.getElementById('pt-progress-bar');if(bar)bar.style.width=((_ptStep+1)/steps.length*100)+'%';
+  document.getElementById('pt-back').hidden=_ptStep===0;
+  document.getElementById('pt-next').hidden=_ptStep===steps.length-1;
+  document.getElementById('pt-submit').hidden=_ptStep!==steps.length-1;
+  if (_ptStep === steps.length-1) portalWizardSummary();
+  steps[_ptStep].scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 function getPortals() { try { return JSON.parse(localStorage.getItem('hub_portals')||'[]'); } catch { return []; } }
 function setPortals(p) { localStorage.setItem('hub_portals', JSON.stringify(p)); }
 
 function portalOpenForm(prefill) {
   _ptEditId = null;
+  _ptWorkspaceId = prefill?.workspaceId || '';
   ['pt-mission','pt-client','pt-total','pt-pay','pt-pw','pt-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('pt-acompte').value = 50;
   document.getElementById('pt-step').value = 3;
@@ -3224,16 +3377,20 @@ function portalOpenForm(prefill) {
   if (prefill) { if(prefill.client) document.getElementById('pt-client').value=prefill.client; if(prefill.mission) document.getElementById('pt-mission').value=prefill.mission; if(prefill.total) document.getElementById('pt-total').value=prefill.total; }
   document.getElementById('pt-submit').textContent = 'Créer le portail';
   document.getElementById('portal-form').classList.add('visible');
+  const form = document.getElementById('portal-form');
+  if (!form.dataset.summaryBound) { form.addEventListener('input', portalWizardSummary); form.addEventListener('change', portalWizardSummary); form.dataset.summaryBound = '1'; }
+  _ptStep=0; portalStep(0);
   refreshInvDatalists();
   document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
 }
-function portalCloseForm() { document.getElementById('portal-form').classList.remove('visible'); _ptEditId=null; }
+function portalCloseForm() { document.getElementById('portal-form').classList.remove('visible'); _ptEditId=null; _ptWorkspaceId=''; }
 function portalAddDelivRow(label, url) {
   const box = document.getElementById('pt-deliv-list'); if(!box) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr auto;gap:6px;margin-bottom:6px';
   row.innerHTML = `<input class="prop-input pt-dl-label" placeholder="Logo final" value="${esc(label||'')}"><input class="prop-input pt-dl-url" placeholder="https://…" value="${esc(url||'')}"><button class="btn btn-ghost" style="font-size:11px" onclick="this.parentElement.remove()">✕</button>`;
   box.appendChild(row);
+  portalWizardSummary();
 }
 function portalCollectDeliv() {
   return [...document.querySelectorAll('#pt-deliv-list > div')].map(r=>({
@@ -3242,9 +3399,16 @@ function portalCollectDeliv() {
   })).filter(d=>d.url);
 }
 function portalSave() {
+  for (let step=0; step<3; step++) {
+    if (!portalWizardValid(step)) { _ptStep=step; portalStep(0); return; }
+  }
   const mission = document.getElementById('pt-mission')?.value.trim();
   if (!mission) { showToast('Nom de la mission requis','#c0392b',1500); return; }
   const client = document.getElementById('pt-client')?.value.trim()||'';
+  const linkedWorkspace = _ptWorkspaceId && window.ClientWorkspace ? ClientWorkspace.get(_ptWorkspaceId) : null;
+  if (linkedWorkspace?.clientName && linkedWorkspace.clientName.trim().toLocaleLowerCase('fr') !== client.toLocaleLowerCase('fr')) {
+    showToast('Ce portail est lié au dossier de « '+linkedWorkspace.clientName+' ». Garde ce client ou crée un autre dossier.','#c0392b',4000); return;
+  }
   const data = {
     mission, client,
     total: parseFloat(document.getElementById('pt-total')?.value)||0,
@@ -3268,6 +3432,7 @@ function portalSave() {
   }
   const portals = getPortals();
   let newPortal = null;
+  let clientAdded = false;
   if (_ptEditId) {
     const p = portals.find(x=>x.id===_ptEditId);
     if (p) Object.assign(p, data);
@@ -3276,23 +3441,38 @@ function portalSave() {
     portals.unshift(newPortal);
     // Client inconnu → créé dans Clients
     if (client) {
-      const cls=JSON.parse(localStorage.getItem('hub_clients')||'[]');
-      if(!cls.find(c=>(c.name||'').toLowerCase()===client.toLowerCase())){
+      let cls=[]; try{cls=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+      if(!Array.isArray(cls)) cls=[];
+      if(!cls.find(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===client.toLocaleLowerCase('fr'))){
         cls.push({id:Date.now().toString()+'c',name:client,type:'',status:'active',progress:0,revenue:0,createdAt:Date.now()});
-        localStorage.setItem('hub_clients',JSON.stringify(cls)); renderClients();
+        localStorage.setItem('hub_clients',JSON.stringify(cls)); clientAdded=true; renderClients();
       }
     }
   }
   setPortals(portals);
+  if (clientAdded) SiteAutoPublish.queue();
   // Dossier client : le portail créé à la main n'a pas de jeton → il se rattache
   // au seul projet de ce nom (si non ambigu), sinon il reste « à rattacher ».
-  if (newPortal && client && window.ClientWorkspace) { try { ClientWorkspace.bindByClient(client, newPortal.id, 'portal'); } catch {} }
+  if (newPortal && window.ClientWorkspace) { try {
+    if (_ptWorkspaceId) ClientWorkspace.attach(newPortal.id, _ptWorkspaceId, 'portal');
+    else if (client) ClientWorkspace.bindByClient(client, newPortal.id, 'portal');
+  } catch {} }
+  const wasEditing=!!_ptEditId;
+  const savedPortal=wasEditing ? portals.find(p=>p.id===_ptEditId) : newPortal;
+  const updateOnline=wasEditing && !!savedPortal?.publishedAt &&
+    (portalCloud() || (SiteConfig.get().autoPublish && Auth.ok()));
   portalCloseForm(); renderPortals();
-  showToast(_ptEditId?'Portail mis à jour ✓ — republie pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
+  if (updateOnline) {
+    showToast('Portail enregistré — mise à jour du lien en cours…','#2e9a63',3500);
+    portalPublish(savedPortal.id, { automatic:true });
+  } else {
+    showToast(wasEditing?'Portail mis à jour ✓ — clique « Republier » pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
+  }
 }
 function portalEdit(id) {
   const p = getPortals().find(x=>x.id===id); if(!p) return;
   _ptEditId = id;
+  _ptWorkspaceId = p.workspaceId || '';
   const set=(i,v)=>{const el=document.getElementById(i);if(el)el.value=v??'';};
   set('pt-mission',p.mission); set('pt-client',p.client); set('pt-total',p.total);
   set('pt-acompte',p.acomptePct); set('pt-step',p.stepIndex); set('pt-pay',p.paymentLink);
@@ -3301,6 +3481,9 @@ function portalEdit(id) {
   (p.deliverables||[]).forEach(d=>portalAddDelivRow(d.label,d.url)); if(!(p.deliverables||[]).length) portalAddDelivRow();
   document.getElementById('pt-submit').textContent='Enregistrer';
   document.getElementById('portal-form').classList.add('visible');
+  const form=document.getElementById('portal-form');
+  if (!form.dataset.summaryBound) { form.addEventListener('input', portalWizardSummary); form.addEventListener('change', portalWizardSummary); form.dataset.summaryBound='1'; }
+  _ptStep=0; portalStep(0);
   document.querySelector('.scroll-area')?.scrollTo({top:0,behavior:'smooth'});
 }
 function portalDelete(id) {
@@ -3326,9 +3509,9 @@ function portalRegen(id) {
 async function portalToggleActive(id) {
   const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
   p.active=!p.active; setPortals(portals); renderPortals();
-  if(p.publishedAt) portalPublish(id); // répercute l'état en ligne
+  if(p.publishedAt) await portalPublish(id, { automatic:true }); // répercute l'état en ligne
 }
-async function portalPublish(id) {
+async function portalPublish(id, { automatic=false }={}) {
   const portals=getPortals(); const p=portals.find(x=>x.id===id); if(!p) return;
   const btn=document.getElementById('pub-'+id);
   const setBtn=t=>{if(btn)btn.textContent=t;};
@@ -3340,10 +3523,10 @@ async function portalPublish(id) {
       const cfg=SiteConfig.get();
       await Cloud.savePortalDoc({ ...p, siteName:cfg.siteName, accent:cfg.accentColor, theme:cfg.theme });
       const url=portalUrlFor(p.id);
-      p.publishedAt=Date.now(); p.url=url; setPortals(portals);
-      await navigator.clipboard.writeText(url).catch(()=>{});
+      p.publishedAt=Date.now(); p.url=url; p.deployVerified=true; setPortals(portals);
+      if (!automatic) await navigator.clipboard.writeText(url).catch(()=>{});
       renderPortals();
-      showToast('✓ Portail en ligne instantanément — lien copié !','#2e9a63',3500);
+      showToast(automatic?'✓ Portail mis à jour en ligne':'✓ Portail en ligne instantanément — lien copié !','#2e9a63',3500);
     } catch(e){ showToast('✗ '+e.message,'#c0392b',3500); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
     return;
   }
@@ -3352,12 +3535,12 @@ async function portalPublish(id) {
   if(!Auth.ok()){ showToast('Connecte-toi (Google) ou GitHub d\'abord','#e4b24a'); showPage('github'); return; }
   if(btn)btn.disabled=true; setBtn('⟳ Publication…');
   try {
-    const { url, built }=await publishPortal(p, setBtn);
-    p.publishedAt=Date.now(); p.url=url; setPortals(portals);
-    await navigator.clipboard.writeText(url).catch(()=>{});
+    const { url, built, sha, fileSha }=await publishPortal(p, setBtn);
+    p.publishedAt=Date.now(); p.url=url; p.deploySha=sha; p.deployFileSha=fileSha; p.deployVerified=built; setPortals(portals);
+    if (!automatic) await navigator.clipboard.writeText(url).catch(()=>{});
     renderPortals();
-    if(built) showToast('✓ Portail en ligne — lien copié !','#2e9a63',3500);
-    else showToast('✓ Publié — lien copié. Le portail sera actif d\'ici ~1 min (bouton « Vérifier »).','#e4b24a',5000);
+    if(built) showToast(automatic?'✓ Portail mis à jour en ligne':'✓ Portail en ligne — lien copié !','#2e9a63',3500);
+    else showToast(automatic?'Mise à jour envoyée — build Pages en attente':'Publication envoyée — lien copié. Vérifie le build Pages avant de partager.','#e4b24a',5000);
   } catch(e){ showToast('✗ '+e.message,'#c0392b',4000); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
 }
 async function portalVerify(id) {
@@ -3365,7 +3548,11 @@ async function portalVerify(id) {
   showToast('Vérification…','#666',1200);
   try {
     const r=await verifyPortal(id);
-    if(r.ok) showToast('✓ Portail en ligne et accessible','#2e9a63',3000);
+    if(r.ok) {
+      const portals=getPortals(), p=portals.find(x=>x.id===id);
+      if(p){p.deployVerified=true;setPortals(portals);renderPortals();}
+      showToast('✓ Portail en ligne et accessible','#2e9a63',3000);
+    }
     else showToast((r.pending?'⏳ ':'✗ ')+r.reason, r.pending?'#e4b24a':'#c0392b', 4000);
   } catch(e){ showToast('✗ '+e.message,'#c0392b',3000); }
 }
@@ -3388,17 +3575,17 @@ function renderPortals() {
   ct.innerHTML=portals.map(p=>{
     const t=Number(p.total)||0, a=Math.round(t*(Number(p.acomptePct)||0)/100), solde=t-a;
     const stepLbl=['Brief','Devis','Acompte','Production','Livraison','Terminé'][p.stepIndex]||'Brief';
-    const pub=p.publishedAt;
+    const pub=p.publishedAt, verified=!!pub && p.deployVerified===true;
     return `<div class="gc" style="padding:14px;${p.active===false?'opacity:.55':''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:160px">
           <div style="font-size:13px;font-weight:700">${esc(p.mission)}${(p.password||p.passwordHash)?' <span title="Protégé par mot de passe">🔒</span>':''}${p.active===false?' <span style="color:var(--red);font-size:9px">DÉSACTIVÉ</span>':''}</div>
           <div style="font-size:10px;color:var(--muted2)">${esc(p.client||'Sans client')} · ${stepLbl} · ${t.toLocaleString('fr')} € (solde ${solde.toLocaleString('fr')} €)</div>
         </div>
-        <span style="font-size:9px;padding:3px 9px;border-radius:10px;background:${pub?'var(--green-dim)':'var(--gold-dim)'};color:${pub?'var(--green)':'var(--gold-l)'};font-weight:700">${pub?'En ligne':'Non publié'}</span>
+        <span style="font-size:9px;padding:3px 9px;border-radius:10px;background:${verified?'var(--green-dim)':'var(--gold-dim)'};color:${verified?'var(--green)':'var(--gold-l)'};font-weight:700">${verified?'En ligne':pub?'Build à vérifier':'Non publié'}</span>
       </div>
       ${pub?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:7px 10px;background:var(--s2);border-radius:6px">
-        <span style="flex:1;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔗 Espace client · en ligne</span>
+        <span style="flex:1;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔗 Espace client · ${verified?'en ligne':'build à vérifier'}</span>
         <a class="btn btn-ghost" style="font-size:9px;padding:3px 8px" href="${esc(p.url)}" target="_blank">Ouvrir ↗</a>
         <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="portalCopy('${p.id}')">Partager</button>
         <button class="btn btn-ghost" style="font-size:9px;padding:3px 8px" onclick="showQR('${esc(p.url)}','${esc(p.mission)}')">⬡ QR</button>
@@ -3473,6 +3660,8 @@ async function refreshRealStats(silent) {
 let _googleUser = null;
 function gateShow() {
   const g = document.getElementById('login-gate'); if (!g) return;
+  const outage = document.getElementById('gate-cloud-outage');
+  if (outage) { outage.style.display = Cloud.unavailableReason ? '' : 'none'; outage.textContent = Cloud.unavailableReason || ''; }
   if (window.Cloud && Cloud.enabled) {
     document.getElementById('gate-google').style.display = 'flex';
     if (Cloud.discordReady()) document.getElementById('gate-discord').style.display = 'flex';
@@ -3496,10 +3685,7 @@ async function gateGoogle() {
   try {
     await Cloud.signInGoogle();   // la suite est gérée par Cloud.onAuth → afterGoogleLogin
   } catch (e) {
-    const m = e.code === 'auth/popup-blocked' ? 'Pop-up bloquée — autorise les pop-ups pour ce site'
-            : e.code === 'auth/unauthorized-domain' ? 'Domaine non autorisé — ajoute-le dans Firebase → Authentication → Settings → Authorized domains'
-            : e.code === 'auth/popup-closed-by-user' ? 'Connexion annulée'
-            : (e.message || 'Erreur de connexion');
+    const m = Cloud.authErrorMessage(e);
     if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✗ ' + m; }
     if (btn) btn.disabled = false;
   }

@@ -12,7 +12,7 @@ function loadCore() {
   const context = { console, setTimeout, localStorage, window: {}, document: {} };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync('js/core.js', 'utf8') +
-    ';globalThis.exported={GH,SiteConfig,generateSite,ensureReviewClient};', context);
+    ';globalThis.exported={GH,Auth,SiteConfig,SiteAutoPublish,generateSite,buildAnalyticsProjectManifest,deployPortfolio,publishPortal,verifyPortal,ensureReviewClient};', context);
   return { ...context.exported, localStorage, context };
 }
 
@@ -115,4 +115,212 @@ test('generated portfolio includes readable reviews and optional wheel smoothing
   }
   const without = generateSite({ ...cfg, smoothWheel: false }, [], []);
   assert.doesNotMatch(without, /addEventListener\('wheel'/);
+});
+
+test('publication waits for the build of its own commit and omits local deployment metadata', async () => {
+  const { GH, Auth, SiteConfig, deployPortfolio, localStorage, context } = loadCore();
+  context.setTimeout = callback => { callback(); return 0; };
+  Auth.ok = () => true; Auth.token = () => 'token'; Auth.owner = () => 'owner';
+  SiteConfig.save({ ...SiteConfig.defaults(), repo: 'owner/site',
+    lastDeploy: { url: 'https://old.example/', ts: 1 },
+    contactMethods: [{ id: 'phone', on: false, value: 'private phone' }],
+    projectTags: ['Unpublished draft'] });
+  const newSha = 'a'.repeat(40), oldSha = 'b'.repeat(40);
+  let committed, polls = 0;
+  GH.ensureRepo = async () => {}; GH.enablePages = async () => {};
+  GH.commitFiles = async (_token, _owner, _repo, files) => { committed = files; return newSha; };
+  GH.pagesInfo = async () => ({ html_url: 'https://owner.github.io/site/' });
+  GH.pagesLatestBuild = async () => (++polls === 1
+    ? { status: 'built', commit: oldSha }
+    : { status: 'built', commit: newSha });
+  const result = await deployPortfolio();
+  assert.equal(result.verified, true);
+  assert.equal(result.sha, newSha);
+  assert.equal(polls, 2);
+  const manifest = JSON.parse(committed.find(f => f.path === 'site-config.json').content);
+  assert.equal(manifest.lastDeploy, undefined);
+  assert.equal(manifest.contactMethods, undefined);
+  assert.equal(manifest.projectTags, undefined);
+  assert.doesNotMatch(committed.find(f => f.path === 'index.html').content, /private phone|Unpublished draft/);
+  assert.equal(JSON.parse(localStorage.getItem(SiteConfig._K)).lastDeploy.sha, newSha);
+  assert.equal(SiteConfig.get().autoPublish, true, 'la première publication vérifiée active les futures mises à jour');
+});
+
+test('an explicit auto-publish opt-out survives a manual publication', async () => {
+  const { GH, Auth, SiteConfig, deployPortfolio } = loadCore();
+  Auth.ok = () => true; Auth.token = () => 'token'; Auth.owner = () => 'owner';
+  SiteConfig.save({ ...SiteConfig.defaults(), repo: 'owner/site', autoPublishChoice: 'off' });
+  GH.ensureRepo = async () => {}; GH.enablePages = async () => {};
+  const manualSha = 'c'.repeat(40);
+  GH.commitFiles = async () => manualSha;
+  GH.pagesInfo = async () => ({ html_url: 'https://owner.github.io/site/' });
+  GH.pagesLatestBuild = async () => ({ status: 'built', commit: manualSha });
+  assert.equal((await deployPortfolio()).verified, true);
+  assert.equal(SiteConfig.get().autoPublish, false);
+});
+
+test('portal publication waits for its own Pages build and later builds still verify it', async () => {
+  const { GH, Auth, SiteConfig, publishPortal, verifyPortal, localStorage, context } = loadCore();
+  context.setTimeout = callback => { callback(); return 0; };
+  Auth.ok = () => true; Auth.token = () => 'token'; Auth.owner = () => 'owner';
+  SiteConfig.save({ ...SiteConfig.defaults(), repo: 'owner/site' });
+  GH.ensureRepo = async () => {}; GH.enablePages = async () => {};
+  GH.fileSha = async () => 'page-blob';
+  GH.commitFiles = async () => 'portal-sha';
+  GH.api = async () => ({ sha: 'portal-blob' });
+  let polls = 0;
+  GH.pagesLatestBuild = async () => (++polls === 1
+    ? { status: 'built', commit: 'older-sha' }
+    : { status: 'built', commit: 'portal-sha' });
+  const result = await publishPortal({ id: 'portal-1', mission: 'Logo', active: false });
+  assert.equal(result.built, true);
+  assert.equal(result.sha, 'portal-sha');
+  assert.equal(result.fileSha, 'portal-blob');
+  assert.equal(polls, 2);
+
+  localStorage.setItem('hub_portals', JSON.stringify([{ id: 'portal-1', deploySha: 'portal-sha', deployFileSha: 'portal-blob' }]));
+  GH.pagesLatestBuild = async () => ({ status: 'built', commit: 'newer-site-sha' });
+  assert.equal((await verifyPortal('portal-1')).ok, true);
+});
+
+test('project filters, analytics manifest, branding and optional audio work in all three public themes', () => {
+  const { SiteConfig, generateSite, buildAnalyticsProjectManifest } = loadCore();
+  const project = { id: 'p1', title: 'Exemple', tags: ['Motion', 'Logo'], cover: '' };
+  for (const layoutStyle of ['float', 'sidebar', 'bento']) {
+    const html = generateSite({ ...SiteConfig.defaults(), layoutStyle,
+      siteLogo: 'https://example.com/logo.png', favicon: 'https://example.com/icon.png',
+      titleEffect: 'glow', backgroundMusic: 'https://example.com/music.mp3' }, [project], []);
+    assert.match(html, /data-tag="motion"/);
+    assert.match(html, /data-tags="\[&quot;motion&quot;,&quot;logo&quot;\]"/);
+    const manifest = buildAnalyticsProjectManifest(html, [project]);
+    assert.equal(manifest.error, null);
+    assert.equal(JSON.stringify(manifest.entries), JSON.stringify([{ id: 'p1', title: 'Exemple' }]));
+    assert.match(html, /class="site-sound"/);
+    assert.match(html, /rel="icon" href="https:\/\/example.com\/icon.png"/);
+    for (const [, script] of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) {
+      if (script.trim()) new vm.Script(script);
+    }
+  }
+});
+
+test('custom logo and site name can appear together in every public layout', () => {
+  const { SiteConfig, generateSite } = loadCore();
+  for (const layoutStyle of ['float', 'sidebar', 'bento']) {
+    const html = generateSite({ ...SiteConfig.defaults(), layoutStyle,
+      siteName: 'Folio', siteLogo: 'https://example.com/logo.png',
+      brandMode: 'both', brandSize: 48 }, [], []);
+    assert.match(html, /class="brand-img" style="width:48px;height:48px"/);
+    assert.match(html, /Folio/);
+  }
+});
+
+test('Clients & Projets keeps local workspaces visible without Firebase', async () => {
+  const data = new Map();
+  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
+  const local = { token: 'local-token', clientName: 'Alice', projectName: 'Identité', localOnly: true };
+  const ClientWorkspace = { all: () => [local], migrate: async () => ({}) };
+  const body = { innerHTML: '' };
+  const context = { console, localStorage, ClientWorkspace,
+    window: { ClientWorkspace }, document: { getElementById: id => id === 'cp-body' ? body : null } };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('js/clients.js', 'utf8'), context);
+  const CP = context.window.CP;
+  CP._paint = () => { body.innerHTML = CP._links.map(x => x.projectName).join(','); };
+  await CP.render();
+  assert.equal(body.innerHTML, 'Identité');
+  assert.equal(CP._links[0].localOnly, true);
+  assert.match(CP._actions(CP._links[0]), /Local/);
+  assert.doesNotMatch(CP._actions(CP._links[0]), /Ouvrir le lien client/);
+});
+
+test('manual projects link to an existing client and create a new fiche only when needed', () => {
+  const data = new Map([['hub_clients', JSON.stringify([{ id: 'alice', name: 'Alice' }])]]);
+  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
+  const fields = {
+    'cp-manual-client': { value: ' alice ' },
+    'cp-manual-name': { value: 'Identité' },
+    'cp-manual-type': { value: 'Design' },
+  };
+  const match = { hidden: true, replaceChildren() { this.children = []; }, append(...nodes) { this.children.push(...nodes); } };
+  const workspaces = [];
+  const ClientWorkspace = {
+    all: () => workspaces,
+    ensure(token, patch) { const item = { token, ...patch }; workspaces.push(item); return item; },
+    save() {},
+  };
+  let queued = 0, viewed = '';
+  const context = { console, localStorage, ClientWorkspace, SiteAutoPublish: { queue: () => queued++ },
+    crypto: { randomUUID: () => '12345678-1234-1234-1234-123456789abc' },
+    window: { ClientWorkspace, showToast() {} },
+    document: {
+      getElementById: id => id === 'cp-manual-match' ? match : fields[id] || null,
+      createElement: () => ({ textContent: '', onclick: null }),
+      querySelectorAll: () => [],
+    } };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('js/clients.js', 'utf8'), context);
+  const CP = context.window.CP;
+  CP._paint = () => {}; CP._badge = () => {}; CP.viewClient = id => { viewed = id; };
+  assert.equal(CP.checkManualClient().id, 'alice');
+  assert.equal(match.hidden, false);
+  assert.match(match.children[0].textContent, /déjà existant/);
+  CP.saveManual();
+  assert.equal(JSON.parse(localStorage.getItem('hub_clients')).length, 1);
+  assert.equal(workspaces[0].clientId, 'alice');
+  assert.equal(workspaces[0].projectType, 'Design');
+  assert.equal(viewed, 'alice');
+  assert.equal(queued, 0);
+
+  fields['cp-manual-client'].value = 'Bob';
+  fields['cp-manual-name'].value = 'Site';
+  CP.saveManual();
+  assert.equal(JSON.parse(localStorage.getItem('hub_clients')).length, 2);
+  assert.equal(workspaces[1].clientName, 'Bob');
+  assert.equal(queued, 1);
+});
+
+test('a portal launched from a client dossier keeps that exact project link', () => {
+  const data = new Map();
+  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
+  const calls = [];
+  const context = { console, localStorage, setTimeout: fn => fn(),
+    document: { getElementById: () => null, addEventListener: () => {} },
+    window: { showPage: page => calls.push(page), portalOpenForm: prefill => calls.push(prefill) } };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('js/client-workspace.js', 'utf8'), context);
+  const ClientWorkspace = context.window.ClientWorkspace;
+  ClientWorkspace.ensure('project-1', { clientName: 'Alice', projectName: 'Logo' });
+  ClientWorkspace.ensure('project-2', { clientName: 'Alice', projectName: 'Site' });
+  ClientWorkspace._current = { w: ClientWorkspace.get('project-2') };
+  ClientWorkspace.editPortal('');
+  assert.equal(calls[0], 'portals');
+  assert.equal(calls[1].workspaceId, 'project-2');
+  localStorage.setItem('hub_portals', JSON.stringify([{ id: 'portal-1', client: 'Alice' }]));
+  assert.equal(ClientWorkspace.attach('portal-1', 'project-2', 'portal'), true);
+  assert.equal(JSON.parse(localStorage.getItem('hub_portals'))[0].workspaceId, 'project-2');
+  assert.equal(ClientWorkspace.get('project-2').refs.portal, 'portal-1');
+  assert.equal(ClientWorkspace.get('project-1').refs.portal, undefined);
+});
+
+test('public Firebase functions use the same project settings as the dashboard', async () => {
+  const { PROJECT_ID, WEB_API_KEY, STORAGE_BUCKET } = await import('../firebase/edge-config.js');
+  const context = { window: {} };
+  vm.runInNewContext(fs.readFileSync('firebase/firebase-config.js', 'utf8'), context);
+  const cfg = context.window.FIREBASE_CONFIG;
+  assert.equal(PROJECT_ID, cfg.projectId);
+  assert.equal(WEB_API_KEY, cfg.apiKey);
+  assert.equal(STORAGE_BUCKET, cfg.storageBucket);
+  await Promise.all(['c/[token].js', 'request/[token].js', 'estimate/[code].js', 'u/[pseudo].js']
+    .map(path => import('../functions/' + path)));
+});
+
+test('invalid legacy Firebase config leaves GitHub access available', () => {
+  const context = { console, window: { FIREBASE_CONFIG: { disabled: true, apiKey: 'invalid' } } };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('js/cloud.js', 'utf8'), context);
+  assert.equal(context.window.Cloud.enabled, false);
+  assert.match(context.window.Cloud.unavailableReason, /Firebase est suspendu/);
+  context.document = { addEventListener: () => {} };
+  vm.runInContext(fs.readFileSync('js/analytics.js', 'utf8'), context);
+  assert.match(context.window.Analytics._emptyMsg(), /Statistiques cloud suspendues/);
 });
