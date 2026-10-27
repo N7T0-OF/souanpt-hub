@@ -34,12 +34,12 @@ les déploiements automatiques de `main` dans **Branch control** avant tout
 téléversement direct pour éviter une publication concurrente. Garde les aperçus
 des branches activés si tu souhaites voir les PR.
 
-**Mode B — Via GitHub Actions (publication automatisée principale)**
-Après fusion sur `main`, la CI valide tests et artefacts avant le déploiement. Le
-workflow Cloudflare publie le Worker Analytics puis Pages et vérifie le commit
-servi. Il échoue explicitement si `CLOUDFLARE_API_TOKEN` manque. N'active pas en
-même temps un build Git natif Cloudflare pour ce projet, afin d'éviter deux
-déploiements concurrents.
+**Mode B — Via GitHub Actions**
+Après fusion sur `main`, la CI valide tests et artefacts, puis publie
+automatiquement sur GitHub Pages et vérifie le commit servi. Cloudflare reste
+un déploiement manuel séparé : son workflow publie le Worker Analytics puis
+Pages et exige `CLOUDFLARE_API_TOKEN`. N'active pas en même temps un build Git
+natif Cloudflare pour `main`, afin d'éviter deux déploiements concurrents.
 
 Le mode direct sert au téléversement manuel de Pages uniquement; pour le Worker,
 utilise le workflow contrôlé et configure ses secrets selon

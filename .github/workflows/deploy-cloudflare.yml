@@ -1,8 +1,6 @@
 name: Deploy hub and protected analytics to Cloudflare
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
