@@ -264,6 +264,43 @@ test('adding a client survives a form repaint and an unavailable auto publicatio
   assert.match(notices.at(-1), /existe déjà/);
 });
 
+test('anonymous preview mode works only on deployment previews and never creates an admin session', () => {
+  const saved = new Map();
+  const sessionStorage = { getItem: key => saved.get(key) ?? null,
+    setItem: (key, value) => saved.set(key, value), removeItem: key => saved.delete(key) };
+  const banner = { hidden: true };
+  const calls = [];
+  const location = { hostname: '505beab1.souanptjub.pages.dev' };
+  let connected = false;
+  const Auth = { ok: () => connected };
+  const context = { location, sessionStorage, Auth, Cloud: { user: () => null },
+    document: { getElementById: id => id === 'preview-mode-banner' ? banner : null },
+    window: { CP: { setView: view => calls.push(view) }, addEventListener() {} },
+    gateHide: () => calls.push('hide'), gateShow: () => calls.push('gate'),
+    showPage: page => calls.push(page), showToast() {} };
+  vm.createContext(context);
+  const html = fs.readFileSync('app.html', 'utf8');
+  vm.runInContext(html.slice(html.indexOf('const PreviewMode ='), html.indexOf('function gateShow()')) +
+    ';globalThis.previewMode=PreviewMode;', context);
+  context.previewMode.enter();
+  assert.equal(context.previewMode.active(), true);
+  assert.equal(banner.hidden, false);
+  assert.deepEqual(calls, ['hide', 'cp', 'clients']);
+  assert.equal(Auth.ok(), false);
+
+  context.previewMode.leave();
+  assert.equal(banner.hidden, true);
+  assert.equal(calls.at(-1), 'gate');
+  location.hostname = 'souanptjub.pages.dev';
+  context.previewMode.enter();
+  assert.equal(context.previewMode.active(), false);
+  assert.equal(saved.size, 0);
+  location.hostname = '505beab1.souanptjub.pages.dev';
+  connected = true;
+  context.previewMode.enter();
+  assert.equal(saved.size, 0);
+});
+
 test('manual projects link to an existing client and create a new fiche only when needed', () => {
   const data = new Map([['hub_clients', JSON.stringify([{ id: 'alice', name: 'Alice' }])]]);
   const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
