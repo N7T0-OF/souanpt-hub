@@ -2930,19 +2930,20 @@ function renderLinks() {
 function deleteLink(id) { localStorage.setItem('hub_links', JSON.stringify(JSON.parse(localStorage.getItem('hub_links')||'[]').filter(l=>l.id!==id))); SiteAutoPublish.queue(); renderLinks(); }
 
 function addClient() {
-  const name=document.getElementById('cl-name')?.value.trim(); if(!name) return;
+  const name=(document.getElementById('cl-name')?.value || CP._clientDraft.name || '').trim();
+  if(!name){ showToast('Indique le nom du client','#c0392b',2500); document.getElementById('cl-name')?.focus(); return; }
   let cl; try { cl=JSON.parse(localStorage.getItem('hub_clients')||'[]'); } catch { cl=[]; }
   if(!Array.isArray(cl)) cl=[];
   const existing=cl.find(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===name.toLocaleLowerCase('fr'));
   if(existing){CP.checkClientDuplicate();showToast('Ce client existe déjà — utilise « Voir la fiche »','#e4b24a',3500);return;}
-  const newClient={ id:Date.now().toString(36)+Math.random().toString(36).slice(2,7), name, type:document.getElementById('cl-type')?.value||'', status:'active', progress:0, revenue:0, createdAt:Date.now() };
+  const newClient={ id:Date.now().toString(36)+Math.random().toString(36).slice(2,7), name, type:document.getElementById('cl-type')?.value||CP._clientDraft.type||'', status:'active', progress:0, revenue:0, createdAt:Date.now() };
   cl.push(newClient);
-  localStorage.setItem('hub_clients', JSON.stringify(cl));
-  SiteAutoPublish.queue();
-  renderClients();
+  try { localStorage.setItem('hub_clients', JSON.stringify(cl)); }
+  catch (e) { showToast('Impossible d’enregistrer ce client dans le navigateur','#c0392b',4000); return; }
   CP._clientFormOpen=false; CP._clientDraft={name:'',type:''};
-  document.getElementById('add-client-form')?.classList.remove('visible');
   CP.viewClient(newClient.id);
+  // L'affichage local ne doit pas dépendre d'une publication distante.
+  try { SiteAutoPublish.queue(); } catch (e) { console.warn('[client] publication automatique',e); }
   showToast('Client ajouté ✓','#2e9a63',1800);
 }
 function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); SiteAutoPublish.queue(); renderClients(); }

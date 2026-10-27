@@ -25,7 +25,7 @@ jobs:
         run: |
           while IFS= read -r -d '' file; do node --check "$file"; done < <(find js functions cloudflare scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0)
       - name: Run tests
-        run: node --test tests/*.test.mjs
+        run: node --test tests/*.test.mjs tests/*.test.cjs
       - name: Install Java 21 for Firestore emulator
         uses: actions/setup-java@v4
         with:

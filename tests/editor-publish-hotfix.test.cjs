@@ -233,6 +233,37 @@ test('Clients & Projets keeps local workspaces visible without Firebase', async 
   assert.doesNotMatch(CP._actions(CP._links[0]), /Ouvrir le lien client/);
 });
 
+test('adding a client survives a form repaint and an unavailable auto publication', () => {
+  const data = new Map();
+  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
+  const viewed = [], notices = [];
+  const CP = {
+    _clientDraft: { name: 'Nouveau client', type: 'Design' }, _clientFormOpen: true,
+    viewClient: id => viewed.push(id), checkClientDuplicate() {},
+  };
+  const context = {
+    console: { warn() {} }, localStorage, CP,
+    document: { getElementById: () => null },
+    SiteAutoPublish: { queue() { throw new Error('publication indisponible'); } },
+    showToast: message => notices.push(message),
+  };
+  vm.createContext(context);
+  const html = fs.readFileSync('app.html', 'utf8');
+  vm.runInContext(html.slice(html.indexOf('function addClient()'), html.indexOf('function deleteClient(')), context);
+  context.addClient();
+  const saved = JSON.parse(localStorage.getItem('hub_clients'));
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].name, 'Nouveau client');
+  assert.equal(saved[0].type, 'Design');
+  assert.equal(viewed[0], saved[0].id);
+  assert.equal(CP._clientFormOpen, false);
+  assert.match(notices.at(-1), /Client ajouté/);
+  CP._clientDraft.name = 'Nouveau client';
+  context.addClient();
+  assert.equal(JSON.parse(localStorage.getItem('hub_clients')).length, 1);
+  assert.match(notices.at(-1), /existe déjà/);
+});
+
 test('manual projects link to an existing client and create a new fiche only when needed', () => {
   const data = new Map([['hub_clients', JSON.stringify([{ id: 'alice', name: 'Alice' }])]]);
   const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };

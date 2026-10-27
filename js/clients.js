@@ -91,6 +91,7 @@
       return existing || null;
     },
     viewClient(id) {
+      this.expandedClientIds.add(String(id));
       this.toggleClientForm(false); this.setView('clients');
       const card = document.getElementById('client-card-' + id);
       if (card) { card.open = true; card.scrollIntoView({ behavior:'smooth', block:'center' }); card.focus({ preventScroll:true }); card.style.outline = '2px solid var(--accent)'; setTimeout(() => { card.style.outline = ''; }, 2500); }
@@ -234,7 +235,7 @@
             <span class="cp-roster-sub">${roster.length} fiche${roster.length > 1 ? 's' : ''}${withProject.size ? ' · ' + withProject.size + ' avec projet' : ''}</span></span>
           <button class="btn btn-ghost" style="font-size:10px;margin-left:auto" onclick="CP.toggleClientForm()">+ Client</button>
         </div>
-        <div class="form-box${this._clientFormOpen ? ' visible' : ''}" id="add-client-form">
+        <form class="form-box${this._clientFormOpen ? ' visible' : ''}" id="add-client-form" onsubmit="event.preventDefault();addClient()">
           <div class="biz-form">
             <div><div class="prop-label">Nom</div><input class="prop-input" id="cl-name" placeholder="Entreprise" value="${this._esc(this._clientDraft.name)}" oninput="CP._clientDraft.name=this.value;CP.checkClientDuplicate()"></div>
             <div><div class="prop-label">Type</div><input class="prop-input" id="cl-type" placeholder="Design, Dev..." value="${this._esc(this._clientDraft.type)}" oninput="CP._clientDraft.type=this.value"></div>
@@ -242,10 +243,10 @@
           <div id="cl-duplicate" role="alert" style="color:var(--gold-l);font-size:11px;margin-top:8px" hidden></div>
           <div class="hintbox" style="margin-top:10px">💡 La fiche est partagée : <strong style="color:var(--text)">Facturation</strong> et <strong style="color:var(--text)">Portails</strong> proposent ce nom automatiquement — et créent la fiche si elle n'existe pas.</div>
           <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn btn-accent" onclick="addClient()">Ajouter</button>
-            <button class="btn btn-ghost" onclick="CP.toggleClientForm(false)">Annuler</button>
+            <button class="btn btn-accent" type="submit">Ajouter</button>
+            <button class="btn btn-ghost" type="button" onclick="CP.toggleClientForm(false)">Annuler</button>
           </div>
-        </div>
+        </form>
         <div class="cp-roster-grid" id="clients-list"></div>
       </div>`;
 
