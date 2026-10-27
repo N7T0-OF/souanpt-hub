@@ -1,0 +1,149 @@
+name: Create corrective release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  package-and-release:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require a validated main commit and matching version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          version="$(node -e 'const fs=require("fs");const s=fs.readFileSync("js/quote.js","utf8");process.stdout.write(s.match(/const\s+HUB_VERSIONS\s*=\s*\[\s*\[["\x27](\d+\.\d+\.\d+)/)[1])')"
+          test "$RELEASE_TAG" = "v$version" || { echo "Tag $RELEASE_TAG does not match v$version"; exit 1; }
+      - name: Require successful production deployments for this commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflows = ['deploy.yml', 'deploy-cloudflare.yml'];
+            for (const workflow_id of workflows) {
+              const deadline = Date.now() + 30 * 60 * 1000;
+              let run;
+              while (Date.now() < deadline) {
+                const { data } = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id,
+                  head_sha: context.sha,
+                  per_page: 20,
+                });
+                run = data.workflow_runs.find(item => ['push', 'workflow_dispatch'].includes(item.event) && item.head_branch === 'main');
+                if (run?.status === 'completed') {
+                  if (run.conclusion !== 'success') {
+                    core.setFailed(workflow_id + ' did not successfully deploy commit ' + context.sha);
+                    return;
+                  }
+                  core.info(workflow_id + ' succeeded for ' + context.sha);
+                  break;
+                }
+                await new Promise(resolve => setTimeout(resolve, 15000));
+              }
+              if (!run || run.status !== 'completed' || run.conclusion !== 'success') {
+                core.setFailed(workflow_id + ' did not successfully deploy commit ' + context.sha);
+                return;
+              }
+            }
+      - name: Build release archives and checksums
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          pages="$RUNNER_TEMP/${RELEASE_TAG}-pages"
+          cloudflare="$RUNNER_TEMP/${RELEASE_TAG}-cloudflare"
+          node scripts/prepare-deploy.mjs --channel=release-pages --output="$pages"
+          node scripts/prepare-deploy.mjs --channel=release-cloudflare --output="$cloudflare"
+          (cd "$pages" && zip -qr "$RUNNER_TEMP/${RELEASE_TAG}-pages.zip" .)
+          (cd "$cloudflare" && zip -qr "$RUNNER_TEMP/${RELEASE_TAG}-cloudflare.zip" .)
+          cd "$RUNNER_TEMP"
+          sha256sum "${RELEASE_TAG}-pages.zip" "${RELEASE_TAG}-cloudflare.zip" > SHA256SUMS.txt
+      - name: Verify current production deployments
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          const expected = process.env.EXPECTED_SHA;
+          if (!process.env.CF_TOKEN) throw new Error('CLOUDFLARE_API_TOKEN is required to verify the current production deployment');
+          const projectUrl = 'https://api.cloudflare.com/client/v4/accounts/3812fed3ef304d1dea00c6498d09aa52/pages/projects/souanpthub';
+          const sites = [
+            ['GitHub Pages', 'https://n7t0-of.github.io/souanpt-hub/build-info.json', 'github-pages'],
+            ['Cloudflare Pages', 'https://souanptjub.pages.dev/build-info.json', 'cloudflare'],
+          ];
+          const deadline = Date.now() + 120000;
+          while (true) {
+            try {
+              const projectResponse = await fetch(projectUrl, {
+                headers: { Authorization: `Bearer ${process.env.CF_TOKEN}` }, signal: AbortSignal.timeout(15000),
+              });
+              if (!projectResponse.ok) throw new Error(`Cloudflare Pages project lookup failed (${projectResponse.status})`);
+              const data = await projectResponse.json();
+              const project = data.result;
+              if (!data.success || project?.subdomain !== 'souanptjub.pages.dev'
+                || project.source?.config?.production_deployments_enabled !== false
+                || project.canonical_deployment?.environment !== 'production'
+                || project.canonical_deployment?.deployment_trigger?.metadata?.commit_hash !== expected) {
+                throw new Error('Cloudflare canonical production deployment does not match this release commit');
+              }
+              for (const [name, url, channel] of sites) {
+                const response = await fetch(`${url}?release-check=${expected}-${Date.now()}`, {
+                  headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(15000),
+                });
+                if (!response.ok) throw new Error(`${name} marker lookup failed (${response.status})`);
+                const marker = await response.json();
+                if (marker.commit !== expected || marker.channel !== channel) {
+                  throw new Error(`${name} currently serves ${marker.commit || 'no commit'}, expected ${expected}`);
+                }
+                console.log(`${name} currently serves ${expected}.`);
+              }
+              break;
+            } catch (error) {
+              if (Date.now() >= deadline) throw error;
+              console.warn(`Production verification pending: ${error.message}`);
+              await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+          }
+          NODE
+      - name: Verify current protected Analytics Worker
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: node scripts/verify-analytics-deploy.mjs
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Souanpt Hub ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            Validated corrective release. Public deployment archives include a `build-info.json` marker with the source commit SHA.
+
+            Analytics ingestion stays closed until its Cloudflare rate-limit binding, secrets, and explicit profile opt-in are configured.
+          files: |
+            ${{ runner.temp }}/${{ github.ref_name }}-pages.zip
+            ${{ runner.temp }}/${{ github.ref_name }}-cloudflare.zip
+            ${{ runner.temp }}/SHA256SUMS.txt

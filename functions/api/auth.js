@@ -51,11 +51,28 @@ export function allowedOrigins(env) {
   return new Set(DEFAULT_ORIGINS.concat(extra));
 }
 
+/**
+ * P0 — CSRF. Le cookie est `SameSite=None` (le hub GitHub Pages l'appelle en
+ * cross-site) : n'importe quelle page, y compris un site relayé par /u/<pseudo>
+ * sur NOTRE domaine, peut faire partir une requête qui le porte. CORS empêche
+ * seulement de LIRE la réponse, pas l'exécution. Toute opération d'écriture
+ * exige donc une origine de la liste blanche (ou la même origine que le
+ * relais) ; une requête sans en-tête Origin est refusée.
+ */
+export function originAllowed(request, env) {
+  const origin = request.headers.get('origin') || '';
+  if (!origin) return false;
+  if (allowedOrigins(env).has(origin)) return true;
+  try { return origin === new URL(request.url).origin; } catch { return false; }
+}
+
 /** En-têtes CORS : `credentials` impose une origine EXACTE (jamais `*`). */
 export function corsHeaders(request, env) {
   const origin = request.headers.get('origin') || '';
   const h = {
-    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    // PUT/PATCH/DELETE doivent être listés, sinon le preflight du hub GitHub
+    // Pages échoue sur les publications et suppressions passées par /api/gh.
+    'access-control-allow-methods': 'GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS',
     'access-control-allow-headers': 'content-type, accept',
     'access-control-max-age': '86400',
     'vary': 'Origin',
@@ -252,12 +269,16 @@ export async function onRequest(context) {
   const op = new URL(request.url).searchParams.get('op') || '';
   try {
     if (op === 'status')  return await statusOp(request, env);
+    // Ouvrir, importer ou fermer une session modifie le cookie : POST d'une
+    // origine autorisée uniquement (sinon un site tiers pourrait connecter la
+    // victime au compte GitHub de l'attaquant ou la déconnecter).
+    if (request.method !== 'POST') return json(request, env, { error: 'op inconnue : ' + op }, 400);
+    if (!originAllowed(request, env)) return json(request, env, { error: 'origine refusée' }, 403);
     if (op === 'logout')  return new Response('{}', {
       status: 200,
       headers: Object.assign({ 'content-type': 'application/json', 'cache-control': 'no-store' },
         corsHeaders(request, env), { 'set-cookie': clearCookie(request) }),
     });
-    if (request.method !== 'POST') return json(request, env, { error: 'op inconnue : ' + op }, 400);
 
     const raw = await body(request);
     if (op === 'device') return await deviceOp(request, env);
@@ -265,6 +286,7 @@ export async function onRequest(context) {
     if (op === 'import') return await importOp(request, env, raw);
     return json(request, env, { error: 'op inconnue : ' + op }, 400);
   } catch (e) {
-    return json(request, env, { error: 'relais : ' + (e && e.message || 'erreur') }, 502);
+    // Pas de détail interne renvoyé au navigateur.
+    return json(request, env, { error: 'relais indisponible' }, 502);
   }
 }

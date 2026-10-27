@@ -4,16 +4,22 @@
 
 Cloudflare Pages est plus fiable que GitHub Pages (fini le « Deployment failed »).
 
-1. Va sur https://dash.cloudflare.com → **Workers & Pages → Create → Pages → Connect to Git**.
-2. Autorise GitHub, choisis le repo **N7T0-OF/souanpt-hub**.
-3. Réglages de build :
-   - **Framework preset** : *None*
-   - **Build command** : *(laisser vide)*
-   - **Build output directory** : `/`
-4. **Save and Deploy**. Ton hub sera en ligne sur `https://souanpt-hub.pages.dev`
-   (chaque `git push` redéploie automatiquement).
+1. Utilise le projet Pages existant `souanpthub`, connecté à Git pour les aperçus de PR.
+2. Dans **Build → Branch control**, désactive **Enable automatic production branch deployments** pour éviter deux publications concurrentes sur `main`.
+3. Configure le secret GitHub `CLOUDFLARE_API_TOKEN`, limité aux droits de
+   publication nécessaires sur le compte Cloudflare et le projet.
+4. Le workflow `.github/workflows/deploy-cloudflare.yml` vérifie le réglage via l'API Cloudflare, déploie le Worker Analytics et attend que son `/status` public confirme le SHA du commit et une ingestion fermée, puis publie le bundle allowlisté et contrôle le `build-info.json` servi. Si le Worker reste ancien ou inaccessible, Pages n'est pas publié.
 
-> ⚠ Après le déploiement, ajoute `souanpt-hub.pages.dev` (et ton domaine perso plus tard)
+Les aperçus de PR issus de la connexion Git Cloudflare sont actuellement visuels :
+leur `build-info.json` renvoie `404`. La CI prépare et valide séparément l'artefact
+à liste autorisée; seul le workflow de production direct le publie et contrôle
+son SHA servi.
+
+Si le secret manque, le workflow échoue explicitement; aucune publication n'est
+annoncée. Voir `docs/migration/02-delivery-and-security.md` avant d'activer
+Analytics : son Worker doit être protégé et déployé séparément du script Pages manuel.
+
+> ⚠ Après le déploiement, ajoute `souanptjub.pages.dev` (et ton domaine perso plus tard)
 > dans **Firebase → Authentication → Settings → Authorized domains**, sinon la connexion
 > Google/Discord sera refusée sur ce domaine.
 
@@ -87,10 +93,9 @@ Quand tout est en place, préviens-moi : on teste le flux ensemble et je corrige
 
 ### a) Déployer les Functions
 
-Deux cas, comme au §1 :
-
-- **Connect to Git** → chaque `git push` redéploie `functions/` automatiquement ;
-- **Direct Upload** → relancer `deploy-cloudflare.ps1`.
+Le workflow de production publie `functions/` avec le bundle Pages sur `main`.
+La connexion Git Cloudflare continue à fournir les aperçus des branches et PR.
+`deploy-cloudflare.ps1` reste un outil manuel de secours pour Pages seulement.
 
 Vérifier que `_routes.json` contient `"/api/*"` (déjà versionné) : sans ça,
 Cloudflare ne facture pas… et n'exécute pas les Functions.
@@ -119,15 +124,16 @@ variables** → *Add variable* :
 Puis **Save** puis redéployer (une variable d'environnement ne s'applique qu'au
 prochain build).
 
-Les origines déjà admises : `https://souanpt-hub.pages.dev`,
-`https://souanpt-hub.fr`, `https://n7t0-of.github.io`.
+Les origines déjà admises : `https://souanptjub.pages.dev`,
+`https://souanpt-hub.pages.dev`, `https://souanpt-hub.fr` et
+`https://n7t0-of.github.io`.
 
 ### d) Vérifier
 
 ```bash
-curl -s "https://souanpt-hub.pages.dev/api/auth?op=status"
+curl -s "https://souanptjub.pages.dev/api/auth?op=status"
 # → {"relay":true,"configured":true,"user":null}
-curl -si "https://souanpt-hub.pages.dev/api/gh?path=/user" | head -1
+curl -si "https://souanptjub.pages.dev/api/gh?path=/user" | head -1
 # → HTTP/2 401  {"error":"session"}      (normal : pas de cookie)
 ```
 

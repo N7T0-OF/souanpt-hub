@@ -11,14 +11,51 @@
  *     est reconstruite à partir d'un chemin, jamais d'une URL fournie) ;
  *   • sans cookie valide → 401, et le client bascule sur son mode dégradé.
  *
- * Seules les origines de la liste blanche peuvent l'utiliser (CORS).
+ * Seules les origines de la liste blanche peuvent l'utiliser (CORS), et toute
+ * écriture exige un en-tête Origin autorisé (CSRF, voir originAllowed).
+ *
+ * P0 — ce n'est PAS un proxy générique : seules les opérations GitHub dont le
+ * hub a besoin (ALLOWED) passent. Le jeton historique porte `repo workflow
+ * pages`; sans cette liste, une requête forgée pourrait ajouter une clé de
+ * déploiement, un webhook ou un collaborateur sur un dépôt de la victime.
  */
 
-import { corsHeaders, json, readSession } from './auth.js';
+import { corsHeaders, json, originAllowed, readSession } from './auth.js';
 
 const API = 'https://api.github.com';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'];
+
+/** Opérations autorisées : [méthodes, motif du chemin NORMALISÉ, sans query].
+ *  Inventaire tiré des appels `GH.api` de js/core.js. HEAD suit GET. */
+const SEG = '[^/]+';
+const REPO = `/repos/${SEG}/${SEG}`;
+export const ALLOWED = [
+  [['GET'], '/user'],
+  [['POST'], '/user/repos'],
+  [['GET'], REPO],
+  [['GET', 'PUT', 'DELETE'], `${REPO}/contents(?:/.*)?`],
+  [['GET'], `${REPO}/git/ref/heads/.+`],
+  [['GET'], `${REPO}/git/commits/${SEG}`],
+  [['POST'], `${REPO}/git/(?:blobs|trees|commits)`],
+  [['PATCH'], `${REPO}/git/refs/heads/.+`],
+  [['GET', 'POST'], `${REPO}/pages`],
+  [['GET'], `${REPO}/pages/builds/latest`],
+  [['POST'], `${REPO}/pages/builds`],
+  [['GET'], `${REPO}/actions/runs`],
+  [['GET'], `${REPO}/issues`],
+  [['PATCH'], `${REPO}/issues/\\d+`],
+].map(([methods, pattern]) => [methods, new RegExp('^' + pattern + '$')]);
+
+/** Vérifie l'opération sur le chemin tel que fetch l'enverra : le parseur
+ *  d'URL résout `..` et `%2e%2e`, on contrôle donc le résultat, pas l'entrée. */
+export function operationAllowed(method, target) {
+  let url;
+  try { url = new URL(target); } catch { return false; }
+  if (url.origin !== API) return false;
+  const m = method === 'HEAD' ? 'GET' : method;
+  return ALLOWED.some(([methods, re]) => methods.includes(m) && re.test(url.pathname));
+}
 
 /** En-têtes de réponse à transmettre tels quels (pas content-encoding :
  *  le corps est lu puis ré-émit, il est déjà décompressé). Ne pas transmettre
@@ -41,6 +78,12 @@ export async function onRequest(context) {
   if (!METHODS.includes(request.method)) {
     return json(request, env, { error: 'méthode refusée' }, 405);
   }
+  // Une origine étrangère est refusée quelle que soit la méthode; une écriture
+  // sans Origin aussi (formulaire ou fetch no-cors d'un site tiers).
+  const write = request.method !== 'GET' && request.method !== 'HEAD';
+  if ((request.headers.get('origin') || write) && !originAllowed(request, env)) {
+    return json(request, env, { error: 'origine refusée' }, 403);
+  }
 
   const sess = readSession(request);
   if (!sess) return json(request, env, { error: 'session', hint: 'Reconnecte GitHub' }, 401);
@@ -51,6 +94,9 @@ export async function onRequest(context) {
 
   // Concaténation stricte : la cible reste api.github.com quoi qu'il arrive.
   const target = API + path;
+  if (!operationAllowed(request.method, target)) {
+    return json(request, env, { error: 'opération GitHub non autorisée' }, 403);
+  }
 
   const headers = {
     'authorization': 'token ' + sess.t,

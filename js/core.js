@@ -783,13 +783,14 @@ const HubFiles = {
 const HUB_REPO_NAME    = 'souanpt-hub'; // repo du dashboard — jamais utilisé comme cible de déploiement
 const HUB_HOME_URL     = 'https://souanptjub.pages.dev/'; // accueil souanpt.hub V2 (Cloudflare Pages — cible du badge des sites publiés)
 const ANALYTICS_URL    = 'https://souanpt-analytics.titaneolinne13.workers.dev/hit'; // mouchard des sites publiés → agrégats Firestore (Worker gratuit)
+window.HUB_ANALYTICS_STATUS_URL = ANALYTICS_URL.replace(/\/hit$/, '/status');
 const SITE_REPO_NAME   = 'souanpt-folio'; // repo par défaut du site public
 
 /* Origine candidate du relais d'authentification (T5) : le hub servi par
    Cloudflare Pages expose /api/… sur SA propre origine (candidat n°1), GitHub
    Pages y accède depuis une autre origine (candidat n°2). Vide = même origine.
    Surcharge possible : window.GH_RELAY = 'https://mon-relais.pages.dev'. */
-const GH_RELAY_DEFAULT = 'https://souanpt-hub.pages.dev';
+const GH_RELAY_DEFAULT = 'https://souanptjub.pages.dev';
 
 /** Routine commune à TOUTES les connexions GitHub (token OU relais). */
 async function afterGithubConnect(user) {
@@ -1327,7 +1328,7 @@ function renderBentoGrid(blocks, ctx) {
       const i = Math.max(0, projects.indexOf(p));
       return cell(b, `<div class="bn-cov" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(b))}/cover` : `background:${GRADS[i % 6]}`}"></div>
         <div class="bn-pb"><div class="bn-t">${esc(p.title || 'Projet')}</div><div class="ptags">${(p.tags || []).slice(0, 2).map(t => `<span class="ptag">${esc(t)}</span>`).join('')}</div></div>`,
-        ` data-p="${esc(p.title || 'Projet')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')"` : ''}`);
+        ` data-p="${esc(String(p.id ?? ''))}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')"` : ''}`);
     }
     if (b.type === 'reviews') {
       if (!approved.length) return '';
@@ -1485,7 +1486,7 @@ function generateSite(cfg, projects, reviews, opts) {
   const blkOf = p => blocks.find(b => b.type === 'project' && String(bRef(b)) === String(p.id)) || null;
   const pHid  = p => { const b = blkOf(p); return b ? bHidden(b) : false; };
   const cards = projects.filter(p => editor || !pHid(p)).map((p, i) => `
-    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(p.title||'Projet')}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
+    <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${(p.tags||[]).join('|').toLowerCase()}" data-p="${esc(String(p.id ?? ''))}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(blkOf(p)))}/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
@@ -2134,19 +2135,48 @@ ${fx.mouseglow?`
   });`:''}
 }`:''}
 </script>
-${cfg.ownerUid ? `<script>(function(){var U=${JSON.stringify(String(cfg.ownerUid))},EP=${JSON.stringify(ANALYTICS_URL)};if(!U||location.protocol.indexOf('http')!==0||location.hostname==='localhost'||location.hostname==='127.0.0.1'){return;}var td=new Date().toISOString().slice(0,10),vid,ld,uq=true;try{vid=localStorage.getItem('_shv');if(!vid){vid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('_shv',vid);}ld=localStorage.getItem('_shd');uq=ld!==td;localStorage.setItem('_shd',td);}catch(e){}function S(p){p.uid=U;try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon(EP,b);}else{fetch(EP,{method:'POST',body:b,keepalive:true,mode:'no-cors'});}}catch(e){}}S({t:'pv',u:uq?1:0,ua:navigator.userAgent});var seen={};try{var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){var t=en.target.getAttribute('data-p');if(t){seen[t]=1;}io.unobserve(en.target);}});},{threshold:.5});document.querySelectorAll('[data-p]').forEach(function(el){io.observe(el);});}catch(e){}function F(){var ps=Object.keys(seen);if(ps.length){S({t:'pj',projects:ps});seen={};}}setTimeout(F,4500);addEventListener('pagehide',F);document.querySelectorAll('[data-p]').forEach(function(el){el.addEventListener('click',function(){var t=el.getAttribute('data-p');if(t){S({t:'click',project:t});}});});})();</script>` : ''}
+${cfg.ownerUid ? `<script>(function(){var U=${JSON.stringify(String(cfg.ownerUid))},EP=${JSON.stringify(ANALYTICS_URL)};if(!U||location.protocol.indexOf('http')!==0||location.hostname==='localhost'||location.hostname==='127.0.0.1'){return;}var td=new Date().toISOString().slice(0,10),vid,ld,uq=true;try{vid=localStorage.getItem('_shv');if(!vid){vid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('_shv',vid);}ld=localStorage.getItem('_shd');uq=ld!==td;localStorage.setItem('_shd',td);}catch(e){}function S(p){p.uid=U;p.eid=(window.crypto&&window.crypto.randomUUID?window.crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon(EP,b);}else{fetch(EP,{method:'POST',body:b,keepalive:true,mode:'no-cors'});}}catch(e){}}S({t:'pv',u:uq?1:0,ua:navigator.userAgent});var seen={};try{var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){var t=en.target.getAttribute('data-p');if(t){seen[t]=1;}io.unobserve(en.target);}});},{threshold:.5});document.querySelectorAll('[data-p]').forEach(function(el){io.observe(el);});}catch(e){}function F(){var ps=Object.keys(seen);for(var i=0;i<ps.length;i+=20){S({t:'pj',projects:ps.slice(i,i+20)});}seen={};}setTimeout(F,4500);addEventListener('pagehide',F);document.querySelectorAll('[data-p]').forEach(function(el){el.addEventListener('click',function(){var t=el.getAttribute('data-p');if(t){S({t:'click',project:t});}});});})();</script>` : ''}
 </body></html>`;
 }
 
 /* ══════════════════════════════════════════════════════
    DEPLOY PIPELINE — 1 commit atomique + vérification Pages
 ══════════════════════════════════════════════════════ */
-async function deployPortfolio(onLog, onStep) {
+function buildAnalyticsProjectManifest(siteHTML, projects) {
+  const ids = [...new Set([...siteHTML.matchAll(/\sdata-p="([^"]*)"/g)].map(match => match[1]))];
+  if (ids.length > 40) return { entries: [], error: 'Statistiques : 40 projets publiés maximum.' };
+  if (ids.some(id => !/^[A-Za-z0-9_-]{1,64}$/.test(id)))
+    return { entries: [], error: 'Statistiques : un projet publié possède un ID manquant ou invalide.' };
+  const published = new Set(ids);
+  const byId = new Map();
+  for (const project of projects) {
+    const id = project?.id == null ? '' : String(project.id);
+    if (!published.has(id)) continue;
+    if (byId.has(id)) return { entries: [], error: 'Statistiques : deux projets publiés ont le même ID.' };
+    const title = String(project.title || 'Projet').trim();
+    if (!title || title.length > 80 || /[\u0000-\u001f\u007f]/.test(title) || /^__.*__$/.test(title))
+      return { entries: [], error: 'Statistiques : un titre de projet publié est invalide ou dépasse 80 caractères.' };
+    byId.set(id, title);
+  }
+  if (ids.some(id => !byId.has(id)))
+    return { entries: [], error: 'Statistiques : un projet publié ne correspond pas aux données du site.' };
+  return { entries: ids.map(id => ({ id, title: byId.get(id) })), error: null };
+}
+
+function pagesBuildForCommit(build, commitSha) {
+  return typeof build?.commit === 'string' && typeof commitSha === 'string' &&
+    /^[0-9a-f]{40}$/i.test(commitSha) && build.commit.toLowerCase() === commitSha.toLowerCase();
+}
+
+async function deployPortfolio(onLog, onStep, options = {}) {
   const token = Auth.token();
   if (!Auth.ok()) throw new Error('Non connecté — connecte GitHub d\'abord');
   const cfg   = SiteConfig.get();
   const owner = Auth.owner();
   if (!owner) throw new Error('Profil GitHub introuvable');
+  const publisherUid = window.Cloud && Cloud.enabled && Cloud.user() ? Cloud.user().uid : null;
+  if (options.expectedOwnerUid && publisherUid !== options.expectedOwnerUid)
+    throw new Error('Session Firebase modifiée avant la publication.');
 
   let repoName = (cfg.repo && cfg.repo.includes('/')) ? cfg.repo.split('/')[1] : (cfg.repo || SITE_REPO_NAME);
   if (!repoName || repoName.toLowerCase() === HUB_REPO_NAME) {
@@ -2162,7 +2192,7 @@ async function deployPortfolio(onLog, onStep) {
   onStep?.('behance', 'done');
 
   onStep?.('generate', 'active'); onLog?.('Génération du HTML…');
-  const cfgToUse = { ...cfg, repo: owner + '/' + repoName };
+  const cfgToUse = { ...cfg, ownerUid: publisherUid || '', repo: owner + '/' + repoName };
   /* Les images vivent sur GitHub (media/) : localStorage ne garde qu'une
      miniature. Avant de générer, on remet le PLEIN FORMAT en mémoire — sinon
      le site publié recevrait les miniatures. `site-config.json` (lui, reste en
@@ -2175,13 +2205,18 @@ async function deployPortfolio(onLog, onStep) {
     } catch (e) { console.warn('[images] résolution plein format', e); }
   }
   const siteHTML = generateSite(pubCfg, pubProjects);
+  const analyticsManifest = buildAnalyticsProjectManifest(siteHTML, pubProjects);
+  if (analyticsManifest.error) {
+    if (options.requireAnalyticsManifest) throw new Error(analyticsManifest.error);
+    onLog?.('⚠ ' + analyticsManifest.error + ' Les pages vues restent disponibles.', '#e4b24a');
+  }
   onLog?.(`  → ${Math.round(siteHTML.length/1024)} KB`);
   onStep?.('generate', 'done');
 
   onStep?.('commit', 'active'); onLog?.(`Envoi vers ${owner}/${repoName}…`);
   await GH.ensureRepo(token, owner, repoName, false);
   await GH.enablePages(token, owner, repoName); // activer Pages AVANT le push
-  await GH.commitFiles(token, owner, repoName, [
+  const commitSha = await GH.commitFiles(token, owner, repoName, [
     { path: 'index.html',       content: siteHTML },
     { path: 'site-config.json', content: JSON.stringify(cfgToUse, null, 2) },
     { path: '.nojekyll',        content: '' },
@@ -2197,6 +2232,10 @@ async function deployPortfolio(onLog, onStep) {
   for (let i = 0; i < 15; i++) {
     await new Promise(r => setTimeout(r, 5000));
     const b = await GH.pagesLatestBuild(token, owner, repoName);
+    if (!pagesBuildForCommit(b, commitSha)) {
+      if (i % 3 === 0) onLog?.('  → attente du build de la nouvelle version…');
+      continue;
+    }
     const st = b?.status || 'queued';
     if (st === 'built')  { ok = true; break; }
     if (st === 'errored') {
@@ -2209,6 +2248,8 @@ async function deployPortfolio(onLog, onStep) {
   if (ok) onLog?.('  → ✓ Site en ligne : ' + url);
   else    onLog?.('  → Build en cours — le site sera visible d\'ici 1-2 min : ' + url, '#e4b24a');
   onStep?.('pages', 'done');
+  if (!ok && options.requireAnalyticsManifest)
+    throw new Error('Publication GitHub Pages non confirmée : réessaie l’activation quand le site est en ligne.');
 
   SiteConfig.set('lastDeploy', { url, ts: Date.now(), repo: owner + '/' + repoName });
   SiteConfig.set('repo', owner + '/' + repoName);
@@ -2218,12 +2259,19 @@ async function deployPortfolio(onLog, onStep) {
      le site : /u/<pseudo> répondait « site non publié » et le classement
      renvoyait vers « # ». Ces deux fonctionnalités lisent `siteUrl`/`repo`. */
   try {
-    if (window.Cloud && Cloud.enabled && Cloud.user()) {
-      await Cloud.saveProfile(Cloud.user().uid, {
+    if (!publisherUid || !(window.Cloud && Cloud.enabled && Cloud.user() && Cloud.user().uid === publisherUid)) {
+      if (options.requireAnalyticsManifest) throw new Error('Session Firebase expirée pendant la publication.');
+    } else {
+      await Cloud.saveProfile(publisherUid, {
         siteUrl: url, repo: owner + '/' + repoName, lastPublishedAt: Date.now(),
+        analyticsProjects: analyticsManifest.entries,
       });
     }
-  } catch (e) { console.warn('[deploy] profil non mis à jour', e); }
+  } catch (e) {
+    console.warn('[deploy] profil non mis à jour', e);
+    if (options.requireAnalyticsManifest)
+      throw new Error('Site publié, mais manifeste des projets non enregistré : ' + (e.message || 'réessaie.'));
+  }
 
   return url;
 }

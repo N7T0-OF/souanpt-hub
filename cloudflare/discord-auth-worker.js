@@ -44,10 +44,15 @@ export default {
     env = trimEnv(env);   // nettoie espaces/tabulations collés par erreur dans les secrets
     try {
       if (url.pathname.endsWith('/login'))    return handleLogin(url, env);
-      if (url.pathname.endsWith('/callback')) return await handleCallback(url, env);
+      if (url.pathname.endsWith('/callback')) return await handleCallback(request, url, env);
       return new Response('souanpt Discord auth — /login', { status: 200 });
     } catch (e) {
-      return new Response('Erreur: ' + e.message, { status: 500 });
+      console.error('[discord-auth] callback failed', e && e.name || 'Error');
+      const headers = { 'cache-control': 'no-store' };
+      if (url.pathname.endsWith('/callback')) headers['set-cookie'] = clearOAuthStateCookie(url);
+      return new Response('Connexion indisponible — réessaie depuis /login', {
+        status: 500, headers,
+      });
     }
   },
 };
@@ -77,17 +82,69 @@ function handleLogin(url, env) {
   auth.searchParams.set('response_type', 'code');
   auth.searchParams.set('redirect_uri', url.origin + '/callback');
   auth.searchParams.set('scope', 'identify email');
-  // le site d'origine voyage dans "state" → le retour revient exactement là-bas
-  const ret = url.searchParams.get('return');
-  if (ret) auth.searchParams.set('state', ret);
-  return Response.redirect(auth.toString(), 302);
+  // OAuth state lie le callback à cette demande précise. Le retour est déjà
+  // filtré par safeReturn(); le nonce est aussi conservé en cookie HttpOnly.
+  const returnTo = safeReturn(url.searchParams.get('return') || '', env);
+  const nonce = b64urlBytes(crypto.getRandomValues(new Uint8Array(32)));
+  const state = b64url(JSON.stringify({ nonce, returnTo }));
+  auth.searchParams.set('state', state);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: auth.toString(),
+      'cache-control': 'no-store',
+      'set-cookie': oauthStateCookie(url, nonce),
+    },
+  });
 }
 
-async function handleCallback(url, env) {
+function oauthStateCookie(url, nonce) {
+  return 'discord_oauth_state=' + encodeURIComponent(nonce)
+    + '; Path=/callback; HttpOnly; SameSite=Lax; Max-Age=600'
+    + (url.protocol === 'https:' ? '; Secure' : '');
+}
+
+function clearOAuthStateCookie(url) {
+  return 'discord_oauth_state=; Path=/callback; HttpOnly; SameSite=Lax; Max-Age=0'
+    + (url.protocol === 'https:' ? '; Secure' : '');
+}
+
+function readOAuthState(request, url) {
+  const encoded = url.searchParams.get('state') || '';
+  let state;
+  try {
+    const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(base64 + '='.repeat((4 - base64.length % 4) % 4)), c => c.charCodeAt(0));
+    state = JSON.parse(new TextDecoder().decode(bytes));
+  } catch { return null; }
+  const rawCookie = request.headers.get('cookie') || '';
+  const hit = rawCookie.split(';').map(s => s.trim()).find(s => s.startsWith('discord_oauth_state='));
+  if (!state || typeof state.nonce !== 'string' || !state.nonce || !hit) return null;
+  let cookieNonce = '';
+  try { cookieNonce = decodeURIComponent(hit.slice('discord_oauth_state='.length)); } catch { return null; }
+  if (cookieNonce !== state.nonce || typeof state.returnTo !== 'string') return null;
+  return state;
+}
+
+async function handleCallback(request, url, env) {
+  const state = readOAuthState(request, url);
+  if (!state) return new Response('Connexion expirée ou invalide — repasse par /login', {
+    status: 400,
+    headers: { 'cache-control': 'no-store', 'set-cookie': clearOAuthStateCookie(url) },
+  });
+  if (url.searchParams.has('error')) return new Response('Connexion Discord annulée — repasse par /login', {
+    status: 400,
+    headers: { 'cache-control': 'no-store', 'set-cookie': clearOAuthStateCookie(url) },
+  });
   const err = needSecrets(env, ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY']);
-  if (err) return err;
+  if (err) return new Response(err.body, {
+    status: err.status, headers: { 'cache-control': 'no-store', 'set-cookie': clearOAuthStateCookie(url) },
+  });
   const code = url.searchParams.get('code');
-  if (!code) return new Response('Code manquant — repasse par /login', { status: 400 });
+  if (!code) return new Response('Code manquant — repasse par /login', {
+    status: 400,
+    headers: { 'cache-control': 'no-store', 'set-cookie': clearOAuthStateCookie(url) },
+  });
 
   // 1) code → access token Discord
   const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
@@ -102,8 +159,10 @@ async function handleCallback(url, env) {
     }),
   });
   if (!tokenRes.ok) {
-    const t = await tokenRes.text();
-    return new Response('Échange Discord refusé (' + tokenRes.status + ') — vérifie DISCORD_CLIENT_SECRET et que le redirect "' + url.origin + '/callback" est bien ajouté dans Discord → OAuth2 → Redirects.\n' + t, { status: 502 });
+    return new Response('Échange Discord refusé — vérifie la configuration OAuth puis réessaie.', {
+      status: 502,
+      headers: { 'cache-control': 'no-store', 'set-cookie': clearOAuthStateCookie(url) },
+    });
   }
   const { access_token } = await tokenRes.json();
 
@@ -111,7 +170,10 @@ async function handleCallback(url, env) {
   const meRes = await fetch('https://discord.com/api/users/@me', {
     headers: { Authorization: 'Bearer ' + access_token },
   });
-  if (!meRes.ok) return new Response('Profil Discord illisible', { status: 502 });
+  if (!meRes.ok) return new Response('Profil Discord illisible', {
+    status: 502,
+    headers: { 'cache-control': 'no-store', 'set-cookie': clearOAuthStateCookie(url) },
+  });
   const me = await meRes.json();
 
   // 3) jeton Firebase (custom token signé avec le service account)
@@ -123,8 +185,15 @@ async function handleCallback(url, env) {
   });
 
   // 4) retour vers le site qui a lancé la connexion (validé), jeton dans le fragment (#)
-  const dest = safeReturn(url.searchParams.get('state') || '', env);
-  return Response.redirect(dest + '#ct=' + encodeURIComponent(jwt), 302);
+  const dest = safeReturn(state.returnTo, env);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: dest + '#ct=' + encodeURIComponent(jwt),
+      'cache-control': 'no-store',
+      'set-cookie': clearOAuthStateCookie(url),
+    },
+  });
 }
 
 /* ── Fabrication du custom token Firebase (JWT RS256) ── */

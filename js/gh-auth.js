@@ -55,8 +55,8 @@ const GhSession = {
       if (location.origin && !/\.github\.io$/i.test(location.hostname)) push(location.origin);
     } catch {}
     try { push(window.GH_RELAY || (typeof GH_RELAY_DEFAULT !== 'undefined' ? GH_RELAY_DEFAULT : '')); } catch {}
-    ['https://souanpt-hub.pages.dev', 'https://souanpthub.pages.dev',
-     'https://souanptjub.pages.dev', 'https://souanpt-hub.fr'].forEach(push);
+    ['https://souanptjub.pages.dev', 'https://souanpt-hub.pages.dev',
+     'https://souanpthub.pages.dev', 'https://souanpt-hub.fr'].forEach(push);
     return out;
   },
 
@@ -72,12 +72,14 @@ const GhSession = {
         try {
           const ctrl = new AbortController();
           const timer = setTimeout(() => ctrl.abort(), 3000);
-          const r = await fetch(base + '/api/auth?op=status', {
-            credentials: 'include',
-            headers: { accept: 'application/json' },
-            signal: ctrl.signal,
-          });
-          clearTimeout(timer);
+          let r;
+          try {
+            r = await fetch(base + '/api/auth?op=status', {
+              credentials: 'include',
+              headers: { accept: 'application/json' },
+              signal: ctrl.signal,
+            });
+          } finally { clearTimeout(timer); }
           if (!r.ok) continue;
           d = await r.json();
         } catch { continue; }
@@ -96,7 +98,15 @@ const GhSession = {
       this.user = null;
       this._emit();
       return this;
-    })();
+    })().then(result => {
+      // Un échec temporaire ne doit pas rendre le relais indisponible jusqu'au
+      // prochain rechargement : le bouton de connexion peut relancer le sondage.
+      if (!result.available) this._probe = null;
+      return result;
+    }, error => {
+      this._probe = null;
+      throw error;
+    });
     return this._probe;
   },
 

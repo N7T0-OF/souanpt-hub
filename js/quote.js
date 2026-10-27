@@ -358,6 +358,12 @@ const QuoteUI = {
   _a: null, _e: null,
   _esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); },
   _el(id) { return document.getElementById(id); },
+  _newPublicToken() {
+    // Un lien sans compte est un jeton d'accès : 128 bits aléatoires,
+    // indépendants de l'heure de création et de Math.random().
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
+  },
 
   init() {
     this.renderPricing();
@@ -579,7 +585,7 @@ const QuoteUI = {
     const e = this._e, a = this._a;
     // Si l'estimation vient d'une DEMANDE, on réutilise SON token → le client
     // garde le même /c/ (demande → estimation → mission), aucun nouveau lien.
-    const code = this._fromRequest || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
+    const code = this._fromRequest || this._newPublicToken();
     const days = 7;
     // Objet volontairement plat et minimal — relire cette liste avant d'y ajouter
     // quoi que ce soit : tout champ ajouté devient public.
@@ -662,7 +668,7 @@ const QuoteUI = {
   async newRequestLink() {
     if (!(window.Cloud && Cloud.enabled && Cloud.user()))
       return showToast?.('Connecte-toi pour créer un lien de demande', '#e4b24a', 4000);
-    const token = (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)).toUpperCase();
+    const token = this._newPublicToken();
     try {
       await Cloud._db.collection('requests').doc(token).set({
         owner: Cloud.user().uid,
@@ -1324,6 +1330,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.10.1', "Sécurité OAuth et Analytics renforcée, artefacts de publication allowlistés, CI et vérification de commit déployé."],
   ['3.10.0', "Éditeur plus clair : configuration des sections en « Blocs ✏️ », barre compacte, chiffres clés modifiables, et réseaux gérés en un endroit (URL et icônes automatiques)."],
   ['3.9.0', "Éditeur : bannière principale avec image, sections Chiffres clés & Réseaux, raccourcis clavier, défilement fluide et boutons indisponibles grises."],
   ['3.8.2', "Le site souanptjub.pages.dev est désormais déployé à chaque version (workflow Cloudflare Pages)."],

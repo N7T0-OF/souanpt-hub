@@ -1,0 +1,43 @@
+name: Validate and package
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check
+        shell: bash
+        run: |
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(find js functions cloudflare scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0)
+      - name: Run tests
+        run: node --test tests/*.test.mjs
+      - name: Install Java 21 for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify Firestore security rules
+        run: |
+          npm install --prefix tests/firestore-emulator --no-save --package-lock=false --no-audit --no-fund
+          ./tests/firestore-emulator/node_modules/.bin/firebase emulators:exec --only firestore --project demo-souanpt-rules 'node --test tests/firestore-emulator/rules.test.mjs'
+      - name: Build and validate public artifacts
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          node scripts/prepare-deploy.mjs --channel=github-pages --output="$RUNNER_TEMP/souanpt-pages-${GITHUB_SHA}"
+          node scripts/prepare-deploy.mjs --channel=cloudflare --output="$RUNNER_TEMP/souanpt-cloudflare-${GITHUB_SHA}"
