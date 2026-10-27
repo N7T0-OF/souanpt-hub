@@ -71,6 +71,25 @@
       }
       return existing || null;
     },
+    checkManualClient() {
+      const name = document.getElementById('cp-manual-client')?.value.trim().toLocaleLowerCase('fr') || '';
+      let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      if (!Array.isArray(clients)) clients = [];
+      const existing = name && clients.find(c => String(c.name || '').trim().toLocaleLowerCase('fr') === name);
+      const box = document.getElementById('cp-manual-match');
+      if (box) {
+        box.replaceChildren(); box.hidden = !existing;
+        if (existing) {
+          const label = document.createElement('span');
+          label.textContent = 'Client déjà existant : ' + existing.name + '. Le projet sera lié à sa fiche. ';
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = 'btn btn-ghost'; button.textContent = 'Voir la fiche →';
+          button.onclick = () => { this._creating = false; this.viewClient(existing.id); };
+          box.append(label, button);
+        }
+      }
+      return existing || null;
+    },
     viewClient(id) {
       this.toggleClientForm(false); this.setView('clients');
       const card = document.getElementById('client-card-' + id);
@@ -96,6 +115,13 @@
         document.getElementById('cl-name')?.focus();
         this.checkClientDuplicate();
       }
+    },
+    prefillClient(name) {
+      this._clientDraft = { name, type: '' };
+      this._clientFormOpen = true;
+      this._view = 'clients';
+      this._paint();
+      this.toggleClientForm(true);
     },
 
     /* ── Chargement ──────────────────────────────────────────────────────── */
@@ -243,6 +269,7 @@
           <div class="cp-client-h"><span class="cp-client-name">👤 ${this._esc(name)}</span>
             <span class="cp-client-meta">${items.length} projet${items.length > 1 ? 's' : ''} · ${this._money(total, cur)}</span></div>
           <div class="cp-client-projects">${chips}</div>
+          ${key !== '__none' ? `<button class="btn btn-ghost" style="font-size:10px;margin-top:8px" onclick="CP.prefillClient(${this._esc(JSON.stringify(name))})">+ Créer la fiche client</button>` : ''}
         </div>`;
       }).join('');
       return (window.ClientWorkspace ? ClientWorkspace.valPanel() : '') + rosterHtml + (cards
@@ -329,10 +356,12 @@
       let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
       const chosen = clients.find(c => c.id === clientId);
       panel.innerHTML = `<div class="cp-create-h">Nouveau projet manuel</div>
-        <div class="biz-form"><div><div class="prop-label">Client *</div><input class="prop-input" id="cp-manual-client" list="dl-clients" value="${this._esc(chosen?.name || '')}" placeholder="Nom du client"></div>
+        <div class="biz-form"><div><div class="prop-label">Client *</div><input class="prop-input" id="cp-manual-client" list="dl-clients" value="${this._esc(chosen?.name || '')}" placeholder="Nom du client" oninput="CP.checkManualClient()"></div>
         <div><div class="prop-label">Nom du projet *</div><input class="prop-input" id="cp-manual-name" placeholder="Ex. Identité visuelle"></div>
         <div><div class="prop-label">Type de projet</div><input class="prop-input" id="cp-manual-type" placeholder="Ex. Design, site web"></div></div>
+        <div id="cp-manual-match" role="status" style="color:var(--gold-l);font-size:11px;margin-top:8px" hidden></div>
         <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-accent" onclick="CP.saveManual()">Créer le projet</button><button class="btn btn-ghost" onclick="CP.newProject()">Annuler</button></div>`;
+      this.checkManualClient();
       panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
       panel.querySelector('#cp-manual-name')?.focus();
     },
@@ -343,6 +372,7 @@
       if (!clientName || !projectName) return window.showToast?.('Client et nom du projet requis', '#c0392b', 2500);
       if (!window.ClientWorkspace) return window.showToast?.('Dossier client indisponible', '#c0392b', 2500);
       let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      if (!Array.isArray(clients)) clients = [];
       let client = clients.find(c => String(c.name || '').trim().toLocaleLowerCase('fr') === clientName.toLocaleLowerCase('fr'));
       let createdClient = false;
       if (!client) {

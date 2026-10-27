@@ -228,6 +228,52 @@ test('Clients & Projets keeps local workspaces visible without Firebase', async 
   assert.doesNotMatch(CP._actions(CP._links[0]), /Ouvrir le lien client/);
 });
 
+test('manual projects link to an existing client and create a new fiche only when needed', () => {
+  const data = new Map([['hub_clients', JSON.stringify([{ id: 'alice', name: 'Alice' }])]]);
+  const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
+  const fields = {
+    'cp-manual-client': { value: ' alice ' },
+    'cp-manual-name': { value: 'Identité' },
+    'cp-manual-type': { value: 'Design' },
+  };
+  const match = { hidden: true, replaceChildren() { this.children = []; }, append(...nodes) { this.children.push(...nodes); } };
+  const workspaces = [];
+  const ClientWorkspace = {
+    all: () => workspaces,
+    ensure(token, patch) { const item = { token, ...patch }; workspaces.push(item); return item; },
+    save() {},
+  };
+  let queued = 0, viewed = '';
+  const context = { console, localStorage, ClientWorkspace, SiteAutoPublish: { queue: () => queued++ },
+    crypto: { randomUUID: () => '12345678-1234-1234-1234-123456789abc' },
+    window: { ClientWorkspace, showToast() {} },
+    document: {
+      getElementById: id => id === 'cp-manual-match' ? match : fields[id] || null,
+      createElement: () => ({ textContent: '', onclick: null }),
+      querySelectorAll: () => [],
+    } };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync('js/clients.js', 'utf8'), context);
+  const CP = context.window.CP;
+  CP._paint = () => {}; CP._badge = () => {}; CP.viewClient = id => { viewed = id; };
+  assert.equal(CP.checkManualClient().id, 'alice');
+  assert.equal(match.hidden, false);
+  assert.match(match.children[0].textContent, /déjà existant/);
+  CP.saveManual();
+  assert.equal(JSON.parse(localStorage.getItem('hub_clients')).length, 1);
+  assert.equal(workspaces[0].clientId, 'alice');
+  assert.equal(workspaces[0].projectType, 'Design');
+  assert.equal(viewed, 'alice');
+  assert.equal(queued, 0);
+
+  fields['cp-manual-client'].value = 'Bob';
+  fields['cp-manual-name'].value = 'Site';
+  CP.saveManual();
+  assert.equal(JSON.parse(localStorage.getItem('hub_clients')).length, 2);
+  assert.equal(workspaces[1].clientName, 'Bob');
+  assert.equal(queued, 1);
+});
+
 test('a portal launched from a client dossier keeps that exact project link', () => {
   const data = new Map();
   const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };

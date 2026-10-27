@@ -2934,12 +2934,14 @@ function addClient() {
   if(!Array.isArray(cl)) cl=[];
   const existing=cl.find(c=>String(c.name||'').trim().toLocaleLowerCase('fr')===name.toLocaleLowerCase('fr'));
   if(existing){CP.checkClientDuplicate();showToast('Ce client existe déjà — utilise « Voir la fiche »','#e4b24a',3500);return;}
-  cl.push({ id:Date.now().toString(36)+Math.random().toString(36).slice(2,7), name, type:document.getElementById('cl-type')?.value||'', status:'active', progress:0, revenue:0, createdAt:Date.now() });
+  const newClient={ id:Date.now().toString(36)+Math.random().toString(36).slice(2,7), name, type:document.getElementById('cl-type')?.value||'', status:'active', progress:0, revenue:0, createdAt:Date.now() };
+  cl.push(newClient);
   localStorage.setItem('hub_clients', JSON.stringify(cl));
   SiteAutoPublish.queue();
   renderClients();
   CP._clientFormOpen=false; CP._clientDraft={name:'',type:''};
   document.getElementById('add-client-form')?.classList.remove('visible');
+  CP.viewClient(newClient.id);
   showToast('Client ajouté ✓','#2e9a63',1800);
 }
 function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); SiteAutoPublish.queue(); renderClients(); }
@@ -2982,10 +2984,22 @@ function renderClients() {
       <h4>Projets (${cp.length})</h4>${cp.length?cp.map(p=>`<div class="client-item"><b>${esc(p.projectName||'Projet sans nom')}</b>${p.projectType?` · ${esc(p.projectType)}`:''}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="ClientWorkspace.open('${esc(p.token)}')">Ouvrir</button></div>`).join(''):'<div class="client-sub">Aucun projet lié.</div>'}
       ${types.length?`<div class="client-sub" style="margin-top:7px">Types : ${types.map(esc).join(', ')}</div>`:''}
       <h4>Avis (${cr.length})</h4>${cr.length?cr.map(r=>`<div class="client-item"><span style="color:var(--gold-l)">${'★'.repeat(Math.max(0,Math.min(5,Number(r.rating)||0)))}</span> ${esc(String(r.text||'').slice(0,100))}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="clientReviewJump('${esc(r.id)}')">Voir</button></div>`).join(''):'<div class="client-sub">Aucun avis lié.</div>'}
-      <div class="client-actions"><button class="btn btn-accent" style="font-size:10px" onclick="CP.startManual('${esc(c.id)}')">+ Projet manuel</button>${cwBtn(c.name)}<button class="btn btn-ghost" style="font-size:10px" onclick="deleteClient('${esc(c.id)}')">Supprimer</button></div></div></details>`;
+      <div class="client-actions"><button class="btn btn-accent" style="font-size:10px" onclick="CP.startManual('${esc(c.id)}')">+ Projet manuel</button><button class="btn btn-ghost" style="font-size:10px" onclick="openClientReview('${esc(c.id)}')">+ Avis</button>${cwBtn(c.name)}<button class="btn btn-ghost" style="font-size:10px" onclick="deleteClient('${esc(c.id)}')">Supprimer</button></div></div></details>`;
   }).join('');
 }
 function clientReviewJump(id){showPage('avis');setTimeout(()=>{const card=document.getElementById('review-card-'+id);card?.scrollIntoView({behavior:'smooth',block:'center'});card?.focus({preventScroll:true});},80);}
+function openClientReview(id){
+  let clients=[]; try{clients=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
+  const client=Array.isArray(clients)?clients.find(c=>String(c.id)===String(id)):null;
+  if(!client) return;
+  showPage('avis'); populateReviewClientSelect();
+  const select=document.getElementById('rv-client'), author=document.getElementById('rv-author');
+  if(select) select.value=String(client.id);
+  if(author) author.value=client.name;
+  const form=document.getElementById('add-review-form');
+  form?.classList.add('visible'); form?.scrollIntoView({behavior:'smooth',block:'center'});
+  document.getElementById('rv-text')?.focus();
+}
 
 /* ═══ FACTURATION V2 — recherche, pagination, catalogue, statuts, CSV ═══ */
 const INV_STATUS = {
