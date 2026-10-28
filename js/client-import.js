@@ -4,6 +4,10 @@
   const read = key => { try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr').trim().replace(/\s+/g,' ');
+  const similar = (a, b) => {
+    const left = norm(a), right = norm(b);
+    return left !== right && Math.min(left.length, right.length) >= 4 && (left.includes(right) || right.includes(left));
+  };
   const valid = value => typeof value === 'string' && value.trim().length > 0 && value.length <= 150 && !/[\x00-\x1f<>]/.test(value);
   const pause = () => new Promise(resolve => setTimeout(resolve, 0));
   const ClientImport = {
@@ -24,7 +28,7 @@
     _style() {
       if (document.getElementById('ci-style')) return;
       const style = document.createElement('style'); style.id = 'ci-style';
-      style.textContent = `#ci-root{position:fixed;inset:0;z-index:990}.ci-shade{position:absolute;inset:0;background:#000b;backdrop-filter:blur(6px)}.ci-dialog{position:relative;margin:3vh auto;width:min(760px,calc(100vw - 24px));max-height:94vh;overflow:auto;background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:20px;color:var(--text);box-shadow:0 24px 90px #0009}.ci-dialog header{display:flex;justify-content:space-between;align-items:center;gap:12px}.ci-dialog h2{font-size:17px}.ci-dialog p{font-size:11px;color:var(--muted2);line-height:1.6}.ci-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}#ci-status{font-size:11px;color:var(--gold-l);margin:10px 0}.ci-client{border:1px solid var(--border);border-radius:10px;padding:10px;margin:8px 0}.ci-client>label{font-weight:700}.ci-project{display:block;margin:7px 0 0 21px;font-size:11px}.ci-options{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;margin:12px 0}.ci-options label{display:flex;gap:5px;align-items:center}.ci-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ci-row select,.ci-row input[type=text]{background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:5px;font-size:11px}.ci-summary{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;line-height:1.7}.ci-progress{width:100%;height:9px;accent-color:var(--accent)}`;
+      style.textContent = `#ci-root{position:fixed;inset:0;z-index:990}.ci-shade{position:absolute;inset:0;background:#000b;backdrop-filter:blur(6px)}.ci-dialog{position:relative;margin:3vh auto;width:min(760px,calc(100vw - 24px));max-height:94vh;overflow:auto;background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:20px;color:var(--text);box-shadow:0 24px 90px #0009}.ci-dialog header{display:flex;justify-content:space-between;align-items:center;gap:12px}.ci-dialog h2{font-size:17px}.ci-dialog p{font-size:11px;color:var(--muted2);line-height:1.6}.ci-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}#ci-status{font-size:11px;color:var(--gold-l);margin:10px 0}.ci-client{border:1px solid var(--border);border-radius:10px;padding:10px;margin:8px 0}.ci-client.ci-review{border-color:var(--gold-l)}.ci-client>label{font-weight:700}.ci-project{display:block;margin:7px 0 0 21px;font-size:11px}.ci-options{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;margin:12px 0}.ci-options label{display:flex;gap:5px;align-items:center}.ci-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ci-row select,.ci-row input[type=text]{background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:5px;font-size:11px}.ci-summary{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;line-height:1.7}.ci-progress{width:100%;height:9px;accent-color:var(--accent)}`;
       document.head.appendChild(style);
     },
     status(message) { const el = document.getElementById('ci-status'); if (el) el.textContent = message; },
@@ -66,10 +70,12 @@
       this.report = null;
       const total = this.rows.reduce((n,r) => n + r.projects.length, 0);
       this.status(`${this.rows.length} client(s), ${total} projet(s) détectés dans « ${this.root} ».${fallback ? ' Les dossiers vides ne sont pas visibles dans ce mode.' : ''}`);
+      document.getElementById('ci-preview')?.replaceChildren();
       this.preview();
     },
     preview() {
       const el = document.getElementById('ci-preview'); if (!el) return;
+      if (el.querySelector?.('[data-ci-client]')) this.rememberSelection();
       if (!this.rows.length) { el.innerHTML = '<p>Aucun sous-dossier client détecté.</p>'; return; }
       const existing = read('hub_clients');
       const options = existing.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
@@ -77,16 +83,23 @@
         <div class="ci-actions"><button class="btn btn-ghost" onclick="ClientImport.selectAll(true)">Tout sélectionner</button><button class="btn btn-ghost" onclick="ClientImport.selectAll(false)">Tout désélectionner</button></div>
         ${this.rows.map((r,i) => {
           const exact = existing.find(c => norm(c.name) === norm(r.name));
-          const suggestion = !exact && existing.find(c => norm(c.name).includes(norm(r.name)) || norm(r.name).includes(norm(c.name)));
-          r.matchId = exact?.id || '';
-          return `<div class="ci-client"><div class="ci-row"><label><input type="checkbox" data-ci-client="${i}" checked onchange="ClientImport.summary()"> ${esc(r.name)}</label><small>${exact ? 'Client existant' : suggestion ? 'Client similaire : ' + esc(suggestion.name) + ' — choisis manuellement' : 'Nouveau client'}</small>
-            <select data-ci-match="${i}" aria-label="Rattacher ${esc(r.name)}" onchange="ClientImport.summary()"><option value="">${exact ? 'Rattacher automatiquement' : 'Nouveau client'}</option>${options}</select></div>
-            ${r.projects.map((p,j) => `<label class="ci-project"><input type="checkbox" data-ci-project="${i}:${j}" checked onchange="ClientImport.summary()"> ${esc(p)}</label>`).join('') || '<small>Aucun projet détecté</small>'}</div>`;
+          const suggestion = !exact && existing.find(c => similar(c.name, r.name));
+          const needsReview = !!suggestion && !r.matchId;
+          return `<div class="ci-client${needsReview ? ' ci-review' : ''}"><div class="ci-row"><label><input type="checkbox" data-ci-client="${i}"${r.selected !== false ? ' checked' : ''} onchange="ClientImport.summary()"> ${esc(r.name)}</label><small>${exact ? 'Client existant' : suggestion ? 'Nom proche : ' + esc(suggestion.name) + ' — choisir une action' : 'Nouveau client'}</small>
+            <select data-ci-match="${i}" aria-label="Rattacher ${esc(r.name)}" onchange="ClientImport.summary()"><option value="">${exact ? 'Rattacher automatiquement' : suggestion ? 'Choisir un client ou créer une fiche distincte…' : 'Nouveau client'}</option>${suggestion ? '<option value="__new__">Créer une nouvelle fiche distincte</option>' : ''}${options}</select></div>
+            ${r.projects.map((p,j) => `<label class="ci-project"><input type="checkbox" data-ci-project="${i}:${j}"${r.selectedProjects?.[j] === false ? '' : ' checked'} onchange="ClientImport.summary()"> ${esc(p)}</label>`).join('') || '<small>Aucun projet détecté</small>'}</div>`;
         }).join('')}
         <div class="ci-options"><label>Type commun (facultatif) <input type="text" id="ci-type" maxlength="100" placeholder="Ex. Design"></label><label><input type="checkbox" checked disabled> Projets privés</label></div>
         <div id="ci-summary" class="ci-summary"></div><div class="ci-actions"><button class="btn btn-accent" id="ci-continue" onclick="ClientImport.confirm()">Vérifier l’import</button></div>`;
       this.rows.forEach((r,i) => { const select = el.querySelector(`[data-ci-match="${i}"]`); if (select) select.value = String(r.matchId || ''); });
       this.summary();
+    },
+    rememberSelection() {
+      this.rows.forEach((row, i) => {
+        row.selected = !!document.querySelector(`[data-ci-client="${i}"]`)?.checked;
+        row.selectedProjects = row.projects.map((_, j) => !!document.querySelector(`[data-ci-project="${i}:${j}"]`)?.checked);
+        row.matchId = document.querySelector(`[data-ci-match="${i}"]`)?.value || '';
+      });
     },
     selectAll(on) { document.querySelectorAll('#ci-preview input[type=checkbox]:not(:disabled)').forEach(c => { if (c.hasAttribute('data-ci-client') || c.hasAttribute('data-ci-project')) c.checked = on; }); this.summary(); },
     plan() {
@@ -96,13 +109,15 @@
       const skipDuplicates = document.getElementById('ci-duplicates')?.checked;
       const type = document.getElementById('ci-type')?.value.trim() || '';
       const entries = [], seenClients = new Set(), seenProjects = new Set();
-      let linked = 0, newClients = 0, skipped = 0;
+      let linked = 0, newClients = 0, skipped = 0, unresolved = 0;
       for (let i=0;i<this.rows.length;i++) {
         if (!document.querySelector(`[data-ci-client="${i}"]`)?.checked) continue;
         const row = this.rows[i];
         const chosen = document.querySelector(`[data-ci-match="${i}"]`)?.value || '';
-        let client = chosen ? existing.find(c => String(c.id) === chosen) : null;
+        let client = chosen && chosen !== '__new__' ? existing.find(c => String(c.id) === chosen) : null;
         const exact = existing.find(c => norm(c.name) === norm(row.name));
+        if (chosen && chosen !== '__new__' && !client) { unresolved++; continue; }
+        if (!exact && !chosen && existing.some(c => similar(c.name, row.name))) { unresolved++; continue; }
         if (!client && exact && attach) client = exact;
         if (!client && exact) { skipped += row.projects.filter((_,j) => document.querySelector(`[data-ci-project="${i}:${j}"]`)?.checked).length; continue; }
         if (!client && !create) continue;
@@ -119,18 +134,31 @@
           entries.push({ clientId:client?.id || '', clientName:client?.name || row.name, projectName, projectType:type, root:this.root });
         }
       }
-      return { entries, linked, newClients, skipped };
+      return { entries, linked, newClients, skipped, unresolved };
     },
     summary() {
       const el = document.getElementById('ci-summary'); if (!el) return;
       const p = this.plan();
-      el.textContent = `${p.newClients} client(s) à créer · ${p.linked} à rattacher · ${p.entries.length} projet(s) à créer · ${p.skipped} doublon(s) ignoré(s). Aucun fichier transféré, aucun projet publié.`;
+      el.textContent = `${p.newClients} client(s) à créer · ${p.linked} à rattacher · ${p.entries.length} projet(s) à créer · ${p.skipped} doublon(s) ignoré(s)${p.unresolved ? ' · ' + p.unresolved + ' nom(s) proches à vérifier' : ''}. Aucun fichier transféré, aucun projet publié.`;
     },
     confirm() {
       const p = this.plan();
+      if (p.unresolved) {
+        this.status(`Vérifie ${p.unresolved} client(s) : rattacher à une fiche existante ou créer une fiche distincte.`);
+        const existing = read('hub_clients');
+        this.rows.forEach((row,i) => {
+          if (!document.querySelector(`[data-ci-client="${i}"]`)?.checked) return;
+          const select = document.querySelector(`[data-ci-match="${i}"]`);
+          const missing = select?.value && select.value !== '__new__' && !existing.some(c => String(c.id) === select.value);
+          if (select && (missing || !select.value && existing.some(c => similar(c.name, row.name)))) select.focus?.();
+        });
+        return;
+      }
+      if (!p.newClients && !p.entries.length) { this.status('Aucun nouveau client ou projet à importer avec cette sélection.'); return; }
+      this.rememberSelection();
       const el = document.getElementById('ci-summary'); if (!el) return;
       el.innerHTML = `<b>Résumé de l’import</b><br>${p.newClients} client(s) à créer · ${p.linked} à rattacher · ${p.entries.length} projet(s) à créer · ${p.skipped} doublon(s) ignoré(s).<br>Aucun fichier transféré. Aucun contenu publié.`;
-      document.getElementById('ci-continue').outerHTML = `<button class="btn btn-ghost" onclick="ClientImport.preview()">Retour</button> <button class="btn btn-accent" onclick="ClientImport.importNow()">Importer ${p.entries.length} projet(s)</button>`;
+      document.getElementById('ci-continue').outerHTML = `<button class="btn btn-ghost" onclick="ClientImport.preview()">Retour</button> <button class="btn btn-accent" onclick="ClientImport.importNow()">Importer ${p.newClients} client(s) et ${p.entries.length} projet(s)</button>`;
     },
     async _token(entry) {
       const key = [entry.root, entry.clientName, entry.projectName].map(norm).join('\0');
@@ -143,6 +171,8 @@
       try { if (window.CP?._migrationPromise) await CP._migrationPromise; }
       catch (error) { this.running = false; this.status('Attends la fin de la synchronisation des dossiers avant l’import.'); return; }
       const p = this.plan();
+      if (p.unresolved) { this.running = false; this.status('Résous les noms de clients proches avant de lancer l’import.'); return; }
+      if (!p.newClients && !p.entries.length) { this.running = false; this.status('Aucun nouveau client ou projet à importer.'); return; }
       const selectedRows = this.rows.map((row,i) => ({ row, selected:!!document.querySelector(`[data-ci-client="${i}"]`)?.checked,
         matchId:document.querySelector(`[data-ci-match="${i}"]`)?.value || '' }));
       const createMissing = !!document.getElementById('ci-create')?.checked;
@@ -182,7 +212,7 @@
         }
         // Un client sans projet sélectionné reste importable comme fiche.
         for (const { row, selected, matchId } of selectedRows) {
-          if (!selected || matchId || clientByName.has(norm(row.name)) || !createMissing) continue;
+          if (!selected || matchId && matchId !== '__new__' || clientByName.has(norm(row.name)) || !createMissing) continue;
           const client = { id:crypto.randomUUID(), name:row.name, type:'', status:'active', progress:0, revenue:0, createdAt:Date.now() };
           clients.push(client); clientByName.set(norm(client.name), client); report.createdClients.push(client.name); report.createdClientIds.push(client.id);
         }

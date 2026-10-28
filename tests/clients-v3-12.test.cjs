@@ -64,6 +64,46 @@ test('import plan reuses an existing client and skips a project already in its w
   assert.equal(plan.entries[0].clientId,'c1');
 });
 
+test('a similar client name requires an explicit link or distinct new fiche', () => {
+  const ctx = load('client-import.js', { hub_clients:[{id:'c1',name:'Climb Studio'}] });
+  const importer = ctx.window.ClientImport;
+  importer.rows = [{name:'Climb',projects:['Logo']}]; importer.root = 'clients';
+  ctx.window.ClientWorkspace = { all:() => [] };
+  let choice = '';
+  ctx.document.querySelector = selector => selector.includes('data-ci-match') ? {value:choice} : {checked:true};
+  ctx.document.getElementById = id => id === 'ci-type' ? {value:''} : {checked:true};
+  assert.equal(importer.plan().unresolved,1);
+  assert.equal(importer.plan().entries.length,0);
+  choice = 'c1';
+  assert.equal(importer.plan().unresolved,0);
+  assert.equal(importer.plan().entries[0].clientId,'c1');
+  choice = '__new__';
+  assert.equal(importer.plan().unresolved,0);
+  assert.equal(importer.plan().newClients,1);
+  assert.equal(importer.plan().entries[0].clientName,'Climb');
+  choice = 'deleted-client';
+  assert.equal(importer.plan().unresolved,1);
+  assert.equal(importer.plan().entries.length,0);
+});
+
+test('import review blocks unresolved names before showing the final action', () => {
+  const ctx = load('client-import.js', { hub_clients:[{id:'c1',name:'Climb Studio'}] });
+  const importer = ctx.window.ClientImport;
+  importer.rows = [{name:'Climb',projects:['Logo'],selected:true,selectedProjects:null,matchId:''}];
+  ctx.window.ClientWorkspace = { all:() => [] };
+  const summary = {innerHTML:'unchanged',textContent:''};
+  const preview = {innerHTML:'',querySelector:() => ({value:''})};
+  ctx.document.getElementById = id => ({'ci-preview':preview,'ci-summary':summary,
+    'ci-attach':{checked:true},'ci-create':{checked:true},'ci-duplicates':{checked:true},'ci-type':{value:''}})[id] || null;
+  ctx.document.querySelector = selector => selector.includes('data-ci-match') ? {value:'',focus() {}} : {checked:true};
+  let message = ''; importer.status = value => { message = value; };
+  importer.preview();
+  assert.match(preview.innerHTML,/Créer une nouvelle fiche distincte/);
+  importer.confirm();
+  assert.match(message,/Vérifie 1 client/);
+  assert.equal(summary.innerHTML,'unchanged');
+});
+
 test('unified search handles accents, spacing and local professional projects', () => {
   const ctx = load('clients.js', { hub_clients:[{id:'c1',name:'École Créative'}] });
   const cp = ctx.window.CP;
@@ -107,6 +147,29 @@ test('confirmed folder import creates private workspace data and is idempotent',
   assert.equal(ctx.localStorage.getItem('hub_projects'),null);
   assert.ok(ctx.localStorage.getItem(importer.report.recoveryKey));
   assert.equal(importer.plan().entries.length,0);
+});
+
+test('explicitly distinct client with no projects creates only a private client fiche', async () => {
+  const ctx = load('client-import.js', {
+    hub_clients:[{id:'c1',name:'Climb Studio'}], hub_workspaces:[],
+  });
+  const importer = ctx.window.ClientImport;
+  importer.root = 'clients'; importer.rows = [{name:'Climb',projects:[]}];
+  importer.status = () => {};
+  const area = {innerHTML:''};
+  ctx.document.getElementById = id => ({
+    'ci-preview':area, 'ci-attach':{checked:true}, 'ci-create':{checked:true},
+    'ci-duplicates':{checked:true}, 'ci-type':{value:''},
+  })[id] || null;
+  ctx.document.querySelector = selector => selector.includes('data-ci-match') ? {value:'__new__'} : {checked:true};
+  const workspace = { all:() => JSON.parse(ctx.localStorage.getItem('hub_workspaces') || '[]'),
+    save:items => ctx.localStorage.setItem('hub_workspaces',JSON.stringify(items)) };
+  ctx.window.ClientWorkspace = workspace; ctx.context.ClientWorkspace = workspace;
+  await importer.importNow();
+  const names = JSON.parse(ctx.localStorage.getItem('hub_clients')).map(c => c.name);
+  assert.deepEqual(names,['Climb Studio','Climb']);
+  assert.equal(workspace.all().length,0);
+  assert.deepEqual(Array.from(importer.report.createdClients),['Climb']);
 });
 
 test('dashboard inline scripts remain valid JavaScript after adding import controls', () => {
