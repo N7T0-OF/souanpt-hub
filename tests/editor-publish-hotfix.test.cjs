@@ -12,7 +12,7 @@ function loadCore() {
   const context = { console, setTimeout, localStorage, window: {}, document: {} };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync('js/core.js', 'utf8') +
-    ';globalThis.exported={GH,Auth,SiteConfig,SiteAutoPublish,generateSite,buildAnalyticsProjectManifest,deployPortfolio,publishPortal,verifyPortal,ensureReviewClient};', context);
+    ';globalThis.exported={GH,Auth,SiteConfig,SiteAutoPublish,generateSite,buildAnalyticsProjectManifest,buildPublicProjectsFeed,deployPortfolio,publishPortal,verifyPortal,ensureReviewClient};', context);
   return { ...context.exported, localStorage, context };
 }
 
@@ -141,9 +141,30 @@ test('publication waits for the build of its own commit and omits local deployme
   assert.equal(manifest.lastDeploy, undefined);
   assert.equal(manifest.contactMethods, undefined);
   assert.equal(manifest.projectTags, undefined);
+  assert.deepEqual(JSON.parse(committed.find(f => f.path === 'projects.json').content), { version: 1, projects: [] });
   assert.doesNotMatch(committed.find(f => f.path === 'index.html').content, /private phone|Unpublished draft/);
   assert.equal(JSON.parse(localStorage.getItem(SiteConfig._K)).lastDeploy.sha, newSha);
   assert.equal(SiteConfig.get().autoPublish, true, 'la première publication vérifiée active les futures mises à jour');
+});
+
+test('public projects file contains exactly the rendered projects and drives the public counter', () => {
+  const { SiteConfig, generateSite, buildPublicProjectsFeed } = loadCore();
+  const projects = [
+    { id: 'visible-1', title: 'Logo public' },
+    { id: 'private-2', title: 'Dossier client secret', hidden: true },
+  ];
+  for (const layoutStyle of ['float', 'sidebar', 'bento']) {
+    const html = generateSite({ ...SiteConfig.defaults(), layoutStyle,
+      sections: { projects: true, stats: true },
+      stats: { items: [{ kind: 'auto', id: 'projects' }] } }, projects, []);
+    const feed = buildPublicProjectsFeed(html, projects);
+    assert.equal(feed.error, null);
+    assert.equal(JSON.stringify(feed.projects), JSON.stringify([{ id: 'visible-1', title: 'Logo public' }]));
+    assert.match(html, /fetch\('projects\.json',\{cache:'no-store'\}\)/);
+    assert.match(html, /data-project-count="1"/);
+    assert.doesNotMatch(JSON.stringify(feed), /Dossier client secret/);
+  }
+  assert.match(buildPublicProjectsFeed('<article data-p="missing"></article>', projects).error, /invalide/);
 });
 
 test('an explicit auto-publish opt-out survives a manual publication', async () => {
