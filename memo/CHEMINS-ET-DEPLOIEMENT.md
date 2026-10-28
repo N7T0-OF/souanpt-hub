@@ -7,3 +7,5 @@ Dashboard : GitHub Pages `https://n7t0-of.github.io/souanpt-hub/` est déployé 
 Portfolios utilisateurs : `generateSite()` génère le HTML ; `deployPortfolio()` publie dans le dépôt configuré du créateur. `SiteAutoPublish` programme les mises à jour autorisées et `PublishUI` affiche la progression. Les sites statiques historiques utilisent GitHub Pages. La projection publique `/u/<pseudo>` dépend des fonctions Cloudflare et de l'accès aux données. Ne jamais confondre son état avec le déploiement du dashboard. Un cache peut retarder l'affichage ; vérifier `build-info.json` ou le commit du site ciblé.
 
 Une URL de production n'est « opérationnelle » qu'après un contrôle réel du marqueur, du SHA et du workflow correspondant ; ce document ne garantit pas sa disponibilité à tout instant.
+
+Contrôle du 28 octobre 2026 : `deploy.yml` #78 a réussi pour la fusion de la PR #8 ; le marqueur de GitHub Pages indiquait `3.12.0`, `0fd455fa66a601bbd7ec40e34f50b3fff64f6fa9` et `github-pages`. L'accès à `app.html` affichait encore la porte de connexion liée à Firebase ; les écrans authentifiés n'ont pas été validés en production.
