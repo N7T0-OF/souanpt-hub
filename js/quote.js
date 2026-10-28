@@ -1330,6 +1330,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.12.0', "Recherche unifiée clients et projets, compteurs professionnels, import privé des noms de dossiers et réglages de barre latérale."],
   ['3.10.1', "Sécurité OAuth et Analytics renforcée, artefacts de publication allowlistés, CI et vérification de commit déployé."],
   ['3.10.0', "Éditeur plus clair : configuration des sections en « Blocs ✏️ », barre compacte, chiffres clés modifiables, et réseaux gérés en un endroit (URL et icônes automatiques)."],
   ['3.9.0', "Éditeur : bannière principale avec image, sections Chiffres clés & Réseaux, raccourcis clavier, défilement fluide et boutons indisponibles grises."],

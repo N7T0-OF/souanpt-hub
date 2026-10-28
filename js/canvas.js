@@ -271,7 +271,13 @@ body:not(.ed-on) .ed-navtools{display:none!important}
       add.onclick = e => { e.preventDefault(); e.stopPropagation(); edAddBlock(); };
       const tags = doc.createElement('button'); tags.type = 'button'; tags.textContent = '🏷 Tags';
       tags.onclick = e => { e.preventDefault(); e.stopPropagation(); edWinTags(); };
-      tools.append(sections, add, tags); nav.appendChild(tools);
+      tools.append(sections, add, tags);
+      if (doc.querySelector('.sb-nav')) {
+        const sidebar = doc.createElement('button'); sidebar.type = 'button'; sidebar.textContent = '🎨 Barre latérale';
+        sidebar.onclick = e => { e.preventDefault(); e.stopPropagation(); edWinSidebar(); };
+        tools.appendChild(sidebar);
+      }
+      nav.appendChild(tools);
     }
     // Repère discret : dans l'éditeur, le clic sélectionne le bloc, donc rien
     // ne laisse deviner que la bannière est cliquable sur le site publié.
@@ -969,6 +975,46 @@ function edWinAudio() {
   });
 }
 window.edWinBrand = edWinBrand; window.edWinAudio = edWinAudio;
+
+/* Réglages de la barre latérale publique, raccordés au SiteConfig actuel.
+   La fenêtre est distincte de la colonne historique « Blocs ». */
+function edWinSidebar() {
+  const c = SiteConfig.get(), s = c.sidebarPrefs || {};
+  EdWin.open(null, '🎨 Barre latérale du site', `
+    <div class="edw-l">Apparence et position</div>
+    <label class="edw-l" for="side-position">Position</label><select class="edw-in" id="side-position"><option value="left">À gauche</option><option value="right">À droite</option></select>
+    <div class="edw-l">Largeur (200–340 px)</div><input class="edw-in" id="side-width" type="number" min="200" max="340" value="${Number(s.width) || 230}">
+    <div class="edw-l">Espacement avec le contenu (6–32 px)</div><input class="edw-in" id="side-gap" type="number" min="6" max="32" value="${Number(s.gap) || 14}">
+    <div class="edw-l">Coins arrondis (0–32 px)</div><input class="edw-in" id="side-radius" type="number" min="0" max="32" value="${Number.isFinite(Number(s.radius)) ? Number(s.radius) : 14}">
+    <div class="edw-l">Taille des liens (11–17 px)</div><input class="edw-in" id="side-font" type="number" min="11" max="17" value="${Number(s.fontSize) || 13}">
+    <div class="edw-l">Couleurs</div><div class="edw-row"><label>Fond <input type="color" id="side-bg" value="${/^#[0-9a-f]{6}$/i.test(s.background || '') ? s.background : c.theme === '#f8f8f8' ? '#fafafa' : '#101010'}"></label><label>Liens <input type="color" id="side-text" value="${/^#[0-9a-f]{6}$/i.test(s.textColor || '') ? s.textColor : c.theme === '#f8f8f8' ? '#666666' : '#aaaaaa'}"></label></div>
+    <div class="edw-l">Navigation et visibilité</div>
+    <label class="edw-tog"><input type="checkbox" id="side-cats"${s.showCategories === false ? '' : ' checked'}> Afficher les tags de projets</label>
+    <label class="edw-tog"><input type="checkbox" id="side-contact"${s.showContact === false ? '' : ' checked'}> Afficher le contact</label>
+    <label class="edw-tog"><input type="checkbox" id="side-compact"${s.compact ? ' checked' : ''}> Navigation compacte</label>
+    <label class="edw-tog"><input type="checkbox" id="side-hover"${s.hoverLift ? ' checked' : ''}> Décalage doux au survol</label>
+    <div class="edw-row"><button class="edw-st" id="side-sections">Ordre et noms des sections</button><button class="edw-st" id="side-brand">Logo et identité</button></div>
+    <div class="edw-row"><button class="edw-st" id="side-reset">Réinitialiser</button><button class="edw-ok" id="side-save">Appliquer</button></div>`, w => {
+      w.querySelector('#side-position').value = s.position === 'right' ? 'right' : 'left';
+      w.querySelector('#side-sections').onclick = () => { EdWin.close(); edWinSections(null); };
+      w.querySelector('#side-brand').onclick = () => { EdWin.close(); edWinBrand(); };
+      w.querySelector('#side-reset').onclick = () => { SiteConfig.set('sidebarPrefs', {}); SiteAutoPublish.queue(); EdWin.close(); edRefreshPreview(); };
+      w.querySelector('#side-save').onclick = () => {
+        const num = (id, lo, hi, fallback) => Math.max(lo, Math.min(hi, Number(w.querySelector(id).value) || fallback));
+        SiteConfig.set('sidebarPrefs', {
+          position:w.querySelector('#side-position').value,
+          width:num('#side-width',200,340,230), gap:num('#side-gap',6,32,14),
+          radius:Math.max(0,Math.min(32,Number(w.querySelector('#side-radius').value) || 0)),
+          fontSize:num('#side-font',11,17,13),
+          background:w.querySelector('#side-bg').value, textColor:w.querySelector('#side-text').value,
+          showCategories:w.querySelector('#side-cats').checked, showContact:w.querySelector('#side-contact').checked,
+          compact:w.querySelector('#side-compact').checked, hoverLift:w.querySelector('#side-hover').checked,
+        });
+        SiteAutoPublish.queue(); EdWin.close(); edRefreshPreview();
+      };
+    });
+}
+window.edWinSidebar = edWinSidebar;
 
 /* ── 🎨 Thème (ex-groupe « Thème » du panneau) ── */
 function edWinTheme(btn) {

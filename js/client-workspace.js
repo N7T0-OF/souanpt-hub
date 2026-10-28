@@ -357,6 +357,47 @@
       if (root) { root.classList.remove('on'); root.setAttribute('aria-hidden', 'true'); }
       this._current = null;
     },
+    /** Modifie uniquement les projets locaux privés (manuels/importés). */
+    editLocal() {
+      const w = this._current?.w; if (!w?.localOnly) return;
+      const drawer = document.querySelector('#cw-root .cw-drawer'); if (!drawer) return;
+      let form = drawer.querySelector('#cw-local-edit');
+      if (form) { form.remove(); return; }
+      const clients = read('hub_clients', []);
+      form = document.createElement('div'); form.id = 'cw-local-edit';
+      form.style.cssText = 'padding:14px;border-bottom:1px solid var(--border);display:grid;gap:9px;font-size:11px';
+      form.innerHTML = `<label>Nom du projet <input id="cw-edit-name" class="prop-input" maxlength="150" value="${esc(w.projectName || '')}"></label>
+        <label>Type de prestation <input id="cw-edit-type" class="prop-input" maxlength="100" value="${esc(w.projectType || '')}"></label>
+        <label>Client <select id="cw-edit-client" class="prop-input">${clients.map(c => `<option value="${esc(c.id)}"${c.id === w.clientId ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+        <label>État <select id="cw-edit-status" class="prop-input"><option value="active">Actif</option><option value="archived">Archivé</option></select></label>
+        <div><button type="button" class="cw-btn go" id="cw-edit-save">Enregistrer</button> <button type="button" class="cw-btn" id="cw-edit-cancel">Annuler</button></div>`;
+      drawer.querySelector('header')?.after(form);
+      form.querySelector('#cw-edit-status').value = w.status === 'archived' ? 'archived' : 'active';
+      form.querySelector('#cw-edit-save').onclick = () => this.saveLocalEdit();
+      form.querySelector('#cw-edit-cancel').onclick = () => form.remove();
+      form.querySelector('#cw-edit-name')?.focus();
+    },
+    saveLocalEdit() {
+      const w = this._current?.w, form = document.getElementById('cw-local-edit');
+      if (!w?.localOnly || !form) return;
+      const name = form.querySelector('#cw-edit-name').value.trim();
+      if (!name) return window.showToast?.('Indique un nom de projet', '#c0392b', 2500);
+      const selectedId = form.querySelector('#cw-edit-client').value;
+      const client = read('hub_clients', []).find(c => String(c.id) === selectedId);
+      if (!client) return window.showToast?.('Choisis un client existant', '#c0392b', 2500);
+      const list = this.all(), target = list.find(x => x.token === w.token);
+      if (!target || !target.localOnly) return;
+      target.projectName = name;
+      target.projectType = form.querySelector('#cw-edit-type').value.trim();
+      target.clientId = client.id; target.clientName = client.name;
+      target.status = form.querySelector('#cw-edit-status').value === 'archived' ? 'archived' : 'active';
+      target.updatedAt = Date.now();
+      this.save(list);
+      if (window.CP) { CP._links = CP._mergeLinks(CP._links.filter(l => !l.localOnly)); CP.invalidateSearch(); CP._paint(); CP._badge(); }
+      if (typeof syncKPIs === 'function') syncKPIs();
+      this.open(w.token);
+      window.showToast?.('Dossier privé mis à jour ✓', '#2e9a63', 2200);
+    },
 
     /* Clôture LOGIQUE : étape `done` + horodatage. Aucune suppression, rien
        n'est déplacé : le nettoyage physique (dossiers réellement terminés)
@@ -707,6 +748,7 @@
           <div class="cw-sub">${w.clientName ? '👤 ' + esc(w.clientName) : '<span style="opacity:.5">Client non renseigné</span>'} · ${this._money(w.total, w.currency)}</div>
           <div class="cw-act">
             ${w.localOnly ? '<span class="cw-via">Projet interne — crée un devis ou un portail pour obtenir un lien client</span>' : `<button class="cw-btn" onclick="ClientWorkspace.copyLink('${esc(w.token)}')" title="Copier le lien client">📋 Copier</button><button class="cw-btn" onclick="ClientWorkspace.showLink('${esc(w.token)}')" title="Ouvrir /c/">🔗 Ouvrir</button>`}
+            ${w.localOnly ? '<button class="cw-btn" onclick="ClientWorkspace.editLocal()">✎ Modifier</button>' : ''}
             ${closed
               ? `<button class="cw-btn" onclick="ClientWorkspace.reopen('${esc(w.token)}')">↺ Rouvrir</button>`
               : `<button class="cw-btn go" onclick="ClientWorkspace.closeMission('${esc(w.token)}')" title="Passe le dossier en Terminé — rien n'est supprimé">✅ Terminer</button>`}

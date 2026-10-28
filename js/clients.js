@@ -43,6 +43,138 @@
     expandedClientIds: new Set(),
     setClientExpanded(id, open) { if (open) this.expandedClientIds.add(String(id)); else this.expandedClientIds.delete(String(id)); },
     sortMode: localStorage.getItem('cp_sort') === 'az' ? 'az' : 'recent',
+    search: '', searchKind: 'all', statusFilter: '', _searchRows: null, _searchTimer: null,
+    _migrationPromise: null,
+    selectedTokens: new Set(), _trashOpen: false,
+    toggleSelect(token, checked) { checked ? this.selectedTokens.add(token) : this.selectedTokens.delete(token); this._paint(); },
+    toggleTrash() { this._trashOpen = !this._trashOpen; this._paint(); },
+    _trashPanel() {
+      if (!this._trashOpen || !window.ClientWorkspace) return '';
+      const trashed = ClientWorkspace.all().filter(w => w.localOnly && w.status === 'trashed');
+      return `<section class="cp-bulk"><b>Corbeille — ${trashed.length} projet(s) privé(s)</b>
+        ${trashed.length ? trashed.map(w => `<span class="cp-result">${this._esc(w.projectName || 'Projet')} · ${this._esc(w.clientName || '')}<button class="btn btn-ghost" type="button" data-cp-restore="${this._esc(w.token)}">Restaurer</button></span>`).join('') : '<small>Aucun dossier dans la corbeille.</small>'}</section>`;
+    },
+    _bulkToolbar() {
+      if (!this.selectedTokens.size) return '';
+      let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      if (!Array.isArray(clients)) clients = [];
+      return `<div class="cp-bulk" role="group" aria-label="Actions groupées"><b>${this.selectedTokens.size} projet(s) privé(s)</b>
+        <select id="cp-bulk-status" aria-label="Statut"><option value="active">En cours</option><option value="done">Terminé</option><option value="archived">Archivé</option></select><button class="btn btn-ghost" onclick="CP.bulk('status')">Appliquer le statut</button>
+        <input id="cp-bulk-type" maxlength="100" placeholder="Type de prestation" aria-label="Type de prestation"><button class="btn btn-ghost" onclick="CP.bulk('type')">Changer le type</button>
+        <select id="cp-bulk-client" aria-label="Client"><option value="">Choisir un client</option>${clients.map(c => `<option value="${this._esc(c.id)}">${this._esc(c.name)}</option>`).join('')}</select><button class="btn btn-ghost" onclick="CP.bulk('client')">Rattacher</button>
+        <button class="btn btn-ghost" onclick="CP.bulk('trash')">Corbeille</button></div>`;
+    },
+    _insights() {
+      const idx = this._index(), byName = new Map(), notes = [];
+      idx.clients.forEach(r => {
+        const key = this.normalize(r.item.name);
+        if (!key) return;
+        if (byName.has(key) && byName.get(key) !== r.item.id) notes.push(`Fiches clientes possiblement en double : ${r.item.name}`);
+        else byName.set(key, r.item.id);
+      });
+      if (idx.clients.length <= 500) for (let i=0;i<idx.clients.length;i++) for (let j=i+1;j<idx.clients.length;j++) {
+        const a = this.normalize(idx.clients[i].item.name), b = this.normalize(idx.clients[j].item.name);
+        if (a && b && a !== b && Math.min(a.length,b.length) >= 5 && (a.includes(b) || b.includes(a)))
+          notes.push(`Noms de clients proches : ${idx.clients[i].item.name} / ${idx.clients[j].item.name}`);
+      }
+      const clients = new Set(idx.clients.map(r => this.normalize(r.item.name)).filter(Boolean));
+      const byProject = new Set();
+      idx.projects.forEach(r => {
+        const p = r.item, client = this.normalize(p.clientName), name = this.normalize(p.projectName);
+        if (!client) notes.push(`Projet sans client : ${p.projectName || p.token}`);
+        else if (!clients.has(client)) notes.push(`Fiche client à rattacher : ${p.clientName} — ${p.projectName || 'projet'}`);
+        const key = client + '/' + name;
+        if (name && byProject.has(key)) notes.push(`Projets similaires chez ${p.clientName || 'un client'} : ${p.projectName}`);
+        byProject.add(key);
+      });
+      if (!notes.length) return '';
+      return `<details class="infobox"><summary style="cursor:pointer">🧩 ${notes.length} suggestion(s) de cohérence locale</summary><ul>${notes.slice(0,25).map(n => `<li>${this._esc(n)}</li>`).join('')}</ul><small>Ouvre une fiche ou un dossier pour vérifier avant de rattacher. Aucun changement automatique.</small></details>`;
+    },
+    bulk(action) {
+      if (!window.ClientWorkspace || !this.selectedTokens.size) return;
+      const workspaces = ClientWorkspace.all(), selected = workspaces.filter(w => w.localOnly && this.selectedTokens.has(w.token) && w.status !== 'trashed');
+      if (!selected.length) { this.selectedTokens.clear(); this._paint(); return; }
+      const type = document.getElementById('cp-bulk-type')?.value.trim() || '';
+      const stage = document.getElementById('cp-bulk-status')?.value;
+      const clientId = document.getElementById('cp-bulk-client')?.value;
+      let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      const client = Array.isArray(clients) ? clients.find(c => String(c.id) === String(clientId)) : null;
+      if (action === 'type' && !type) return window.showToast?.('Indique un type', '#c0392b', 2200);
+      if (action === 'client' && !client) return window.showToast?.('Choisis un client', '#c0392b', 2200);
+      if (action === 'trash' && !window.confirm(`Placer ${selected.length} projet(s) privé(s) dans la corbeille récupérable ?`)) return;
+      selected.forEach(w => {
+        if (action === 'type') w.projectType = type;
+        if (action === 'client') { w.clientId = client.id; w.clientName = client.name; }
+        if (action === 'status') {
+          if (stage === 'done') { if (w.stage !== 'done') w.lastStage = w.stage; w.stage = 'done'; w.closedAt = Date.now(); w.status = 'active'; }
+          else if (stage === 'archived') w.status = 'archived';
+          else { w.status = 'active'; if (w.stage === 'done') { w.stage = w.lastStage || 'request'; w.closedAt = null; } }
+        }
+        if (action === 'trash') w.status = 'trashed';
+        w.updatedAt = Date.now();
+      });
+      ClientWorkspace.save(workspaces);
+      this.selectedTokens.clear(); this._links = this._mergeLinks(this._links.filter(l => !l.localOnly));
+      this.invalidateSearch(); this._paint(); this._badge();
+      if (typeof syncKPIs === 'function') syncKPIs();
+      window.showToast?.(`${selected.length} projet(s) mis à jour ✓`, '#2e9a63', 2400);
+    },
+    restoreTrash(token) {
+      const list = ClientWorkspace.all(), w = list.find(item => item.token === token && item.localOnly && item.status === 'trashed');
+      if (!w) return;
+      w.status = 'active'; w.updatedAt = Date.now(); ClientWorkspace.save(list);
+      this._links = this._mergeLinks(this._links.filter(l => !l.localOnly)); this.invalidateSearch(); this._paint(); this._badge();
+      if (typeof syncKPIs === 'function') syncKPIs();
+    },
+    normalize(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr').trim().replace(/\s+/g, ' '); },
+    setSearch(value) {
+      this.search = this.normalize(value);
+      clearTimeout(this._searchTimer);
+      this._searchTimer = setTimeout(() => this._paint(), 90);
+    },
+    clearSearch() { this.search = ''; const input = document.getElementById('cp-search'); if (input) { input.value = ''; input.focus(); } this._paint(); },
+    setSearchKind(kind) { this.searchKind = ['clients','projects'].includes(kind) ? kind : 'all'; this._paint(); },
+    setStatusFilter(kind) { this.statusFilter = this.statusFilter === kind ? '' : kind; this.setView('list'); },
+    invalidateSearch() { this._searchRows = null; },
+    _index() {
+      if (this._searchRows) return this._searchRows;
+      let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
+      if (!Array.isArray(clients)) clients = [];
+      const projectRows = this._links.map(p => ({ item:p, text:this.normalize([p.projectName,p.projectType,p.type,p.clientName,p.description,p.mission].join(' ')) }));
+      this._searchRows = { clients: clients.map(c => ({ item:c, text:this.normalize([c.name,c.type,c.description].join(' ')) })), projects:projectRows };
+      return this._searchRows;
+    },
+    _matches(text) { return !this.search || this.search.split(' ').every(part => text.includes(part)); },
+    _filteredLinks() {
+      const rows = this._index().projects;
+      return rows.filter(r => (!this.search || this.searchKind !== 'clients' && this._matches(r.text))
+        && (!this.statusFilter || (this.statusFilter === 'active' ? r.item.stage !== 'done' && r.item.status !== 'archived' && r.item.status !== 'trashed' : r.item.stage === 'done'))).map(r => r.item);
+    },
+    matchesClient(client) {
+      if (!this.search) return true;
+      if (this.searchKind === 'projects') return false;
+      return this._matches(this.normalize([client.name,client.type,client.description].join(' ')))
+        || this._index().projects.some(r => (r.item.clientId === client.id || !r.item.clientId && this.normalize(r.item.clientName) === this.normalize(client.name)) && this._matches(r.text));
+    },
+    _searchResults() {
+      if (!this.search) return '';
+      const idx = this._index();
+      const clients = this.searchKind === 'projects' ? [] : idx.clients.filter(r => this._matches(r.text));
+      const projects = this.searchKind === 'clients' ? [] : idx.projects.filter(r => this._matches(r.text));
+      const row = (label, kind, id, subtitle) => `<div class="cp-result"><span><b>${this._esc(label)}</b><small style="display:block;color:var(--muted2)">${this._esc(subtitle || '')}</small></span><button class="btn btn-ghost" type="button" data-cp-result="${kind}" data-id="${this._esc(id)}">Ouvrir</button></div>`;
+      return `<section class="cp-search-results" aria-live="polite"><b>Résultats — ${clients.length} client${clients.length > 1 ? 's' : ''} · ${projects.length} projet${projects.length > 1 ? 's' : ''}</b>
+        ${clients.length ? `<h4>Clients</h4>${clients.map(r => row(r.item.name, 'client', r.item.id, r.item.type)).join('')}` : ''}
+        ${projects.length ? `<h4>Projets</h4>${projects.map(r => row(r.item.projectName || 'Projet sans nom', 'project', r.item.token, r.item.clientName)).join('')}` : ''}
+        ${!clients.length && !projects.length ? '<div class="cp-empty-col">Aucun résultat</div>' : ''}</section>`;
+    },
+    _metrics() {
+      const target = document.getElementById('cp-metrics'); if (!target || !window.ClientMetrics) return;
+      const m = ClientMetrics.collect(this._links);
+      target.innerHTML = `<button class="cp-metric" onclick="CP.setView('clients')"><b>${m.clients}</b><small>Clients</small></button>
+        <button class="cp-metric" onclick="CP.statusFilter='';CP.setView('list')"><b>${m.professionalProjects}</b><small>Projets professionnels</small></button>
+        <button class="cp-metric" onclick="CP.setStatusFilter('active')"><b>${m.activeProjects}</b><small>En cours</small></button>
+        <button class="cp-metric" onclick="CP.setStatusFilter('done')"><b>${m.completedProjects}</b><small>Terminés</small></button>`;
+    },
 
     setSort() {
       this.sortMode = this.sortMode === 'recent' ? 'az' : 'recent';
@@ -128,15 +260,17 @@
     /* ── Chargement ──────────────────────────────────────────────────────── */
     async render() {
       const body = document.getElementById('cp-body'); if (!body) return;
+      this.invalidateSearch();
       const sortButton = document.getElementById('cp-sort');
       if (sortButton) sortButton.textContent = 'Trier : ' + (this.sortMode === 'az' ? 'A-Z' : 'Plus récent');
       if (!(window.Cloud && Cloud.enabled && Cloud.user())) {
         this._loading = false; this._links = this._mergeLinks();
+        this.invalidateSearch();
         this._paint();
         this._badge();
-        if (window.ClientWorkspace) ClientWorkspace.migrate().then(() => {
-          this._links = this._mergeLinks(); this._paint(); this._badge();
-        }).catch(() => {});
+        if (window.ClientWorkspace) (this._migrationPromise ||= ClientWorkspace.migrate()).then(() => {
+          this._links = this._mergeLinks(); this.invalidateSearch(); this._paint(); this._badge();
+        }).catch(() => {}).finally(() => { this._migrationPromise = null; });
         return;
       }
       this._loading = true; this._paint();
@@ -148,14 +282,15 @@
         try { await Registry.sync(true); links = await Registry.list(); } catch (e) {}
       }
       this._links = this._mergeLinks(links);
+      this.invalidateSearch();
       this._loading = false;
       this._paint();
       this._badge();
       // Recense les projets + rattache factures/portails sans jeton (1×/session,
       // non destructif) : le dossier n'affiche rien d'autre que ce qui existe.
-      if (window.ClientWorkspace) ClientWorkspace.migrate().then(() => {
-        this._links = this._mergeLinks(links); this._paint(); this._badge();
-      }).catch(() => {});
+      if (window.ClientWorkspace) (this._migrationPromise ||= ClientWorkspace.migrate()).then(() => {
+        this._links = this._mergeLinks(links); this.invalidateSearch(); this._paint(); this._badge();
+      }).catch(() => {}).finally(() => { this._migrationPromise = null; });
     },
 
     setView(v) {
@@ -167,12 +302,13 @@
     /* ── Rendu ───────────────────────────────────────────────────────────── */
     _paint() {
       const body = document.getElementById('cp-body'); if (!body) return;
-      let head = this._creating ? this._createPanel() : '';
+      this._metrics();
+      let head = this._trashPanel() + this._bulkToolbar() + this._insights() + (this._creating ? this._createPanel() : '') + this._searchResults();
       if (!(window.Cloud && Cloud.enabled && Cloud.user())) head += '<div class="infobox" style="margin:10px 0">Mode local : tes fiches et dossiers de ce navigateur restent accessibles. La synchronisation attend une connexion Google ou Discord valide.</div>';
-      if (this._loading) { body.innerHTML = head + this._msg('Chargement de tes projets…'); return; }
+      if (this._loading) { body.innerHTML = head + this._msg('Chargement de tes projets…'); this._after(); return; }
       // Sans projet, la vue Clients montre quand même l'annuaire (sinon on
       // perdrait l'accès aux fiches en fusionnant l'ancienne page).
-      if (!this._links.length && this._view !== 'clients') { body.innerHTML = head + this._empty(); return; }
+      if (!this._links.length && this._view !== 'clients') { body.innerHTML = head + this._empty(); this._after(); return; }
       const view = this._view === 'list' ? this._list()
                  : this._view === 'clients' ? this._clients()
                  : this._pipeline();
@@ -183,13 +319,18 @@
     /* Ce qu'il faut peindre après coup : l'annuaire est rendu par renderClients()
        (app.html) et non par ce module. */
     _after() {
+      document.querySelectorAll('#cp-body [data-cp-result]').forEach(button => button.addEventListener('click', () => {
+        if (button.dataset.cpResult === 'client') this.viewClient(button.dataset.id);
+        else this.manage(button.dataset.id);
+      }));
+      document.querySelectorAll('#cp-body [data-cp-restore]').forEach(button => button.addEventListener('click', () => this.restoreTrash(button.dataset.cpRestore)));
       if (this._view !== 'clients') return;
       try { window.renderClients?.(); } catch {}
     },
 
     _pipeline() {
       const cols = STAGE_ORDER.map(stage => {
-        const items = this.orderedLinks(this._links.filter(l => (l.stage || 'request') === stage));
+        const items = this.orderedLinks(this._filteredLinks().filter(l => (l.stage || 'request') === stage));
         const cards = items.length
           ? items.map(l => this._card(l, true)).join('')
           : `<div class="cp-empty-col">—</div>`;
@@ -205,9 +346,10 @@
     },
 
     _list() {
-      const rows = this.orderedLinks().map(l => {
+      const rows = this.orderedLinks(this._filteredLinks()).map(l => {
         const s = STAGE[l.stage || 'request'], st = STATUS[l.status || 'active'];
         return `<div class="cp-row">
+          ${l.localOnly ? `<input type="checkbox" aria-label="Sélectionner ${this._esc(l.projectName || 'Projet')}" data-token="${this._esc(l.token)}" onchange="CP.toggleSelect(this.dataset.token,this.checked)"${this.selectedTokens.has(l.token) ? ' checked' : ''}>` : ''}
           <div class="cp-row-main">
             <div class="cp-row-title">${this._esc(l.projectName) || '<span style="opacity:.5">Projet sans nom</span>'}</div>
             <div class="cp-row-sub">${l.clientName ? '👤 ' + this._esc(l.clientName) + ' · ' : ''}${this._rel(l.updatedAt || l.createdAt)}</div>
@@ -251,7 +393,7 @@
       </div>`;
 
       const groups = new Map();
-      this.orderedLinks().forEach(l => {
+      this.orderedLinks(this._filteredLinks()).forEach(l => {
         const key = (l.clientName || '').trim() || '__none';
         if (key !== '__none' && roster.some(c => String(c.name || '').trim().toLocaleLowerCase('fr') === key.toLocaleLowerCase('fr'))) return;
         if (!groups.has(key)) groups.set(key, []);
@@ -388,7 +530,8 @@
       const index = workspaces.findIndex(item => item.token === token);
       if (index >= 0) { workspaces[index] = w; ClientWorkspace.save(workspaces); }
       this._creating = false; this._manualClientId = '';
-      this._links = this._mergeLinks(); this._view = 'clients';
+      this._links = this._mergeLinks(this._links.filter(l => !l.localOnly)); this._view = 'clients';
+      this.invalidateSearch();
       document.querySelectorAll('#cp-views button').forEach(b => b.classList.toggle('active', b.dataset.v === 'clients'));
       this._paint(); this._badge(); this.viewClient(client.id);
       if (createdClient && typeof SiteAutoPublish !== 'undefined') SiteAutoPublish.queue();
