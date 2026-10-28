@@ -83,6 +83,7 @@
       if (patch.stage && this._rank(patch.stage) >= this._rank(w.stage)) w.stage = patch.stage;
       for (const k of ['clientId', 'clientName', 'projectName', 'projectType', 'total', 'currency'])
         if (patch[k] != null && patch[k] !== '') w[k] = patch[k];
+      if (patch.localOnly === true) w.localOnly = true;
       if (patch.status && ['active', 'inactive', 'archived', 'trashed'].includes(patch.status)) {
         if (!w.status || patch.status !== 'active' || w.status === 'active') w.status = patch.status;
       }

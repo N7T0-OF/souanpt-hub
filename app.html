@@ -1495,6 +1495,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div class="ov-card"><div class="ov-ic">👁️</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-views">—</div><div class="ov-c-l">Vues totales</div></div></div>
         <div class="ov-card"><div class="ov-ic">👤</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-uniq">—</div><div class="ov-c-l">Visiteurs uniques</div></div></div>
         <div class="ov-card"><div class="ov-ic">📂</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-projects">0</div><div class="ov-c-l">Projets publiés</div></div></div>
+        <div class="ov-card"><div class="ov-ic">🗂️</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-client-projects">0</div><div class="ov-c-l">Projets clients</div></div></div>
         <div class="ov-card"><div class="ov-ic">⭐</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-reviews">0</div><div class="ov-c-l">Avis reçus</div></div></div>
         <div class="ov-card"><div class="ov-ic">💼</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-clients">0</div><div class="ov-c-l">Clients</div></div></div>
         <div class="ov-card"><div class="ov-ic">📄</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-invoices">0</div><div class="ov-c-l">Factures</div></div></div>
@@ -1612,6 +1613,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <button class="btn btn-ghost" id="cp-trash-btn" style="font-size:10px" onclick="CP.toggleTrash()">Corbeille</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="openClientForm()">+ Client</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="ClientImport.open()">📁 Importer un dossier</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="CP.startManual()">+ Dossier de projet</button>
         <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau projet</button>
       </div>
       <div class="infobox">🗂️ <strong>Tout ton relationnel client au même endroit.</strong> Chaque demande, devis et mission d'un même projet vit sur <strong>un seul lien</strong> qui suit son cycle de vie — de la première prise de contact à la livraison. Les outils détaillés (analyse, grille tarifaire, portail) restent accessibles depuis chaque projet.</div>
@@ -3012,10 +3014,10 @@ function renderClients() {
     const progress=Math.max(0,Math.min(100,Number(c.progress)||0));
     return `<details class="gc client-card" id="client-card-${esc(c.id)}" data-client-id="${esc(c.id)}" tabindex="-1"${CP.expandedClientIds.has(String(c.id))?' open':''} ontoggle="CP.setClientExpanded(this.dataset.clientId,this.open)"><summary><div class="client-av" style="background:${cols[i%4]};color:${tcols[i%4]}">${esc((c.name||'?')[0].toUpperCase())}</div><div style="flex:1;min-width:0"><div class="client-name">${esc(c.name)}</div><div class="client-sub">${esc(c.type||'Client')} · ${cp.length} projet${cp.length>1?'s':''} · ${cr.length} avis</div></div><span class="rstatus st-ok">${c.status==='active'?'Actif':'En cours'}</span></summary>
       <div class="client-extra"><div>Progression <b>${progress}%</b><div class="progress-bar-w" style="width:100%;margin-top:5px"><div class="progress-bar" style="width:${progress}%"></div></div></div>
-      <h4>Projets (${cp.length})</h4>${cp.length?cp.map(p=>`<div class="client-item"><b>${esc(p.projectName||'Projet sans nom')}</b>${p.projectType?` · ${esc(p.projectType)}`:''}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="ClientWorkspace.open('${esc(p.token)}')">Ouvrir</button></div>`).join(''):'<div class="client-sub">Aucun projet lié.</div>'}
+      <h4>Dossiers de projet (${cp.length})</h4>${cp.length?cp.map(p=>`<div class="client-item"><b>${esc(p.projectName||'Projet sans nom')}</b>${p.projectType?` · ${esc(p.projectType)}`:''}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="ClientWorkspace.open('${esc(p.token)}')">Ouvrir le dossier</button></div>`).join(''):'<div class="client-sub">Aucun dossier de projet lié.</div>'}
       ${types.length?`<div class="client-sub" style="margin-top:7px">Types : ${types.map(esc).join(', ')}</div>`:''}
       <h4>Avis (${cr.length})</h4>${cr.length?cr.map(r=>`<div class="client-item"><span style="color:var(--gold-l)">${'★'.repeat(Math.max(0,Math.min(5,Number(r.rating)||0)))}</span> ${esc(String(r.text||'').slice(0,100))}<button class="btn btn-ghost" style="float:right;font-size:9px" onclick="clientReviewJump('${esc(r.id)}')">Voir</button></div>`).join(''):'<div class="client-sub">Aucun avis lié.</div>'}
-      <div class="client-actions"><button class="btn btn-accent" style="font-size:10px" onclick="CP.startManual('${esc(c.id)}')">+ Projet manuel</button><button class="btn btn-ghost" style="font-size:10px" onclick="openClientReview('${esc(c.id)}')">+ Avis</button>${cwBtn(c.name)}<button class="btn btn-ghost" style="font-size:10px" onclick="deleteClient('${esc(c.id)}')">Supprimer</button></div></div></details>`;
+      <div class="client-actions"><button class="btn btn-accent" style="font-size:10px" onclick="CP.startManual('${esc(c.id)}')">+ Dossier de projet</button><button class="btn btn-ghost" style="font-size:10px" onclick="openClientReview('${esc(c.id)}')">+ Avis</button>${cwBtn(c.name)}<button class="btn btn-ghost" style="font-size:10px" onclick="deleteClient('${esc(c.id)}')">Supprimer</button></div></div></details>`;
   }).join('');
 }
 function clientReviewJump(id){showPage('avis');setTimeout(()=>{const card=document.getElementById('review-card-'+id);card?.scrollIntoView({behavior:'smooth',block:'center'});card?.focus({preventScroll:true});},80);}
@@ -3262,6 +3264,8 @@ function syncKPIs() {
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   // Cartes résumé de « Vue d'ensemble »
   set('ov-projects',projs.length);
+  const clientMetrics=window.ClientMetrics?.collect(window.CP?._links);
+  set('ov-client-projects',clientMetrics?.professionalProjects ?? 0);
   set('ov-reviews',revs.length);
   set('ov-clients',cl.length);
   set('ov-invoices',inv.length);
