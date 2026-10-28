@@ -498,12 +498,12 @@
       if (!panel) return;
       let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
       const chosen = clients.find(c => c.id === clientId);
-      panel.innerHTML = `<div class="cp-create-h">Nouveau projet manuel</div>
+      panel.innerHTML = `<div class="cp-create-h">Nouveau dossier de projet</div>
         <div class="biz-form"><div><div class="prop-label">Client *</div><input class="prop-input" id="cp-manual-client" list="dl-clients" value="${this._esc(chosen?.name || '')}" placeholder="Nom du client" oninput="CP.checkManualClient()"></div>
         <div><div class="prop-label">Nom du projet *</div><input class="prop-input" id="cp-manual-name" placeholder="Ex. Identité visuelle"></div>
         <div><div class="prop-label">Type de projet</div><input class="prop-input" id="cp-manual-type" placeholder="Ex. Design, site web"></div></div>
         <div id="cp-manual-match" role="status" style="color:var(--gold-l);font-size:11px;margin-top:8px" hidden></div>
-        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-accent" onclick="CP.saveManual()">Créer le projet</button><button class="btn btn-ghost" onclick="CP.newProject()">Annuler</button></div>`;
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-accent" onclick="CP.saveManual()">Créer et ouvrir le dossier</button><button class="btn btn-ghost" onclick="CP.newProject()">Annuler</button></div>`;
       this.checkManualClient();
       panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
       panel.querySelector('#cp-manual-name')?.focus();
@@ -516,26 +516,37 @@
       if (!window.ClientWorkspace) return window.showToast?.('Dossier client indisponible', '#c0392b', 2500);
       let clients = []; try { clients = JSON.parse(localStorage.getItem('hub_clients') || '[]'); } catch {}
       if (!Array.isArray(clients)) clients = [];
-      let client = clients.find(c => String(c.name || '').trim().toLocaleLowerCase('fr') === clientName.toLocaleLowerCase('fr'));
+      const normalizedName = clientName.toLocaleLowerCase('fr');
+      const selectedClient = clients.find(c => String(c.id) === String(this._manualClientId));
+      let client = selectedClient && String(selectedClient.name || '').trim().toLocaleLowerCase('fr') === normalizedName
+        ? selectedClient : clients.find(c => String(c.name || '').trim().toLocaleLowerCase('fr') === normalizedName);
       let createdClient = false;
       if (!client) {
         client = { id: crypto.randomUUID(), name: clientName, type: '', status: 'active', progress: 0, revenue: 0, createdAt: Date.now() };
-        clients.push(client); localStorage.setItem('hub_clients', JSON.stringify(clients));
+        clients.push(client);
         createdClient = true;
       }
       const token = crypto.randomUUID().replace(/-/g, '').slice(0, 20);
-      const w = ClientWorkspace.ensure(token, { clientId: client.id, clientName: client.name, projectName, projectType, stage: 'request' });
-      w.localOnly = true;
-      const workspaces = ClientWorkspace.all();
-      const index = workspaces.findIndex(item => item.token === token);
-      if (index >= 0) { workspaces[index] = w; ClientWorkspace.save(workspaces); }
+      try {
+        if (createdClient) localStorage.setItem('hub_clients', JSON.stringify(clients));
+        ClientWorkspace.ensure(token, { clientId: client.id, clientName: client.name, projectName, projectType, stage: 'request', localOnly: true });
+      } catch (error) {
+        if (createdClient) try { localStorage.setItem('hub_clients', JSON.stringify(clients.filter(c => c.id !== client.id))); } catch {}
+        window.showToast?.('Impossible d’enregistrer le dossier sur cet appareil', '#c0392b', 3500);
+        return;
+      }
       this._creating = false; this._manualClientId = '';
       this._links = this._mergeLinks(this._links.filter(l => !l.localOnly)); this._view = 'clients';
       this.invalidateSearch();
       document.querySelectorAll('#cp-views button').forEach(b => b.classList.toggle('active', b.dataset.v === 'clients'));
       this._paint(); this._badge(); this.viewClient(client.id);
-      if (createdClient && typeof SiteAutoPublish !== 'undefined') SiteAutoPublish.queue();
-      window.showToast?.('Projet créé dans ce navigateur ✓', '#2e9a63', 2500);
+      if (typeof syncKPIs === 'function') syncKPIs();
+      if (createdClient && typeof SiteAutoPublish !== 'undefined') {
+        try { SiteAutoPublish.queue(); } catch (error) { console.warn('[client] publication automatique', error); }
+      }
+      try { Promise.resolve(ClientWorkspace.open(token)).catch(error => console.warn('[client] ouverture du dossier', error)); }
+      catch (error) { console.warn('[client] ouverture du dossier', error); }
+      window.showToast?.('Dossier de projet créé ✓', '#2e9a63', 2500);
     },
 
     /* ── Badge de navigation : nombre de projets actifs (hors terminés) ──── */

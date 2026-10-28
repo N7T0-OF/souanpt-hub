@@ -330,12 +330,14 @@ test('manual projects link to an existing client and create a new fiche only whe
   const workspaces = [];
   const ClientWorkspace = {
     all: () => workspaces,
-    ensure(token, patch) { const item = { token, ...patch }; workspaces.push(item); return item; },
-    save() {},
+    ensure(token, patch) { const item = { token, ...patch }; workspaces.push(item); localStorage.setItem('hub_workspaces', JSON.stringify(workspaces)); return item; },
+    open(token) { opened.push(token); },
   };
-  let queued = 0, viewed = '';
+  let queued = 0, viewed = '', synced = 0, uuid = 0;
+  const opened = [];
   const context = { console, localStorage, ClientWorkspace, SiteAutoPublish: { queue: () => queued++ },
-    crypto: { randomUUID: () => '12345678-1234-1234-1234-123456789abc' },
+    crypto: { randomUUID: () => `${String(++uuid).padStart(8,'0')}-1234-1234-1234-123456789abc` },
+    syncKPIs: () => synced++,
     window: { ClientWorkspace, showToast() {} },
     document: {
       getElementById: id => id === 'cp-manual-match' ? match : fields[id] || null,
@@ -344,6 +346,7 @@ test('manual projects link to an existing client and create a new fiche only whe
     } };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync('js/clients.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('js/client-metrics.js', 'utf8'), context);
   const CP = context.window.CP;
   CP._paint = () => {}; CP._badge = () => {}; CP.viewClient = id => { viewed = id; };
   assert.equal(CP.checkManualClient().id, 'alice');
@@ -353,8 +356,12 @@ test('manual projects link to an existing client and create a new fiche only whe
   assert.equal(JSON.parse(localStorage.getItem('hub_clients')).length, 1);
   assert.equal(workspaces[0].clientId, 'alice');
   assert.equal(workspaces[0].projectType, 'Design');
+  assert.equal(workspaces[0].localOnly, true);
   assert.equal(viewed, 'alice');
   assert.equal(queued, 0);
+  assert.deepEqual(opened, [workspaces[0].token]);
+  assert.equal(synced, 1);
+  assert.equal(context.window.ClientMetrics.collect().professionalProjects, 1);
 
   fields['cp-manual-client'].value = 'Bob';
   fields['cp-manual-name'].value = 'Site';
@@ -362,6 +369,9 @@ test('manual projects link to an existing client and create a new fiche only whe
   assert.equal(JSON.parse(localStorage.getItem('hub_clients')).length, 2);
   assert.equal(workspaces[1].clientName, 'Bob');
   assert.equal(queued, 1);
+  assert.deepEqual(opened, workspaces.map(w => w.token));
+  assert.equal(synced, 2);
+  assert.equal(context.window.ClientMetrics.collect().professionalProjects, 2);
 });
 
 test('a portal launched from a client dossier keeps that exact project link', () => {
