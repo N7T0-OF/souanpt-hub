@@ -12,7 +12,7 @@ for (const channel of ['github-pages', 'cloudflare']) {
     t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
     const result = buildDistribution({ channel, output, commitSha: 'a'.repeat(40), builtAt: '2026-10-21T00:00:00.000Z' });
     assert.equal(result.commit, 'a'.repeat(40));
-    assert.equal(result.version, '3.10.1');
+    assert.equal(result.version, '3.12.0');
     assert.equal(validateDistribution(output, channel).info.channel, channel);
     assert.equal(fs.existsSync(path.join(output, 'docs')), false);
     assert.equal(fs.existsSync(path.join(output, 'README.md')), false);

@@ -1034,6 +1034,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cp-roster-h b{font-size:11px;color:var(--text)}
 .cp-roster-sub{font-size:9.5px;color:var(--muted);font-weight:400}
 .cp-roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.cp-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.cp-search-wrap{position:relative;flex:1;min-width:220px}
+.cp-search-wrap input{width:100%;padding-right:34px}
+.cp-search-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted2);cursor:pointer;font-size:17px}
+.cp-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 14px}
+.cp-metric{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:left;color:var(--text);cursor:pointer}
+.cp-metric b{display:block;font-size:21px;color:var(--accent)}
+.cp-metric small{font-size:10px;color:var(--muted2)}
+.cp-result{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:5px 0}
+.cp-bulk{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:10px;background:var(--s1);border:1px solid var(--border2);border-radius:9px;margin-bottom:12px}
+.cp-bulk input,.cp-bulk select{max-width:180px;background:var(--s2);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:6px;font-size:10px}
+@media(max-width:640px){.cp-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.cp-roster-grid{grid-template-columns:1fr}}
 .client-card summary{display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none}
 .client-card summary::-webkit-details-marker{display:none}
@@ -1597,10 +1609,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button data-v="clients" onclick="CP.setView('clients')">Clients</button>
         </div>
         <button class="btn btn-ghost" id="cp-sort" style="font-size:10px" onclick="CP.setSort()">Trier : Plus récent</button>
+        <button class="btn btn-ghost" id="cp-trash-btn" style="font-size:10px" onclick="CP.toggleTrash()">Corbeille</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="openClientForm()">+ Client</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="ClientImport.open()">📁 Importer un dossier</button>
         <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau projet</button>
       </div>
       <div class="infobox">🗂️ <strong>Tout ton relationnel client au même endroit.</strong> Chaque demande, devis et mission d'un même projet vit sur <strong>un seul lien</strong> qui suit son cycle de vie — de la première prise de contact à la livraison. Les outils détaillés (analyse, grille tarifaire, portail) restent accessibles depuis chaque projet.</div>
+      <div class="cp-tools"><label class="cp-search-wrap"><span class="sr-only">Recherche clients et projets</span><input class="prop-input" id="cp-search" placeholder="🔍 Rechercher un client ou un projet…" oninput="CP.setSearch(this.value)" autocomplete="off"><button class="cp-search-clear" type="button" aria-label="Effacer la recherche" onclick="CP.clearSearch()">×</button></label><select id="cp-search-kind" class="prop-input" style="width:auto" aria-label="Type de résultat" onchange="CP.setSearchKind(this.value)"><option value="all">Tous</option><option value="clients">Clients</option><option value="projects">Projets</option></select></div>
+      <div id="cp-metrics" class="cp-metrics"></div>
       <div id="cp-body"></div>
     </div>
 
@@ -2296,6 +2312,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/quote.js"></script>
 <script src="js/client-workspace.js"></script>
 <script src="js/clients.js"></script>
+<script src="js/client-metrics.js"></script>
+<script src="js/client-import.js"></script>
 <script>
 /* ═══ SETTINGS ═══ */
 function settingsTab(name, el) {
@@ -2951,12 +2969,13 @@ function addClient() {
   try { localStorage.setItem('hub_clients', JSON.stringify(cl)); }
   catch (e) { showToast('Impossible d’enregistrer ce client dans le navigateur','#c0392b',4000); return; }
   CP._clientFormOpen=false; CP._clientDraft={name:'',type:''};
+  CP.invalidateSearch?.();
   CP.viewClient(newClient.id);
   // L'affichage local ne doit pas dépendre d'une publication distante.
   try { SiteAutoPublish.queue(); } catch (e) { console.warn('[client] publication automatique',e); }
   showToast('Client ajouté ✓','#2e9a63',1800);
 }
-function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); SiteAutoPublish.queue(); renderClients(); }
+function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); CP.invalidateSearch?.(); CP._paint?.(); SiteAutoPublish.queue(); }
 function renderClients() {
   let cl=[]; try{cl=JSON.parse(localStorage.getItem('hub_clients')||'[]');}catch{}
   if(!Array.isArray(cl)) cl=[];
@@ -2979,7 +2998,7 @@ function renderClients() {
   const cols=['rgba(201,146,42,.12)','rgba(46,154,99,.1)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
   if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
-  const sorted=cl.slice().sort((a,b)=>CP.sortMode==='az' ? String(a.name||'').localeCompare(String(b.name||''),'fr') : (Number(b.createdAt)||0)-(Number(a.createdAt)||0));
+  const sorted=cl.filter(c=>CP.matchesClient(c)).sort((a,b)=>CP.sortMode==='az' ? String(a.name||'').localeCompare(String(b.name||''),'fr') : (Number(b.createdAt)||0)-(Number(a.createdAt)||0));
   let reviews=[]; try{reviews=JSON.parse(localStorage.getItem('hub_reviews')||'[]');}catch{}
   if(!Array.isArray(reviews)) reviews=[];
   const projects=(window.CP&&Array.isArray(CP._links)?CP._links:[]);

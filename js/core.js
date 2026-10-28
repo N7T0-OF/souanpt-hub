@@ -856,6 +856,7 @@ const SiteConfig = {
     avisMode: 'defile',
     about: '', goatcounter: '',
     layoutStyle: 'float', heroImage: '', projectsLimit: 0,
+    sidebarPrefs: {},             // réglages ciblés du thème latéral, défaut historique inchangé
     // Bannière du thème Latérale : action au clic (voir heroLinkHref).
     // { type:'none'|'url'|'section'|'project'|'file'|'contact', url, section, projectId, blank }
     heroLink: { type: 'none' },
@@ -1022,6 +1023,8 @@ const STAT_SOURCES = {
   projects: 'Projets', clients: 'Clients', files: 'Fichiers en ligne',
   videos: 'Vidéos', images: 'Images', thumbs: 'Miniatures créées',
   reviews: 'Avis reçus', invoices: 'Factures émises', revenue: 'CA encaissé',
+  professionalProjects: 'Projets professionnels', activeProjects: 'Projets en cours',
+  completedProjects: 'Projets terminés', publicProjects: 'Projets publics',
 };
 /** Valeurs brutes de toutes les sources, lues à l'instant T. */
 function statValues() {
@@ -1032,9 +1035,14 @@ function statValues() {
   const n = k => files.filter(f => kind(f) === k).length;
   let thumbs = 0;
   try { if (window.HubImages) thumbs = HubImages.stats().offloaded; } catch {}
+  const cm = window.ClientMetrics ? ClientMetrics.collect(window.CP?._links) : null;
   return {
     projects: getProjects().length,
-    clients:  arr('hub_clients').length,
+    clients:  cm ? cm.clients : arr('hub_clients').length,
+    professionalProjects: cm ? cm.professionalProjects : 0,
+    activeProjects: cm ? cm.activeProjects : 0,
+    completedProjects: cm ? cm.completedProjects : 0,
+    publicProjects: cm ? cm.publicProjects : getProjects().length,
     files:    files.length,
     videos:   n('video'),
     images:   n('image') + n('gif'),
@@ -1413,6 +1421,13 @@ function generateSite(cfg, projects, reviews, opts) {
   const behanceUser = (cfg.behance || '').replace('@','');
   const GRADS  = ['linear-gradient(135deg,#1a0533,#6B21A8)','linear-gradient(135deg,#0a1628,#1e40af)','linear-gradient(135deg,#0d1f0d,#166534)','linear-gradient(135deg,#2d0a0a,#991b1b)','linear-gradient(135deg,#1a1400,#854d0e)','linear-gradient(135deg,#0a0a1f,#1e1b4b)'];
   const layoutStyle = ['sidebar', 'bento'].includes(cfg.layoutStyle) ? cfg.layoutStyle : 'float';
+  const side = cfg.sidebarPrefs && typeof cfg.sidebarPrefs === 'object' ? cfg.sidebarPrefs : {};
+  const sideWidth = Math.max(200, Math.min(340, Number(side.width) || 230));
+  const sideGap = Math.max(6, Math.min(32, Number(side.gap) || 14));
+  const sideRadius = Math.max(0, Math.min(32, Number(side.radius) || 14));
+  const sideFont = Math.max(11, Math.min(17, Number(side.fontSize) || 13));
+  const sideBg = /^#[0-9a-f]{6}$/i.test(side.background || '') ? side.background : (dark ? 'rgba(255,255,255,.025)' : '#fafafa');
+  const sideText = /^#[0-9a-f]{6}$/i.test(side.textColor || '') ? side.textColor : 'var(--m)';
   const links       = getLinks();
   const blocks      = getBlocks(cfg, projects, links);   // même modèle pour tous les styles
   const heroImage   = String(cfg.heroImage || '').trim();
@@ -1990,13 +2005,13 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
   .bn-grid{grid-template-columns:1fr}
   .bn{grid-column:auto/span 1!important;grid-row:auto!important}
 }
-.sb-wrap{display:flex;min-height:100vh;gap:14px;padding:14px}
-.sb-side{width:230px;flex-shrink:0;position:sticky;top:14px;height:calc(100vh - 28px);padding:24px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--b);border-radius:14px;background:${dark?'rgba(255,255,255,.025)':'#fafafa'};overflow-y:auto}
+.sb-wrap{display:flex;flex-direction:${side.position === 'right' ? 'row-reverse' : 'row'};min-height:100vh;gap:${sideGap}px;padding:14px}
+.sb-side{width:${sideWidth}px;flex-shrink:0;position:sticky;top:14px;height:calc(100vh - 28px);padding:24px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--b);border-radius:${sideRadius}px;background:${sideBg};overflow-y:auto}
 .sb-logo{display:flex;align-items:center;gap:9px;font-size:18px;font-weight:800;letter-spacing:-.5px;margin-bottom:20px}
 .sb-logo .ic{width:28px;height:28px;border-radius:9px;background:var(--a);color:#060606;display:inline-flex;align-items:center;justify-content:center;font-size:15px}
 .sb-nav{display:flex;flex-direction:column;gap:2px;background:none;border:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;border-radius:14px;max-width:none;width:100%}
-.sb-nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:600;color:var(--m);transition:.15s}
-.sb-nav a:hover{background:rgba(128,128,128,.1);color:var(--t)}
+.sb-nav a{display:flex;align-items:center;gap:11px;padding:${side.compact ? 6 : 10}px 12px;border-radius:10px;font-size:${sideFont}px;font-weight:600;color:${sideText};transition:.15s}
+.sb-nav a:hover{background:rgba(128,128,128,.1);color:var(--t);${side.hoverLift ? 'transform:translateX(3px);' : ''}}
 .sb-nav .sbi{width:18px;text-align:center;opacity:.8}
 .sb-cat{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--m);margin:20px 12px 8px}
 .sb-tags{display:flex;flex-direction:column;gap:1px}
@@ -2016,7 +2031,7 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .sb-hero-in .htag{color:#fff;opacity:.85}
 .sb-hero-in h1{color:#fff;font-size:clamp(34px,5vw,60px)}
 .sb-hero-in .hsub{color:rgba(255,255,255,.8);margin-bottom:0}
-@media(max-width:820px){.sb-side{position:fixed;left:-260px;top:14px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{left:14px}.sb-main{padding:0}}
+@media(max-width:820px){.sb-side{position:fixed;${side.position === 'right' ? 'right' : 'left'}:-${sideWidth + 30}px;top:14px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{${side.position === 'right' ? 'right' : 'left'}:14px}.sb-main{padding:0}}
 @media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}.navcta{display:none}.burger{display:flex}}
 </style></head><body>
 ${layoutStyle === 'bento' ? `
@@ -2038,8 +2053,8 @@ ${layoutStyle === 'bento' ? `
       ${order.filter(k=>secLive(k)).map(k=>`<a href="#${k}"><span class="sbi">${SEC_ICONS[k]||'•'}</span>${SEC_LABELS[k]}</a>`).join('')}
       ${behanceUser?`<a href="https://www.behance.net/${esc(behanceUser)}" target="_blank"><span class="sbi">↗</span>Behance</a>`:''}
     </nav>
-    ${tagList.length&&secLive('projects')?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(t=>`<a href="#projects" onclick="return filterTag(this.dataset.t)" data-t="${esc(t.toLocaleLowerCase('fr'))}">${esc(t)}</a>`).join('')}</div>`:''}
-    ${cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
+    ${side.showCategories !== false && tagList.length&&secLive('projects')?`<div class="sb-cat">Catégories</div><div class="sb-tags"><a href="#projects" onclick="return filterTag('')" class="on" data-t="">Tous</a>${tagList.map(t=>`<a href="#projects" onclick="return filterTag(this.dataset.t)" data-t="${esc(t.toLocaleLowerCase('fr'))}">${esc(t)}</a>`).join('')}</div>`:''}
+    ${side.showContact !== false && cfg.email?`<a class="sb-cta" href="mailto:${esc(cfg.email)}">Me contacter</a>`:''}
   </aside>
   <main class="sb-main">
     ${!heroShow ? '' : `<${heroHref ? 'a' : 'div'} class="sb-hero${heroHref ? ' sb-hero-link' : ''}${heroCls}" data-b="b_profile" data-no-drag${

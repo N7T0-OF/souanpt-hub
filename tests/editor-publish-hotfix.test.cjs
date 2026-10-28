@@ -214,6 +214,23 @@ test('custom logo and site name can appear together in every public layout', () 
   }
 });
 
+test('sidebar preferences alter only the sidebar layout and keep other themes intact', () => {
+  const { SiteConfig, generateSite } = loadCore();
+  const cfg = { ...SiteConfig.defaults(), sidebarPrefs:{ position:'right', width:280, gap:20,
+    radius:6, fontSize:15, background:'#121212', textColor:'#dddddd', compact:true,
+    showCategories:false, showContact:false, hoverLift:true }, email:'me@example.com' };
+  const sidebar = generateSite({ ...cfg, layoutStyle:'sidebar' }, [], []);
+  assert.match(sidebar, /flex-direction:row-reverse/);
+  assert.match(sidebar, /\.sb-side\{width:280px/);
+  assert.match(sidebar, /background:#121212/);
+  assert.doesNotMatch(sidebar, /class="sb-cta"/);
+  for (const layoutStyle of ['float','bento']) {
+    const html = generateSite({ ...cfg, layoutStyle }, [], []);
+    assert.doesNotMatch(html, /class="sb-side"/);
+    assert.match(html, /me@example\.com/);
+  }
+});
+
 test('Clients & Projets keeps local workspaces visible without Firebase', async () => {
   const data = new Map();
   const localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)) };
