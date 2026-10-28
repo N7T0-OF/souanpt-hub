@@ -3263,8 +3263,8 @@ function syncKPIs() {
   let revs=[]; try{revs=JSON.parse(localStorage.getItem('hub_reviews')||'[]');}catch{}
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   // Cartes résumé de « Vue d'ensemble »
-  set('ov-projects',projs.length);
   const clientMetrics=window.ClientMetrics?.collect(window.CP?._links);
+  set('ov-projects',clientMetrics?.publicProjects ?? projs.filter(p=>p && p.hidden !== true && p.visibility?.public !== false).length);
   set('ov-client-projects',clientMetrics?.professionalProjects ?? 0);
   set('ov-reviews',revs.length);
   set('ov-clients',cl.length);

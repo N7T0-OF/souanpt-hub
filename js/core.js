@@ -1102,6 +1102,7 @@ const bW      = b => Math.max(1, (b.layout ? b.layout.w : b.w) || 1);
 const bH      = b => Math.max(1, (b.layout ? b.layout.h : b.h) || 1);
 const bLocked = b => !!(b.layout ? b.layout.locked : b.locked);
 const bHidden = b => (b.visibility ? b.visibility.public === false : !!b.hidden);
+const projectPublic = p => !!p && p.hidden !== true && p.visibility?.public !== false;
 const bRef    = b => (b.content && b.content.ref !== undefined ? b.content.ref : b.ref);
 const bProps  = b => b.content || b.props || {};
 /* Point focal du média (0-100 sur chaque axe), 50/50 = centré.
@@ -1319,7 +1320,8 @@ function renderBentoGrid(blocks, ctx) {
 
   // En mode éditeur les blocs masqués sont RENDUS (grisés par la couche d'édition) ;
   // à la publication ils ne sont pas émis du tout.
-  const shown = blocks.filter(b => editor || !bHidden(b));
+  const shown = blocks.filter(b => editor || (!bHidden(b) &&
+    (b.type !== 'project' || projectPublic(P(bRef(b))))));
   const parts = shown.map(b => {
     if (b.type === 'profile')
       return cell(b, `<div class="bn-av">${siteLogo ? `<img src="${esc(siteLogo)}" alt="" class="brand-img">` : esc(String(cfg.siteName || 'S')[0].toUpperCase())}</div>
@@ -1515,7 +1517,7 @@ function generateSite(cfg, projects, reviews, opts) {
   const revY        = animLevel === 'none' ? 0 : animLevel === 'premium' ? 26 : 18;
 
   const blkOf = p => blocks.find(b => b.type === 'project' && String(bRef(b)) === String(p.id)) || null;
-  const pHid  = p => { const b = blkOf(p); return b ? bHidden(b) : false; };
+  const pHid  = p => { const b = blkOf(p); return !projectPublic(p) || (b ? bHidden(b) : false); };
   const cards = projects.filter(p => editor || !pHid(p)).map((p, i) => `
     <article class="pc${projLimit && i >= projLimit ? ' pc-hidden' : ''}${pHid(p) ? ' bl-hidden' : ''}" data-tags="${esc(JSON.stringify((p.tags||[]).map(t=>String(t).trim().toLocaleLowerCase('fr'))))}" data-p="${esc(String(p.id ?? ''))}" data-b="${esc((blkOf(p) || {}).id || '')}"${p.url ? ` onclick="window.open('${esc(p.url)}','_blank')" title="Ouvrir le projet"` : ''}>
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(blkOf(p)))}/cover` : `background:${GRADS[i%6]}`}">${p.url?'<span class="go">Voir le projet ↗</span>':''}</div>
@@ -1672,7 +1674,7 @@ function generateSite(cfg, projects, reviews, opts) {
        à chaque visite, valeur de repli gravée dans la page). Le tout gratuit,
        sans compte ni service tiers obligatoire. */
     stats: `<section id="stats" class="rev">${secHead('stats')}
-  <div class="kpis">${statsItems.map(it => `<div class="kpi"${it.kind === 'api' ? ` data-kpi-url="${esc(it.url)}" data-kpi-path="${esc(it.path)}" data-kpi-pre="${esc(it.prefix || '')}" data-kpi-suf="${esc(it.suffix || '')}"` : ''}><b class="kpi-v">${esc(String(it.prefix || '') + it.value + String(it.suffix || ''))}</b><span class="kpi-l">${esc(it.label)}</span></div>`).join('')}</div>
+  <div class="kpis">${statsItems.map(it => `<div class="kpi"${it.kind === 'auto' && (it.id === 'projects' || it.id === 'publicProjects') ? ` data-project-count="1" data-kpi-pre="${esc(it.prefix || '')}" data-kpi-suf="${esc(it.suffix || '')}"` : ''}${it.kind === 'api' ? ` data-kpi-url="${esc(it.url)}" data-kpi-path="${esc(it.path)}" data-kpi-pre="${esc(it.prefix || '')}" data-kpi-suf="${esc(it.suffix || '')}"` : ''}><b class="kpi-v">${esc(String(it.prefix || '') + it.value + String(it.suffix || ''))}</b><span class="kpi-l">${esc(it.label)}</span></div>`).join('')}</div>
 </section>`,
     /* ── NOUVEAU (v3.9) : les liens du profil, enfin visibles hors Bento ──
        Les thèmes Flottante et Latérale ignoraient les blocs Lien (« les liens
@@ -2162,6 +2164,15 @@ function filterTag(t){
   });
   return false;
 }
+/* Le fichier public ne contient que les projets effectivement présents sur le
+   site. La valeur statique reste visible si le réseau est indisponible. */
+(function(){var els=[].slice.call(document.querySelectorAll('.kpi[data-project-count]'));if(!els.length)return;
+fetch('projects.json',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(d){
+  if(d.version!==1||!Array.isArray(d.projects))return;
+  var ids={};for(var i=0;i<d.projects.length;i++){var p=d.projects[i];if(!p||typeof p.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(p.id)||ids[p.id])return;ids[p.id]=1;}
+  els.forEach(function(el){var v=String(d.projects.length);var t=el.querySelector('.kpi-v');if(t)t.textContent=(el.getAttribute('data-kpi-pre')||'')+v+(el.getAttribute('data-kpi-suf')||'');});
+}).catch(function(){});
+})();
 /* ── Chiffres clés alimentés par une API publique (v3.9) ──
    La valeur gravée dans la page sert de REPLI : la section reste lisible sans
    réseau, sans script tiers obligatoire. Essai en direct, puis deux relais CORS
@@ -2229,6 +2240,28 @@ function buildAnalyticsProjectManifest(siteHTML, projects) {
   return { entries: ids.map(id => ({ id, title: byId.get(id) })), error: null };
 }
 
+/* Une liste publique déterministe, produite dans le même commit que le site.
+   Aucun dossier client, brouillon, prix ou note privée n'y entre. */
+function buildPublicProjectsFeed(siteHTML, projects) {
+  const ids = [...new Set([...siteHTML.matchAll(/\sdata-p="([^"]*)"/g)].map(match => match[1]))];
+  if (ids.length > 1000) return { projects: [], error: 'Le site dépasse la limite de 1000 projets publics.' };
+  const byId = new Map();
+  for (const project of projects) {
+    const id = project?.id == null ? '' : String(project.id);
+    if (!ids.includes(id)) continue;
+    if (byId.has(id)) return { projects: [], error: 'Deux projets publics ont le même identifiant.' };
+    byId.set(id, project);
+  }
+  const entries = [];
+  for (const id of ids) {
+    const project = byId.get(id), title = String(project?.title || 'Projet').trim();
+    if (!project || !/^[A-Za-z0-9_-]{1,64}$/.test(id) || !title || title.length > 80 || /[\u0000-\u001f\u007f]/.test(title))
+      return { projects: [], error: 'Un projet public possède un identifiant ou un titre invalide.' };
+    entries.push({ id, title });
+  }
+  return { projects: entries, error: null };
+}
+
 function pagesBuildForCommit(build, commitSha) {
   return typeof build?.commit === 'string' && typeof commitSha === 'string' &&
     /^[0-9a-f]{40}$/i.test(commitSha) && build.commit.toLowerCase() === commitSha.toLowerCase();
@@ -2274,6 +2307,8 @@ async function deployPortfolio(onLog, onStep, options = {}) {
     } catch (e) { console.warn('[images] résolution plein format', e); }
   }
   const siteHTML = generateSite(pubCfg, pubProjects);
+  const publicFeed = buildPublicProjectsFeed(siteHTML, pubProjects);
+  if (publicFeed.error) throw new Error(publicFeed.error);
   const analyticsManifest = buildAnalyticsProjectManifest(siteHTML, pubProjects);
   if (analyticsManifest.error) {
     if (options.requireAnalyticsManifest) throw new Error(analyticsManifest.error);
@@ -2292,6 +2327,7 @@ async function deployPortfolio(onLog, onStep, options = {}) {
   await GH.enablePages(token, owner, repoName); // activer Pages AVANT le push
   const commitSha = await GH.commitFiles(token, owner, repoName, [
     { path: 'index.html',       content: siteHTML },
+    { path: 'projects.json',    content: JSON.stringify({ version: 1, projects: publicFeed.projects }, null, 2) },
     { path: 'site-config.json', content: JSON.stringify(siteManifest, null, 2) },
     { path: '.nojekyll',        content: '' },
   ], 'deploy: ' + new Date().toISOString().slice(0,16).replace('T',' '));
