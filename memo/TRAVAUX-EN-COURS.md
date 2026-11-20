@@ -1,5 +1,7 @@
 # Travaux en cours
 
+- Contrôle du 20 novembre 2026 : GitHub Pages sert `3.12.1` (`4082a2f`, `main`). Cloudflare Pages `souanptjub.pages.dev` sert encore `3.10.1`, sans `build-info.json` : les déploiements automatiques de production sont coupés depuis le 21 octobre et `deploy-cloudflare.yml` exige le secret `CLOUDFLARE_API_TOKEN`, toujours absent. La version `3.13.0` (raccourci mobile, fenêtre Behance, couleurs liées à l'accent) n'existe que sur la branche `claude/site-only-pwa`, non fusionnée.
+
 - V3.12.0 : recherche unifiée, métriques professionnelles, personnalisation de la barre latérale et import local des noms de dossiers livrés par la PR #8. Ses trois contrôles ont réussi ; fusion sur `main` au SHA `0fd455fa66a601bbd7ec40e34f50b3fff64f6fa9`. Le workflow GitHub Pages #78 a réussi et le marqueur public a confirmé ce SHA, la version `3.12.0` et le canal `github-pages`. Vérifier encore les interactions authentifiées et les trois thèmes avec de vraies données lors du retour de l'accès.
 - Le projet Firebase `souanpt-hub` n'est pas visible dans les comptes actuellement accessibles ; une demande au support est en attente. Ne pas importer les données dans `sankai-life`.
 - Les correspondances approximatives à l'import imposent désormais un choix humain explicite avant l'écriture ; l'import automatique se limite aux noms exacts. Les actions groupées présentes sont volontairement limitées aux dossiers privés. Le panneau de suggestions est un diagnostic local ; l'association automatique ambiguë reste exclue pour éviter les faux rattachements.
