@@ -160,12 +160,19 @@ const EdCanvas = {
     this.commit(blocks); this.rerender();
     showToast?.('Bloc collé ✓', '#2e9a63', 1600);
   },
-  _ui(t) { return !!(t && t.closest && t.closest('#ed-tb,.ed-rz,.ed-h,.ed-ctx,.ed-navtools')); },
+  // #bv = fenêtre Behance ouverte dans l'aperçu : ses commandes doivent répondre.
+  _ui(t) { return !!(t && t.closest && t.closest('#ed-tb,.ed-rz,.ed-h,.ed-ctx,.ed-navtools,#bv')); },
 
   _css(doc) {
     if (doc.getElementById('ed-canvas-css')) return;
     const s = doc.createElement('style'); s.id = 'ed-canvas-css';
+    // La couche d'édition suit l'accent du TABLEAU DE BORD (pas celui du site
+    // prévisualisé) : l'aperçu est un document séparé, on lui transmet la valeur.
+    const hub = getComputedStyle(document.documentElement);
+    const edA = hub.getPropertyValue('--accent').trim() || '#C8FF00';
+    const edOn = hub.getPropertyValue('--on-accent').trim() || '#060606';
     s.textContent = `
+:root{--ed-a:${edA};--ed-on-a:${edOn}}
 /* Même scrollbar que le Hub (l'aperçu est un document séparé : la scrollbar du
    dashboard ne s'y applique pas, on voyait celle native du navigateur). */
 ::-webkit-scrollbar{width:4px;height:4px}
@@ -173,8 +180,8 @@ const EdCanvas = {
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:2px}
 html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 .ed-on [data-b]{cursor:default}
-.ed-on [data-b]:hover{outline:1px dashed rgba(200,255,0,.55);outline-offset:2px}
-.ed-on [data-b].ed-sel{outline:2px solid #C8FF00;outline-offset:2px}
+.ed-on [data-b]:hover{outline:1px dashed color-mix(in srgb,var(--ed-a) 55%,transparent);outline-offset:2px}
+.ed-on [data-b].ed-sel{outline:2px solid var(--ed-a);outline-offset:2px}
 /* Bloc masqué : visible mais grisé EN ÉDITION (déplaçable/modifiable), absent en Aperçu.
    La transition joue dans les deux sens → retour immédiat des couleurs au réaffichage. */
 /* ATTENTION : le site publié masque .bl-hidden avec display:none !important.
@@ -197,8 +204,8 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
    est masqué : sans ça, « supprimer » ressemble à une perte définitive. */
 .ed-on .sb-hero.bl-hidden::after,
 .ed-on .hero.bl-hidden::after{content:'Bannière masquée — clique dessus puis 👁 pour la remettre';
-  top:10px;right:10px;font-size:9px;padding:4px 9px;border-radius:999px;color:#C8FF00;
-  border-color:rgba(200,255,0,.32)}
+  top:10px;right:10px;font-size:9px;padding:4px 9px;border-radius:999px;color:var(--ed-a);
+  border-color:color-mix(in srgb,var(--ed-a) 32%,transparent)}
 .ed-on .bl-hidden *{pointer-events:none}
 .ed-on .bl-hidden>.ed-h{pointer-events:auto}
 .ed-h{display:none;position:absolute;top:6px;left:6px;z-index:60;background:rgba(15,15,15,.88);color:#f0ece4;
@@ -208,19 +215,19 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 .ed-drag{opacity:.5;box-shadow:0 22px 55px rgba(0,0,0,.55)!important;z-index:50}
 /* Repère « bannière cliquable » — visible dans l'éditeur seulement. */
 .ed-linkflag{display:none;position:absolute;top:10px;right:10px;z-index:60;background:rgba(15,15,15,.86);
-      color:#C8FF00;border:1px solid rgba(200,255,0,.32);border-radius:999px;padding:4px 10px;
+      color:var(--ed-a);border:1px solid color-mix(in srgb,var(--ed-a) 32%,transparent);border-radius:999px;padding:4px 10px;
       font:600 10px/1 system-ui;pointer-events:none}
 .ed-on .ed-linkflag{display:block}
 .ed-tb{position:absolute;z-index:9999;display:flex;gap:2px;align-items:center;background:rgba(15,15,15,.94);
       -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.14);
       border-radius:10px;padding:4px;box-shadow:0 12px 34px rgba(0,0,0,.5);font-family:system-ui,sans-serif}
 .ed-tb button{background:none;border:none;color:#f0ece4;font:600 11px system-ui;padding:5px 8px;border-radius:6px;cursor:pointer;white-space:nowrap}
-.ed-tb button:hover{background:rgba(255,255,255,.1);color:#C8FF00}
+.ed-tb button:hover{background:rgba(255,255,255,.1);color:var(--ed-a)}
 .ed-tb .ed-ty{font:700 9px system-ui;color:rgba(240,236,228,.5);padding:0 6px;text-transform:uppercase;letter-spacing:1px}
 .ed-tb .sep{width:1px;align-self:stretch;background:rgba(255,255,255,.14);margin:2px}
-.ed-rz{position:absolute;z-index:9998;width:11px;height:11px;background:#C8FF00;border-radius:3px;
+.ed-rz{position:absolute;z-index:9998;width:11px;height:11px;background:var(--ed-a);border-radius:3px;
       box-shadow:0 0 0 2px rgba(0,0,0,.4);cursor:nwse-resize}
-.ed-size{position:absolute;z-index:10000;background:#C8FF00;color:#060606;font:800 10px system-ui;padding:3px 7px;border-radius:6px;pointer-events:none}
+.ed-size{position:absolute;z-index:10000;background:var(--ed-a);color:var(--ed-on-a);font:800 10px system-ui;padding:3px 7px;border-radius:6px;pointer-events:none}
 /* Menu contextuel (clic droit) — canvas uniquement */
 .ed-ctx{position:absolute;z-index:10001;min-width:196px;padding:5px;background:rgba(18,18,18,.96);
   -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.14);
@@ -228,7 +235,7 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
 @keyframes edCtx{from{opacity:0;transform:scale(.96) translateY(-4px)}to{opacity:1;transform:none}}
 .ed-ctx button{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;background:none;border:none;
   color:#f0ece4;font:600 11px system-ui;padding:7px 9px;border-radius:7px;cursor:pointer;text-align:left}
-.ed-ctx button:hover{background:rgba(255,255,255,.09);color:#C8FF00}
+.ed-ctx button:hover{background:rgba(255,255,255,.09);color:var(--ed-a)}
 .ed-ctx button i{font-style:normal;font-size:9px;color:rgba(240,236,228,.4)}
 .ed-ctx-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
 /* Déplacement façon écran d'accueil : la carte décolle et suit le curseur.
@@ -239,12 +246,12 @@ html{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
    totalement (comme sur le site publié, où elle n'est même pas générée). */
 body:not(.ed-on) [data-add]{display:none!important}
 .ed-navtools{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.ed-navtools button{background:rgba(200,255,0,.1);color:#c8ff00;border:1px solid rgba(200,255,0,.38);border-radius:8px;padding:8px 11px;font:700 11px system-ui;cursor:pointer}
-.ed-navtools button:hover{background:#c8ff00;color:#0b0b0b}
+.ed-navtools button{background:color-mix(in srgb,var(--ed-a) 10%,transparent);color:var(--ed-a);border:1px solid color-mix(in srgb,var(--ed-a) 38%,transparent);border-radius:8px;padding:8px 11px;font:700 11px system-ui;cursor:pointer}
+.ed-navtools button:hover{background:var(--ed-a);color:var(--ed-on-a)}
 .sb-nav .ed-navtools{display:grid;margin:12px 6px 0}.sb-nav .ed-navtools button{width:100%;text-align:left}
 body:not(.ed-on) .ed-navtools{display:none!important}
 /* Fantôme laissé à l'ancienne place */
-.ed-ph{border:1px dashed rgba(200,255,0,.5)!important;border-radius:14px;background:rgba(200,255,0,.05)!important;pointer-events:none}
+.ed-ph{border:1px dashed color-mix(in srgb,var(--ed-a) 50%,transparent)!important;border-radius:14px;background:color-mix(in srgb,var(--ed-a) 5%,transparent)!important;pointer-events:none}
 /* Retour visuel dès le pointerdown (avant décollage) : léger enfoncement + grab,
    et déjà plus de sélection de texte pendant l'attente (fin du bug signalé). */
 .ed-hold{transform:scale(.995);cursor:grab;transition:transform .1s ease}
@@ -1787,7 +1794,9 @@ function edWinEdit(blockId) {
              <div class="edw-fx2">
                <label>Horizontal <input type="range" id="fx" min="0" max="100" value="${f.x}"></label>
                <label>Vertical <input type="range" id="fy" min="0" max="100" value="${f.y}"></label>
-             </div>` : '');
+             </div>` : '')
+         // Fenêtre Behance : cadrage, image d'aperçu PNG (js/behance-editor.js)
+         + (window.EdBehance ? EdBehance.projectSection(p) : '');
     save = w => {
       const ps = getProjects(); const x = ps.find(y => String(y.id) === String(bRef(b)));
       if (x) { x.title = w.querySelector('#e1').value;
@@ -1860,6 +1869,7 @@ function edWinEdit(blockId) {
       w.querySelectorAll('[data-on],[data-v]').forEach(el => { el.oninput = check; el.onchange = check; });
       check();
     }
+    if (b.type === 'project' && window.EdBehance) EdBehance.bindProject(w, String(bRef(b)));
     const ok = w.querySelector('#edw-save');
     if (ok) ok.onclick = () => { save(w); SiteAutoPublish.queue(); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
   });

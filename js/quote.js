@@ -825,7 +825,7 @@ const QuoteUI = {
       }).join('')}
     </div>`;
 
-    const accCard = !nA ? '' : `<div class="an-card" style="border-color:rgba(200,255,0,.3)">
+    const accCard = !nA ? '' : `<div class="an-card" style="border-color:color-mix(in srgb,var(--accent) 30%,transparent)">
       <div class="an-card-h"><span>✅ Acceptations à confirmer</span><span class="an-card-sub">${nA} en attente</span></div>
       ${this._acc.map(({ est, accept }) => {
         const parts = String(accept.message || '').split('·').map(s => s.trim());

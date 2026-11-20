@@ -455,7 +455,7 @@ function edRenderBlocks() {
   list.innerHTML =
     lockItem('Hero','★') +
     _edOrder.map((k,i)=>`<div class="ed-block-item" draggable="true" style="${_edVis[k]===false?'opacity:.4;':''}border-style:solid"
-      ondragstart="edBlockDragStart(event,${i})" ondragover="event.preventDefault();this.style.borderColor='rgba(200,255,0,.5)'"
+      ondragstart="edBlockDragStart(event,${i})" ondragover="event.preventDefault();this.style.borderColor='color-mix(in srgb,var(--accent) 50%,transparent)'"
       ondragleave="this.style.borderColor=''" ondrop="edBlockDrop(event,${i})" ondragend="edRenderBlocks()">
       <span style="cursor:grab;letter-spacing:-1px" title="Glisser pour réordonner">⋮⋮</span> <button class="ed-sec-go" onclick="edOpenSections('${k}')" title="Configurer « ${ED_SECTIONS[k]} » — raccourci S">${ED_SECTIONS[k]}</button>
       <button onclick="edToggleBlock('${k}')" title="${_edVis[k]===false?'Afficher la section':'Masquer la section'}"
@@ -527,6 +527,8 @@ async function edRefreshPreview() {
     if(loading)loading.style.display='none';
     // l'aperçu devient l'éditeur : on injecte la couche d'édition dans l'iframe
     try { window.EdCanvas && EdCanvas.attach(frame.contentDocument); } catch(e){ console.warn('[canvas]', e); }
+    // Fenêtre Behance demandée avant le rechargement de l'aperçu : on la rouvre.
+    try { window.EdBehance && EdBehance.afterPreview(frame); } catch(e){ console.warn('[behance]', e); }
   };
   frame.src = _edBlobUrl;
   setTimeout(()=>{ if(loading)loading.style.display='none'; },2000);
@@ -697,7 +699,9 @@ const BubbleWidget = {
   drawQR(canvas,text){
     const ctx=canvas.getContext('2d'); const S=canvas.width,C=21,cs=Math.floor(S/C);
     function h(s){let v=0;for(let i=0;i<s.length;i++)v=(Math.imul(31,v)+s.charCodeAt(i))|0;return Math.abs(v);}
-    ctx.fillStyle='#111';ctx.fillRect(0,0,S,S);ctx.fillStyle='#C8FF00';
+    // Motif décoratif : couleur d'accent du tableau de bord (une seule source).
+    const acc=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#C8FF00';
+    ctx.fillStyle='#111';ctx.fillRect(0,0,S,S);ctx.fillStyle=acc;
     for(let r=0;r<C;r++)for(let c=0;c<C;c++){
       const f=(r<7&&c<7)||(r<7&&c>=C-7)||(r>=C-7&&c<7);
       const inn=(r>=2&&r<=4&&c>=2&&c<=4)||(r>=2&&r<=4&&c>=C-5&&c<C)||(r>=C-5&&r<C&&c>=2&&c<=4);
