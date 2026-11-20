@@ -26,7 +26,7 @@ Le dépôt Sankai Life est le candidat pour la cible, sous réserve de l'audit d
 ```text
 apps/
   web/             dashboard et profils publics issus de Souanpt Hub
-  android/         application Android existante
+                   (installable sur téléphone et tablette : manifeste + service worker, pas d'APK)
 packages/
   schemas/         contrats communs versionnés
   profile/         identité, profil public et portfolio
@@ -73,30 +73,29 @@ Cette structure est une proposition à valider; elle ne justifie pas une réorga
 - Faire d'abord une répétition sur snapshot et comptes synthétiques, mesurer les résultats et tester le retour arrière.
 - Critère : parité des fonctions convenues, aucune perte détectée sur les jeux de test et restauration démontrée avant une migration réelle.
 
-### 6. Liaison Android
+### 6. Version mobile du site (remplace l'application Android)
 
-- Connecter l'application Android aux mêmes contrats et au même `userId`, avec synchronisation explicite, gestion des conflits et fonctionnement dégradé hors ligne.
-- Critère : tests d'aller-retour web/Android, reprise après interruption, conflits simultanés et compatibilité des versions de schéma.
+Décision du 20 novembre 2026 : Sankai Life / Souanpt Hub reste **uniquement un site**. Pas d'APK, pas de publication Google Play, pas d'AdMob. Sur téléphone et tablette, le site s'installe comme une application web (« Ajouter un raccourci »).
+
+- Manifeste (`manifest.webmanifest`), icônes (`icons/`), service worker minimal (`sw.js` : page hors ligne et icônes seulement, aucune page ni réponse d'API en cache) et bouton `js/install-shortcut.js`, affiché uniquement sur téléphone et tablette.
+- Critère : site installable sur Android (fenêtre native du navigateur) et sur iPhone/iPad (instructions Partager → Sur l'écran d'accueil) ; aucune donnée privée dans le cache ; mise en page utilisable à 375 px.
 
 ### 7. Intégration ultérieure de Harvey
 
 - Garder le moteur Python séparé et l'intégrer derrière une API/adaptateur versionné avec authentification, limites d'usage et permissions minimales.
 - Critère : l'indisponibilité de Harvey ne bloque ni l'identité ni les fonctions principales; aucune donnée privée n'est transmise sans consentement explicite.
 
-### 8. Google Play et AdMob ultérieurs
+### 8. Google Play et AdMob — abandonnés
 
-- Préparer le pipeline Android, la signature protégée, les builds de test et la conformité de publication avant tout déploiement public.
-- Ajouter AdMob seulement après validation du consentement, des règles applicables, des paramètres enfants et des contrôles de confidentialité.
-- Critère : AAB reproductible et signé par secrets hors dépôt; tests internes avant diffusion; monétisation désactivable par configuration.
+Retirés de la feuille de route le 20 novembre 2026 avec l'application Android (voir étape 6). Le dépôt `sankai-life` et sa branche `claude/play-readiness` restent en l'état, sans suite prévue ; rien n'a été supprimé.
 
 ## Ordre de travail proposé
 
-1. Audit des trois dépôts et définition des contrats.
+1. Audit des dépôts et définition des contrats.
 2. Prototype d'identité et tests d'isolation.
 3. Dépôt privé et premier profil public partageable.
 4. Migration incrémentale de Souanpt Hub.
-5. Liaison Android et synchronisation.
+5. Version mobile installable du site.
 6. Adaptateur Harvey facultatif.
-7. Distribution Google Play et monétisation, en dernier.
 
 Chaque étape commence par un périmètre livrable, une branche, une CI verte et un aperçu vérifiable. Les étapes qui touchent à des utilisateurs ou à la production attendent leur approbation et les sauvegardes requises.

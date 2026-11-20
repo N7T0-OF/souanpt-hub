@@ -18,5 +18,28 @@ for (const channel of ['github-pages', 'cloudflare']) {
     assert.equal(fs.existsSync(path.join(output, 'README.md')), false);
     assert.equal(fs.existsSync(path.join(output, '.freebuff')), false);
     assert.equal(fs.existsSync(path.join(output, 'functions')), channel === 'cloudflare');
+    for (const file of ['manifest.webmanifest', 'sw.js', 'offline.html', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'])
+      assert.equal(fs.existsSync(path.join(output, file)), true, `${file} ships for the home-screen shortcut`);
   });
 }
+
+test('the web app manifest is installable and the service worker never caches pages', () => {
+  const root = new URL('../', import.meta.url);
+  const manifest = JSON.parse(fs.readFileSync(new URL('manifest.webmanifest', root), 'utf8'));
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.start_url, './app.html');
+  const sizes = manifest.icons.filter(i => i.type === 'image/png').map(i => i.sizes);
+  assert.ok(sizes.includes('192x192') && sizes.includes('512x512'), 'Chrome needs 192 and 512 PNG icons');
+  assert.ok(manifest.icons.some(i => i.purpose === 'maskable'));
+
+  const sw = fs.readFileSync(new URL('sw.js', root), 'utf8');
+  assert.match(sw, /req\.mode !== 'navigate'/, 'only page navigations are intercepted');
+  assert.doesNotMatch(sw, /cache\.put|caches\.open\([^)]*\)\.then\([^)]*put/, 'no response is written to the cache at runtime');
+  assert.match(sw, /fetch\(req\)\.catch\(\(\) => caches\.match\('offline\.html'\)\)/, 'network first, offline page as fallback');
+
+  for (const page of ['index.html', 'app.html']) {
+    const html = fs.readFileSync(new URL(page, root), 'utf8');
+    assert.match(html, /<link rel="manifest" href="manifest\.webmanifest">/, `${page} links the manifest`);
+    assert.match(html, /<script src="js\/install-shortcut\.js" defer><\/script>/, `${page} loads the shortcut button`);
+  }
+});

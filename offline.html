@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#060606">
+<title>Hors ligne — souanpt.hub</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#060606;--t:#f0ece4;--m:rgba(240,236,228,.6);--a:#C8FF00}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;text-align:center}
+main{max-width:360px}
+img{width:72px;height:72px;border-radius:18px;margin-bottom:20px}
+h1{font-size:22px;margin-bottom:10px}
+p{font-size:14px;line-height:1.6;color:var(--m);margin-bottom:22px}
+button{font:inherit;font-weight:700;font-size:14px;padding:12px 24px;border:none;border-radius:10px;background:var(--a);color:#060606;cursor:pointer}
+button:focus-visible{outline:2px solid var(--t);outline-offset:3px}
+</style>
+</head>
+<body>
+<main>
+  <img src="icons/icon-192.png" alt="">
+  <h1>Pas de connexion</h1>
+  <p>souanpt.hub a besoin d'Internet pour afficher tes données à jour. Rien n'est perdu : reconnecte-toi puis réessaie.</p>
+  <button type="button" onclick="location.reload()">Réessayer</button>
+</main>
+</body>
+</html>
