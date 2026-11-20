@@ -18,6 +18,8 @@ for (const channel of ['github-pages', 'cloudflare']) {
     assert.equal(fs.existsSync(path.join(output, 'README.md')), false);
     assert.equal(fs.existsSync(path.join(output, '.freebuff')), false);
     assert.equal(fs.existsSync(path.join(output, 'functions')), channel === 'cloudflare');
+    assert.equal(fs.existsSync(path.join(output, 'firebase/edge-config.js')), channel === 'cloudflare',
+      'the Functions import firebase/edge-config.js: without it Wrangler cannot build them');
     for (const file of ['manifest.webmanifest', 'sw.js', 'offline.html', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'])
       assert.equal(fs.existsSync(path.join(output, file)), true, `${file} ships for the home-screen shortcut`);
   });

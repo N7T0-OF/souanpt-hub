@@ -22,6 +22,9 @@ export function buildDistribution({ channel, output, commitSha, builtAt = new Da
   if (channel.includes('cloudflare')) {
     copyFile('_routes.json', out);
     copyTree('functions', out);
+    // Importé par les Functions (../../firebase/edge-config.js) : sans lui, Wrangler
+    // refuse de construire les Functions et rien n'est publié. Config Web publique.
+    copyFile('firebase/edge-config.js', out);
   }
 
   const versionSource = fs.readFileSync(path.join(ROOT, 'js/quote.js'), 'utf8');
@@ -54,6 +57,15 @@ export function validateDistribution(directory, channel) {
     if (!fs.existsSync(path.join(out, asset))) throw new Error('Ressource du service worker absente : ' + asset);
   }
   if (channel.includes('cloudflare') !== fs.existsSync(path.join(out, 'functions'))) throw new Error('Contenu Functions incorrect pour ce canal');
+  // Chaque import relatif d'une Function doit exister dans l'artefact (sinon Wrangler échoue au déploiement).
+  if (channel.includes('cloudflare')) {
+    for (const fn of listFiles(path.join(out, 'functions')).filter(f => f.endsWith('.js'))) {
+      for (const [, spec] of fs.readFileSync(fn, 'utf8').matchAll(/\bfrom\s+['"](\.{1,2}\/[^'"]+)['"]/g)) {
+        if (!fs.existsSync(path.resolve(path.dirname(fn), spec)))
+          throw new Error(`Import introuvable dans l'artefact : ${path.relative(out, fn).replace(/\\/g, '/')} → ${spec}`);
+      }
+    }
+  }
   for (const jsonFile of ['site-config.json', ...(channel.includes('cloudflare') ? ['_routes.json'] : [])])
     JSON.parse(fs.readFileSync(path.join(out, jsonFile), 'utf8'));
 
