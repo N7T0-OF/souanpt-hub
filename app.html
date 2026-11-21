@@ -603,6 +603,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 #gate-preview-entry{margin-top:12px;background:var(--s2);color:var(--text);border:1px solid var(--border2)}
 #preview-mode-banner{position:fixed;right:16px;bottom:16px;z-index:849;display:flex;align-items:center;gap:12px;max-width:min(440px,calc(100vw - 32px));padding:10px 12px;border:1px solid var(--accent);border-radius:10px;background:var(--s1);box-shadow:0 8px 30px #0009;color:var(--text);font-size:11px}
 #preview-mode-banner[hidden]{display:none}
+#pv-new{position:fixed;inset:0;z-index:950;background:#000;display:flex;flex-direction:column}
+#pv-new iframe{flex:1;width:100%;border:0;background:#060606}
+#pv-new .pv-new-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--s1);border-bottom:1px solid var(--accent);color:var(--text);font-size:12px}
+#pv-new .pv-new-bar span{flex:1;min-width:180px}
+#pv-new .pv-new-bar button{background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:5px 9px;cursor:pointer;white-space:nowrap;font-size:11px}
 #preview-mode-banner button{background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:5px 8px;cursor:pointer;white-space:nowrap}
 
 /* ── ÉDITEUR : appareils + toggles sections ── */
@@ -1327,7 +1332,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     <div class="gate-links"><a href="index.html">← Retour à l'accueil</a><a href="https://github.com/signup" target="_blank">Créer un compte GitHub</a><a href="#" onclick="PreviewMode.promptCode();return false">Aperçu des nouveautés</a></div>
   </div>
 </div>
-<div id="preview-mode-banner" role="status" hidden><span>👁️ Mode essai local · données de cet aperçu uniquement · publication désactivée</span><button type="button" onclick="PreviewMode.leave()">Quitter</button></div>
+<div id="preview-mode-banner" role="status" hidden><span>👁️ Mode aperçu · données de démonstration · rien n'est enregistré ni publié</span><button type="button" onclick="PreviewMode.showNew()">✨ Voir la nouveauté</button><button type="button" onclick="PreviewMode.leave()">Quitter</button></div>
 
 <!-- ══ CHOIX DU PSEUDO (première connexion Google) ══ -->
 <div id="pseudo-gate" style="position:fixed;inset:0;z-index:855;background:rgba(4,4,4,.75);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px">
@@ -3772,10 +3777,29 @@ const PreviewMode = {
     HubPreview.enter(code);   // recharge en mode aperçu
   },
   leave() { if (window.HubPreview) HubPreview.exit(); },
+  /* Démo de la dernière nouveauté : le site de démonstration généré, avec la
+     fenêtre projet ouverte sur la galerie déroulante. Bac à sable uniquement. */
+  showNew() {
+    if (!this.sandbox() || typeof generateSite !== 'function') return;
+    this.closeNew();
+    const wrap = document.createElement('div'); wrap.id = 'pv-new';
+    wrap.innerHTML = '<div class="pv-new-bar"><span>✨ Nouveauté 3.15.0 — la fenêtre projet défile : fais défiler les images</span>'
+      + '<button type="button" data-reopen>↻ Rouvrir le projet</button><button type="button" data-close>✕ Fermer la démo</button></div>';
+    const f = document.createElement('iframe'); f.title = 'Site de démonstration';
+    wrap.appendChild(f); document.body.appendChild(wrap);
+    const openProject = () => { try { f.contentWindow.bvOpen && f.contentWindow.bvOpen('demo-be'); } catch {} };
+    f.onload = () => setTimeout(openProject, 350);
+    wrap.querySelector('[data-close]').onclick = () => this.closeNew();
+    wrap.querySelector('[data-reopen]').onclick = openProject;
+    try { f.srcdoc = generateSite(); } catch (e) { this.closeNew(); showToast?.('Démo indisponible', '#c0392b'); }
+  },
+  closeNew() { document.getElementById('pv-new')?.remove(); },
 };
 if (PreviewMode.sandbox()) {
-  // Chargé en mode aperçu : on masque la porte dès que possible.
+  // Chargé en mode aperçu : on masque la porte dès que possible, puis on
+  // montre directement la nouveauté.
   document.addEventListener('DOMContentLoaded', () => { try { gateHide(); PreviewMode.render(); } catch {} });
+  window.addEventListener('load', () => setTimeout(() => { try { PreviewMode.showNew(); } catch {} }, 400));
 }
 window.addEventListener('hub-auth', () => { if (Auth.ok() && !PreviewMode.sandbox()) PreviewMode.render(); });
 function gateShow() {

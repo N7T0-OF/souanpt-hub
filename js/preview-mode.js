@@ -53,10 +53,38 @@
 
   const d0 = 1795000000000;   // dates relatives fixes (démo déterministe)
   const day = 86400000;
+  /* Planches de démonstration pour la galerie déroulante (nouveauté 3.15.0) :
+     dessinées sur un canvas, en JPEG — aucune image réelle n'est utilisée. */
+  function demoSlides() {
+    const slides = [
+      { h: 760, a: '#C8FF00', b: '#1d2b00', t: 'Miniatures | 2026', s: 'Galerie déroulante — démonstration' },
+      { h: 1100, a: '#8B5CF6', b: '#140a2e', t: 'Processus', s: 'Croquis → composition → rendu' },
+      { h: 900, a: '#F97316', b: '#2a1100', t: 'Recherches couleur', s: 'Palette, contrastes, lisibilité' },
+      { h: 1200, a: '#00D4FF', b: '#00222b', t: 'Rendu final', s: 'Format vignette 16:9' },
+      { h: 700, a: '#C8FF00', b: '#060606', t: 'Merci !', s: 'Fais défiler : c’est la nouveauté' },
+    ];
+    try {
+      return slides.map((sl, i) => {
+        const c = document.createElement('canvas'); c.width = 1200; c.height = sl.h;
+        const g = c.getContext('2d'); if (!g) return '';
+        const grd = g.createLinearGradient(0, 0, 1200, sl.h); grd.addColorStop(0, sl.b); grd.addColorStop(1, '#060606');
+        g.fillStyle = grd; g.fillRect(0, 0, 1200, sl.h);
+        g.globalAlpha = .18; g.fillStyle = sl.a;
+        for (let k = 0; k < 7; k++) { g.beginPath(); g.arc((k * 233 + i * 97) % 1200, (k * 171 + i * 59) % sl.h, 60 + k * 22, 0, 6.3); g.fill(); }
+        g.globalAlpha = 1; g.fillStyle = sl.a; g.fillRect(90, sl.h / 2 - 120, 14, 200);
+        g.fillStyle = '#ffffff'; g.font = 'bold 84px system-ui, sans-serif'; g.fillText(sl.t, 140, sl.h / 2 - 20);
+        g.fillStyle = 'rgba(255,255,255,.72)'; g.font = '36px system-ui, sans-serif'; g.fillText(sl.s, 142, sl.h / 2 + 50);
+        g.fillStyle = sl.a; g.font = 'bold 30px system-ui, sans-serif'; g.fillText(String(i + 1).padStart(2, '0') + ' / ' + slides.length, 1040, sl.h - 60);
+        return c.toDataURL('image/jpeg', .82);
+      }).filter(src => /^data:image\/jpeg;base64,/.test(src));
+    } catch { return []; }
+  }
+
   function demoData() {
+    const gallery = demoSlides();
     return {
       hub_projects: [
-        { id: 'demo-be', title: 'Miniatures | 2026', tags: ['miniatures', '3D'], url: 'https://www.behance.net/gallery/241392957/Miniatures-2026', behance: true, cover: '', views: 214, createdAt: d0 },
+        { id: 'demo-be', title: 'Miniatures | 2026', tags: ['miniatures', '3D'], url: 'https://www.behance.net/gallery/241392957/Miniatures-2026', behance: true, cover: gallery[0] || '', views: 214, createdAt: d0, preview: gallery.length ? { gallery } : {} },
         { id: 'demo-p2', title: 'Identité — Atelier Nova', tags: ['branding', 'logo'], url: 'https://example.com', cover: '', views: 128, createdAt: d0 - 3 * day },
         { id: 'demo-p3', title: 'Kit réseaux sociaux', tags: ['social', 'motion'], url: 'https://example.org', cover: '', views: 76, createdAt: d0 - 6 * day },
       ],

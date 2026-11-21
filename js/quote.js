@@ -1330,6 +1330,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.15.1', "Mode aperçu (code admin) : la dernière nouveauté s'ouvre directement en démo, bouton « Voir la nouveauté »."],
   ['3.15.0', "Fenêtre projet : galerie d'images qui défile (tes propres images, par adresse ou import), à la place de la carte Behance figée."],
   ['3.14.0', "Mode aperçu par code admin : voir les nouveautés sans connexion, sur données de démonstration isolées."],
   ['3.13.1', "Fenêtre Behance : un seul mode, le projet Behance en direct (aperçu PNG retiré)."],

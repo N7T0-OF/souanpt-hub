@@ -45,3 +45,13 @@ test('app.html loads preview-mode.js before Firebase and wires the gate', () => 
   assert.match(html, /PreviewMode\.submitCode\(\)/, 'the gate has an admin-code submit');
   assert.match(html, /id="gate-admin-code"/);
 });
+
+test('the preview shows the latest feature: a demo gallery and a "Voir la nouveauté" demo', () => {
+  assert.match(src, /function demoSlides\(\)/, 'demo slides are generated, no real images');
+  assert.match(src, /image\/jpeg/, 'slides are JPEG data URLs accepted by the gallery validator');
+  assert.match(src, /preview: gallery\.length \? \{ gallery \}/, 'the demo Behance project carries the gallery');
+  const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
+  assert.match(html, /onclick="PreviewMode\.showNew\(\)"/, 'banner button');
+  assert.match(html, /showNew\(\) \{\s*if \(!this\.sandbox\(\)/, 'demo only in the sandbox');
+  assert.match(html, /bvOpen\('demo-be'\)/, 'opens the demo project window');
+});
