@@ -1,23 +1,21 @@
 /* ══════════════════════════════════════════════════════════════════════════
    EdBehance — réglages de la fenêtre Behance dans l'éditeur de site.
 
-   · Fenêtre « Behance » (barre de l'éditeur) : activation, style, mode
-     initial, effets du PSD, dimensions et cadrage par défaut (avancé).
+   · Fenêtre « Behance » (barre de l'éditeur) : activation, style, effets du
+     PSD, dimensions et cadrage par défaut (avancé).
    · Section « Aperçu Behance » dans la fiche d'un projet : code
-     d'intégration (facultatif), cadrage ordinateur / téléphone, image
-     d'aperçu PNG (import, remplacement, suppression), export de la
-     composition statique.
+     d'intégration (facultatif), cadrage ordinateur / téléphone.
+   Un seul mode : le projet Behance en direct.
 
    Chaque changement est envoyé AUSSITÔT à la fenêtre ouverte dans l'aperçu
    (window.bvLive dans l'iframe de l'éditeur) : c'est le même code que le site
    publié (js/behance-viewer.js), donc le rendu est identique.
    Réglages globaux : SiteConfig.behancePreview. Par projet : p.preview
-   = { beId?, png?, crop: { desk, mob } }.
+   = { beId?, crop: { desk, mob } }.
    ══════════════════════════════════════════════════════════════════════════ */
 (function () {
   const BV = () => window.BehanceViewer;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const PNG_MAX_CHARS = 2600000;   // ≈ 1,9 Mo d'image : au-delà, localStorage sature
 
   const EdBehance = {
     _pending: null,
@@ -37,7 +35,7 @@
       p.preview = { ...(p.preview || {}) };
       mutate(p.preview, p);
       try { localStorage.setItem('hub_projects', JSON.stringify(ps)); }
-      catch { showToast?.('⚠ Stockage local plein — image non enregistrée', '#c0392b', 4000); return null; }
+      catch { showToast?.('⚠ Stockage local plein — réglage non enregistré', '#c0392b', 4000); return null; }
       this.push();
       return p;
     },
@@ -51,29 +49,29 @@
     },
     /** Pousse l'état courant dans la fenêtre de l'aperçu, ou régénère l'aperçu
         si son HTML ne contient pas encore la fenêtre (elle était désactivée). */
-    push(openId, mode) {
+    push(openId) {
       const w = this.win();
       const d = this.data();
       if (w && typeof w.bvLive === 'function') {
         if (!d.cfg.enabled) { w.bvClose && w.bvClose(); return; }
-        w.bvLive({ ...d, mode });
-        if (openId && !(w.bvState && w.bvState().open)) w.bvOpen(openId, mode);
+        w.bvLive(d);
+        if (openId && !(w.bvState && w.bvState().open)) w.bvOpen(openId);
         return;
       }
       if (!d.cfg.enabled) return;
-      this._pending = openId ? { id: openId, mode } : this._pending;
+      this._pending = openId || this._pending;
       if (typeof edRefreshPreview === 'function') edRefreshPreview();
     },
     /** Appelé par edRefreshPreview une fois l'aperçu chargé. */
     afterPreview(frame) {
-      const p = this._pending; this._pending = null;
-      if (!p) return;
-      try { const w = frame.contentWindow; if (w.bvOpen) w.bvOpen(p.id, p.mode); } catch {}
+      const id = this._pending; this._pending = null;
+      if (!id) return;
+      try { const w = frame.contentWindow; if (w.bvOpen) w.bvOpen(id); } catch {}
     },
-    test(id, mode) {
+    test(id) {
       if (!id) return showToast?.('Aucun projet Behance à tester', '#e4b24a', 2500);
       if (!this.cfg().enabled) this.setCfg({ enabled: true });
-      this.push(String(id), mode);
+      this.push(String(id));
     },
 
     /* ── fenêtre de réglages globaux ── */
@@ -94,7 +92,6 @@
           <label class="edw-tog bve-main"><input type="checkbox" id="bve-on"${c.enabled ? ' checked' : ''}> <b>Ouvrir les projets Behance dans une fenêtre sur le site</b></label>
           <p class="edw-hint">${ps.length ? ps.length + ' projet' + (ps.length > 1 ? 's' : '') + ' Behance détecté' + (ps.length > 1 ? 's' : '') : 'Aucun projet Behance : importe-les (Behance) ou colle un code d\'intégration dans la fiche d\'un projet.'} · les autres projets gardent leur lien.</p>
           <div class="edw-l">Style (d'après le PSD de référence)</div>${seg('style', c.style, [['perspective', 'Perspective'], ['curved', 'Écran incurvé'], ['flat', 'Plat']])}
-          <div class="edw-l">Mode à l'ouverture</div>${seg('mode', c.mode, [['live', 'Behance Live'], ['png', 'Aperçu PNG']])}
           <div class="edw-l">Affichage</div>${seg('display', c.display, [['window', 'Fenêtre'], ['page', 'Vue plein écran']])}
           <label class="edw-tog"><input type="checkbox" id="bve-link"${c.showLink ? ' checked' : ''}> Bouton « Voir sur Behance »</label>
           <div class="edw-l">Effets</div>
@@ -155,12 +152,7 @@
         <p class="edw-hint" id="bve-code-msg">Seul le numéro du projet est conservé, jamais le code collé.</p>
         ${e ? `<div class="edw-row bve-tabs"><button class="edw-st${this._cropTab === 'desk' ? ' on' : ''}" data-tab="desk">🖥 Ordinateur</button><button class="edw-st${this._cropTab === 'mob' ? ' on' : ''}" data-tab="mob">▮ Téléphone</button></div>
           ${sl('zoom', 'Zoom', 1, 3, k.zoom, '×', .05)}${sl('x', 'Position X', -50, 50, k.x)}${sl('y', 'Rogner en haut', 0, 600, k.y, ' px', 4)}
-          <div class="edw-row"><button class="edw-sec-rst" id="bve-crop-rst">↺ Réinitialiser le cadrage</button><button class="edw-sec-rst" id="bve-try-live">▶ Behance Live</button><button class="edw-sec-rst" id="bve-try-png">▶ Aperçu PNG</button></div>
-          <div class="edw-l">Image d'aperçu (mode PNG)</div>
-          <div class="bve-png">${pv.png ? `<img src="${esc(pv.png)}" alt="Aperçu enregistré">` : `<span>${p.cover ? 'Aucune image : la couverture servira de secours (annoncée comme telle).' : 'Aucune image d\'aperçu.'}</span>`}</div>
-          <div class="edw-row"><button class="edw-sec-rst" id="bve-png-pick">📁 ${pv.png ? 'Remplacer' : 'Importer'} une image</button>${pv.png ? '<button class="edw-sec-rst" id="bve-png-del">✖ Supprimer</button>' : ''}
-            <button class="edw-sec-rst" id="bve-png-export"${pv.png || p.cover ? '' : ' disabled'}>⬇ Exporter la composition PNG</button>
-            <input type="file" id="bve-png-file" accept="image/png,image/jpeg,image/webp" hidden></div>` : ''}
+          <div class="edw-row"><button class="edw-sec-rst" id="bve-crop-rst">↺ Réinitialiser le cadrage</button><button class="edw-sec-rst" id="bve-try-live">▶ Voir dans l'aperçu</button></div>` : ''}
       </div>`;
     },
     bindProject(w, id) {
@@ -188,43 +180,7 @@
         this.push(String(id));
       });
       if (q('#bve-crop-rst')) q('#bve-crop-rst').onclick = () => { this.saveProject(id, pv => { if (pv.crop) delete pv.crop[this._cropTab]; }); rerender(); this.push(String(id)); };
-      if (q('#bve-try-live')) q('#bve-try-live').onclick = () => this.test(id, 'live');
-      if (q('#bve-try-png')) q('#bve-try-png').onclick = () => this.test(id, 'png');
-      const file = q('#bve-png-file');
-      if (q('#bve-png-pick')) q('#bve-png-pick').onclick = () => file.click();
-      if (file) file.onchange = ev => {
-        const f = ev.target.files[0]; ev.target.value = '';
-        if (!f || !/^image\/(png|jpeg|webp)$/.test(f.type)) return showToast?.('Choisis une image PNG, JPEG ou WebP', '#c0392b', 2500);
-        const rd = new FileReader();
-        rd.onload = e2 => {
-          const raw = String(e2.target.result || '');
-          const keep = src => {
-            if (src.length > PNG_MAX_CHARS) return showToast?.('Image trop lourde pour le navigateur — réduis-la sous 2 Mo', '#c0392b', 4000);
-            if (this.saveProject(id, pv => { pv.png = src; })) { rerender(); this.test(id, 'png'); showToast?.('Image d\'aperçu enregistrée ✓', '#2e9a63', 2000); }
-          };
-          // Une grande image est réduite (WebP) ; une image déjà légère reste telle quelle.
-          if (raw.length > PNG_MAX_CHARS / 2 && typeof compressImageSrc === 'function') compressImageSrc(raw, out => keep(out || raw));
-          else keep(raw);
-        };
-        rd.readAsDataURL(f);
-      };
-      if (q('#bve-png-del')) q('#bve-png-del').onclick = () => {
-        if (!confirm('Supprimer l\'image d\'aperçu de ce projet ?')) return;
-        this.saveProject(id, pv => { delete pv.png; }); rerender();
-      };
-      if (q('#bve-png-export')) q('#bve-png-export').onclick = async () => {
-        const p = getProjects().find(x => String(x.id) === String(id)); if (!p) return;
-        const src = (p.preview && p.preview.png) || p.cover;
-        try {
-          const blob = await BV().exportComposition(src, { cfg: this.cfg() });
-          const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-          a.download = 'apercu-' + String(p.title || 'projet').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png';
-          a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1500);
-        } catch (e) {
-          showToast?.((p.preview && p.preview.png) ? '✗ Export impossible : ' + e.message
-            : '✗ La couverture Behance ne peut pas être exportée (protection du navigateur) — importe une image d\'aperçu', '#c0392b', 5000);
-        }
-      };
+      if (q('#bve-try-live')) q('#bve-try-live').onclick = () => this.test(id);
     },
   };
 

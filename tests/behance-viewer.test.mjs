@@ -68,9 +68,10 @@ test('published data cannot break out of its script tag and only carries safe im
   assert.deepEqual(Object.keys(data.projects), ['p1', 'p2']);
   assert.equal(data.projects.p1.title, '</script><script>alert(1)</script>', 'kept as data, decoded safely by JSON.parse');
   assert.equal(data.projects.p1.cover, '');
-  assert.equal(data.projects.p1.png, '');
   assert.equal(data.projects.p1.crop.desk.zoom, 2);
-  assert.equal(data.projects.p2.png, 'data:image/png;base64,iVBORw0KGgo=');
+  // Mode PNG supprimé : une ancienne image d'aperçu enregistrée n'est plus publiée.
+  assert.equal('png' in data.projects.p2, false);
+  assert.equal(JSON.stringify(data).includes('iVBORw0KGgo'), false);
   assert.equal(data.projects.p2.cover, 'https://mir-s3-cdn-cf.behance.net/x.png');
 });
 
@@ -105,4 +106,11 @@ test('text on the accent stays readable for every tested brand colour', () => {
     assert.ok(ratio(acc, t.ink) >= 4.5, `${acc} on-accent contrast ${ratio(acc, t.ink).toFixed(2)}`);
     assert.match(t.soft, /^rgba\(\d+,\d+,\d+,0\.12\)$/);
   }
+});
+
+test('the window has a single live mode', () => {
+  const src = BV.runtime.toString();
+  assert.doesNotMatch(src, /data-mode|Aperçu PNG|bv-png/, 'no PNG toggle or image mode left');
+  assert.equal('mode' in plain(BV.sanitizeConfig({ mode: 'png' })), false, 'an old "mode" setting is ignored');
+  assert.equal(typeof BV.exportComposition, 'undefined');
 });

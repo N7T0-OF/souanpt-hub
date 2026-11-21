@@ -1330,6 +1330,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.13.1', "Fenêtre Behance : un seul mode, le projet Behance en direct (aperçu PNG retiré)."],
   ['3.13.0', "Fenêtre Behance sur le site (effets, recadrage, aperçu PNG), couleurs liées à l'accent, et raccourci sur l'écran d'accueil des téléphones et tablettes."],
   ['3.12.1', "Création directe des dossiers de projet, ouverture immédiate et compteur distinct pour les projets clients."],
   ['3.12.0', "Recherche unifiée clients et projets, compteurs professionnels, import privé des noms de dossiers et réglages de barre latérale."],
