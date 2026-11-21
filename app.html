@@ -11,6 +11,9 @@
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-title" content="souanpt.hub">
+<!-- Mode aperçu (code admin) : AVANT tout, il remplace le stockage par des
+     données de démo et neutralise Firebase si ?apercu=<code> est valide. -->
+<script src="js/preview-mode.js"></script>
 <script src="js/install-shortcut.js" defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
@@ -1307,7 +1310,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     </div>
     <button class="gate-btn" id="gate-preview-entry" type="button" onclick="PreviewMode.enter()" hidden>👁️ Essayer cet aperçu sans connexion</button>
     <div class="gate-msg" id="gate-msg"></div>
-    <div class="gate-links"><a href="index.html">← Retour à l'accueil</a><a href="https://github.com/signup" target="_blank">Créer un compte GitHub</a></div>
+    <!-- Aperçu des nouveautés (code admin). Le code n'est PAS un secret : il ne
+         donne accès qu'à des données de démonstration (voir js/preview-mode.js). -->
+    <div id="gate-admin-box" hidden style="margin-top:10px;padding:10px;background:var(--s2);border-radius:8px">
+      <div class="gate-sub" style="margin-bottom:6px">Code d'aperçu — données de démonstration, sans connexion.</div>
+      <input class="gate-input" id="gate-admin-code" type="password" placeholder="Code admin" onkeydown="if(event.key==='Enter')PreviewMode.submitCode()">
+      <button class="gate-btn" type="button" onclick="PreviewMode.submitCode()">👁️ Voir les nouveautés</button>
+      <div class="gate-msg" id="gate-admin-msg"></div>
+    </div>
+    <div class="gate-links"><a href="index.html">← Retour à l'accueil</a><a href="https://github.com/signup" target="_blank">Créer un compte GitHub</a><a href="#" onclick="PreviewMode.promptCode();return false">Aperçu des nouveautés</a></div>
   </div>
 </div>
 <div id="preview-mode-banner" role="status" hidden><span>👁️ Mode essai local · données de cet aperçu uniquement · publication désactivée</span><button type="button" onclick="PreviewMode.leave()">Quitter</button></div>
@@ -3722,22 +3733,45 @@ async function refreshRealStats(silent) {
 /* ═══ PORTE DE CONNEXION — dashboard verrouillé sans login ═══ */
 let _googleUser = null;
 const PreviewMode = {
-  key: 'souanpt_preview_local',
-  eligible() { return /^[0-9a-f]{8}\.souanptjub\.pages\.dev$/i.test(location.hostname); },
-  active() { try { return this.eligible() && !Auth.ok() && !Cloud.user() && sessionStorage.getItem(this.key) === '1'; } catch { return false; } },
-  render() { const banner = document.getElementById('preview-mode-banner'); if (banner) banner.hidden = !this.active(); },
+  // Bac à sable fourni par js/preview-mode.js (données de démo, sans réseau ni
+  // Firebase). On expose aussi l'ancien aperçu des sous-domaines de prévisualisation.
+  branchPreview: /^[0-9a-f]{8}\.souanptjub\.pages\.dev$/i.test(location.hostname),
+  sandbox() { return !!(window.HubPreview && window.HubPreview.sandbox); },
+  eligible() { return this.sandbox() || this.branchPreview; },
+  active() { return this.sandbox(); },
+  render() {
+    const banner = document.getElementById('preview-mode-banner');
+    if (banner) banner.hidden = !this.active();
+  },
+  /** Entrée depuis la porte : le bouton du sous-domaine de prévisualisation
+      ouvre le dashboard ; ailleurs, l'entrée se fait par le code admin. */
   enter() {
-    if (!this.eligible() || Auth.ok() || Cloud.user()) return;
-    try { sessionStorage.setItem(this.key, '1'); } catch { return showToast('Mode essai indisponible dans ce navigateur','#c0392b',3000); }
-    gateHide(); this.render(); showPage('cp'); window.CP?.setView('clients');
+    if (this.sandbox()) { gateHide(); this.render(); showPage('cp'); window.CP?.setView('clients'); return; }
+    if (this.branchPreview) { gateHide(); showPage('cp'); window.CP?.setView('clients'); return; }
+    this.promptCode();
   },
-  leave(showGate = true) {
-    try { sessionStorage.removeItem(this.key); } catch {}
-    this.render();
-    if (showGate && !Auth.ok() && !Cloud.user()) gateShow();
+  promptCode() {
+    const box = document.getElementById('gate-admin-box');
+    const inp = document.getElementById('gate-admin-code');
+    if (box) box.hidden = false;
+    if (inp) { inp.value = ''; inp.focus(); }
   },
+  submitCode() {
+    const inp = document.getElementById('gate-admin-code');
+    const msg = document.getElementById('gate-admin-msg');
+    const code = (inp?.value || '').trim();
+    if (!window.HubPreview) { if (msg) msg.textContent = 'Mode aperçu indisponible.'; return; }
+    if (!HubPreview.check(code)) { if (msg) { msg.textContent = '✗ Code incorrect.'; msg.style.color = '#c0392b'; } return; }
+    if (msg) { msg.textContent = 'Ouverture de l’aperçu…'; msg.style.color = 'var(--muted2)'; }
+    HubPreview.enter(code);   // recharge en mode aperçu
+  },
+  leave() { if (window.HubPreview) HubPreview.exit(); },
 };
-window.addEventListener('hub-auth', () => { if (Auth.ok()) PreviewMode.leave(false); });
+if (PreviewMode.sandbox()) {
+  // Chargé en mode aperçu : on masque la porte dès que possible.
+  document.addEventListener('DOMContentLoaded', () => { try { gateHide(); PreviewMode.render(); } catch {} });
+}
+window.addEventListener('hub-auth', () => { if (Auth.ok() && !PreviewMode.sandbox()) PreviewMode.render(); });
 function gateShow() {
   const g = document.getElementById('login-gate'); if (!g) return;
   if (PreviewMode.active()) { gateHide(); PreviewMode.render(); return; }

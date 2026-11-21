@@ -302,41 +302,47 @@ test('adding a client survives a form repaint and an unavailable auto publicatio
   assert.match(notices.at(-1), /existe déjà/);
 });
 
-test('anonymous preview mode works only on deployment previews and never creates an admin session', () => {
-  const saved = new Map();
-  const sessionStorage = { getItem: key => saved.get(key) ?? null,
-    setItem: (key, value) => saved.set(key, value), removeItem: key => saved.delete(key) };
+test('preview mode is driven by the sandbox and the admin code, never a real session', () => {
   const banner = { hidden: true };
+  const adminBox = { hidden: true };
+  const adminCode = { value: '', focus() {} };
+  const adminMsg = { textContent: '', style: {} };
+  const els = { 'preview-mode-banner': banner, 'gate-admin-box': adminBox, 'gate-admin-code': adminCode, 'gate-admin-msg': adminMsg, 'login-gate': { classList: { remove() {} } } };
   const calls = [];
-  const location = { hostname: '505beab1.souanptjub.pages.dev' };
-  let connected = false;
-  const Auth = { ok: () => connected };
-  const context = { location, sessionStorage, Auth, Cloud: { user: () => null },
-    document: { getElementById: id => id === 'preview-mode-banner' ? banner : null },
-    window: { CP: { setView: view => calls.push(view) }, addEventListener() {} },
+  const location = { hostname: 'souanptjub.pages.dev' };   // production, pas un sous-domaine de prévisualisation
+  const hub = { sandbox: false, entered: null, exited: false, check: c => c === 'ok-code', enter(c) { this.entered = c; return true; }, exit() { this.exited = true; } };
+  const context = { location, Auth: { ok: () => false }, Cloud: { user: () => null },
+    document: { getElementById: id => els[id] || null, addEventListener() {} },
+    window: { HubPreview: hub, CP: { setView: v => calls.push(v) }, addEventListener() {} },
     gateHide: () => calls.push('hide'), gateShow: () => calls.push('gate'),
-    showPage: page => calls.push(page), showToast() {} };
+    showPage: p => calls.push(p), showToast() {} };
+  context.window.HubPreview = hub; context.HubPreview = hub;
   vm.createContext(context);
   const html = fs.readFileSync('app.html', 'utf8');
   vm.runInContext(html.slice(html.indexOf('const PreviewMode ='), html.indexOf('function gateShow()')) +
     ';globalThis.previewMode=PreviewMode;', context);
-  context.previewMode.enter();
-  assert.equal(context.previewMode.active(), true);
-  assert.equal(banner.hidden, false);
-  assert.deepEqual(calls, ['hide', 'cp', 'clients']);
-  assert.equal(Auth.ok(), false);
+  const PreviewMode = context.previewMode;
 
-  context.previewMode.leave();
-  assert.equal(banner.hidden, true);
-  assert.equal(calls.at(-1), 'gate');
-  location.hostname = 'souanptjub.pages.dev';
-  context.previewMode.enter();
-  assert.equal(context.previewMode.active(), false);
-  assert.equal(saved.size, 0);
-  location.hostname = '505beab1.souanptjub.pages.dev';
-  connected = true;
-  context.previewMode.enter();
-  assert.equal(saved.size, 0);
+  // Hors bac à sable et hors sous-domaine : pas actif, pas de session.
+  assert.equal(PreviewMode.active(), false);
+  assert.equal(PreviewMode.eligible(), false);
+
+  // Mauvais code : aucune entrée en aperçu.
+  PreviewMode.enter();                       // ouvre la saisie du code
+  assert.equal(adminBox.hidden, false);
+  adminCode.value = 'mauvais'; PreviewMode.submitCode();
+  assert.equal(hub.entered, null);
+  // Bon code : délègue à HubPreview.enter (qui recharge en bac à sable).
+  adminCode.value = 'ok-code'; PreviewMode.submitCode();
+  assert.equal(hub.entered, 'ok-code');
+
+  // Bac à sable actif : la fenêtre est « active », la bannière s'affiche.
+  hub.sandbox = true;
+  assert.equal(PreviewMode.active(), true);
+  PreviewMode.render();
+  assert.equal(banner.hidden, false);
+  PreviewMode.leave();
+  assert.equal(hub.exited, true);
 });
 
 test('manual projects link to an existing client and create a new fiche only when needed', () => {
