@@ -114,3 +114,18 @@ test('the window has a single live mode', () => {
   assert.equal('mode' in plain(BV.sanitizeConfig({ mode: 'png' })), false, 'an old "mode" setting is ignored');
   assert.equal(typeof BV.exportComposition, 'undefined');
 });
+
+test('a creator image gallery makes the project scrollable and is validated', () => {
+  const p = { id: 'g1', title: 'Projet', url: 'https://example.com/p',
+    preview: { gallery: ['https://cdn.test/a.png', 'javascript:alert(1)', 'data:image/webp;base64,AAAA', 'ftp://x/y.png', 'https://cdn.test/b.jpg'] } };
+  const e = BV.projectEntry(p, { enabled: true });
+  assert.ok(e, 'a project with only a gallery still opens in the window');
+  assert.deepEqual(e.gallery, ['https://cdn.test/a.png', 'data:image/webp;base64,AAAA', 'https://cdn.test/b.jpg'], 'unsafe sources dropped');
+  assert.equal(e.be, '', 'no Behance id needed');
+  assert.equal(BV.opensInViewer(p, { enabled: true }), true);
+  const many = { id: 'g2', title: 'x', url: 'https://example.com', preview: { gallery: Array.from({ length: 60 }, (_, i) => 'https://cdn.test/' + i + '.png') } };
+  assert.equal(BV.projectEntry(many, { enabled: true }).gallery.length, 40, 'capped at 40');
+  const runtime = BV.runtime.toString();
+  assert.match(runtime, /cur\.gallery && cur\.gallery\.length/, 'the runtime renders the gallery when present');
+  assert.match(runtime, /bv-scroll/, 'scrollable container');
+});

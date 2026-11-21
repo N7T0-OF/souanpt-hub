@@ -145,14 +145,26 @@
       const k = crop[this._cropTab];
       const sl = (key, label, min, max, val, unit, step) => `<label class="bve-sl"><span>${label} <b data-pout="${key}">${val}${unit || ''}</b></span>
         <input type="range" data-pc="${key}" min="${min}" max="${max}" step="${step || 1}" value="${val}" data-unit="${unit || ''}"></label>`;
+      const gallery = Array.isArray(pv.gallery) ? pv.gallery.map(g => typeof g === 'string' ? g : (g && g.src)).filter(Boolean) : [];
+      const hasBe = !!(e && e.be);
       return `<div class="bve-proj" id="bve-proj-sec">
-        <div class="edw-l">Aperçu Behance ${e ? `<span class="edw-hint">projet n° ${esc(e.be)}</span>` : ''}</div>
-        ${e ? '' : '<p class="edw-hint">Ce projet n\'a pas d\'adresse Behance reconnue. Colle son code d\'intégration (Behance → Partager → Intégrer) :</p>'}
-        <input class="edw-in" id="bve-code" placeholder="&lt;iframe src=&quot;https://www.behance.net/embed/project/…&quot; …&gt; ou adresse du projet" value="${esc(pv.beId ? 'https://www.behance.net/embed/project/' + pv.beId : '')}">
+        <div class="edw-l">Images du projet <span class="edw-hint">déroulant — tes propres images</span></div>
+        <div class="bve-gal" id="bve-gal">${gallery.length ? gallery.map((src, i) => `
+          <div class="bve-gal-it" data-i="${i}"><img src="${esc(src)}" alt="" loading="lazy">
+            <div class="bve-gal-act"><button type="button" data-gup="${i}" title="Monter" ${i === 0 ? 'disabled' : ''}>↑</button><button type="button" data-gdel="${i}" title="Retirer">✕</button></div></div>`).join('')
+          : '<p class="edw-hint" style="margin:0">Aucune image. Colle les adresses de tes images (clic droit → « Copier l’adresse de l’image » sur ton projet Behance) ou importe des fichiers.</p>'}</div>
+        <textarea class="edw-in" id="bve-gal-urls" rows="2" placeholder="Colle une ou plusieurs adresses d'images (une par ligne), puis Entrée"></textarea>
+        <div class="edw-row"><button class="edw-sec-rst" id="bve-gal-add">＋ Ajouter les adresses</button><button class="edw-sec-rst" id="bve-gal-pick">📁 Importer des fichiers</button>
+          ${gallery.length ? '<button class="edw-sec-rst" id="bve-gal-clear">✖ Tout retirer</button>' : ''}
+          <input type="file" id="bve-gal-file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>
+        <p class="edw-hint">Avec des images, la fenêtre affiche le projet qui défile. Sans, elle montre la carte Behance (couverture seule : Behance ne fournit pas le contenu complet aux autres sites).</p>
+        <div class="edw-l" style="margin-top:12px">Lien / carte Behance ${hasBe ? `<span class="edw-hint">projet n° ${esc(e.be)}</span>` : ''}</div>
+        <input class="edw-in" id="bve-code" placeholder="Adresse du projet Behance ou code d'intégration (facultatif)" value="${esc(pv.beId ? 'https://www.behance.net/embed/project/' + pv.beId : (BV().projectId(p.url) ? p.url : ''))}">
         <p class="edw-hint" id="bve-code-msg">Seul le numéro du projet est conservé, jamais le code collé.</p>
-        ${e ? `<div class="edw-row bve-tabs"><button class="edw-st${this._cropTab === 'desk' ? ' on' : ''}" data-tab="desk">🖥 Ordinateur</button><button class="edw-st${this._cropTab === 'mob' ? ' on' : ''}" data-tab="mob">▮ Téléphone</button></div>
+        ${hasBe && !gallery.length ? `<div class="edw-row bve-tabs"><button class="edw-st${this._cropTab === 'desk' ? ' on' : ''}" data-tab="desk">🖥 Ordinateur</button><button class="edw-st${this._cropTab === 'mob' ? ' on' : ''}" data-tab="mob">▮ Téléphone</button></div>
           ${sl('zoom', 'Zoom', 1, 3, k.zoom, '×', .05)}${sl('x', 'Position X', -50, 50, k.x)}${sl('y', 'Rogner en haut', 0, 600, k.y, ' px', 4)}
-          <div class="edw-row"><button class="edw-sec-rst" id="bve-crop-rst">↺ Réinitialiser le cadrage</button><button class="edw-sec-rst" id="bve-try-live">▶ Voir dans l'aperçu</button></div>` : ''}
+          <div class="edw-row"><button class="edw-sec-rst" id="bve-crop-rst">↺ Réinitialiser le cadrage</button></div>` : ''}
+        ${e ? '<div class="edw-row"><button class="edw-sec-rst" id="bve-try-live">▶ Voir dans l\'aperçu</button></div>' : ''}
       </div>`;
     },
     bindProject(w, id) {
@@ -181,6 +193,53 @@
       });
       if (q('#bve-crop-rst')) q('#bve-crop-rst').onclick = () => { this.saveProject(id, pv => { if (pv.crop) delete pv.crop[this._cropTab]; }); rerender(); this.push(String(id)); };
       if (q('#bve-try-live')) q('#bve-try-live').onclick = () => this.test(id);
+      this._bindGallery(sec, id, rerender);
+    },
+    /* ── galerie d'images du projet (le déroulé) ── */
+    GAL_MAX: 40,
+    GAL_MAX_BYTES: 3500000,   // ~3,5 Mo de data: cumulés avant saturation localStorage
+    _gallery(id) { const p = getProjects().find(x => String(x.id) === String(id)); const g = p && p.preview && p.preview.gallery; return Array.isArray(g) ? g.map(x => typeof x === 'string' ? x : (x && x.src)).filter(Boolean) : []; },
+    _setGallery(id, list, rerender) {
+      const clean = list.slice(0, this.GAL_MAX);
+      const bytes = clean.filter(s => s.startsWith('data:')).reduce((n, s) => n + s.length, 0);
+      if (bytes > this.GAL_MAX_BYTES) return showToast?.('Trop d\'images importées — préfère coller des adresses, ou retires-en', '#c0392b', 4500);
+      const ok = this.saveProject(id, pv => { if (clean.length) pv.gallery = clean; else delete pv.gallery; });
+      if (ok) { rerender(); this.push(String(id)); }
+    },
+    _bindGallery(sec, id, rerender) {
+      const q = s => sec.querySelector(s);
+      const addUrls = () => {
+        const ta = q('#bve-gal-urls'); if (!ta) return;
+        const urls = ta.value.split(/[\s\n]+/).map(s => s.trim()).filter(s => /^https?:\/\//i.test(s));
+        if (!urls.length) return showToast?.('Colle au moins une adresse http(s) d\'image', '#e4b24a', 2500);
+        this._setGallery(id, this._gallery(id).concat(urls), rerender);
+      };
+      if (q('#bve-gal-add')) q('#bve-gal-add').onclick = addUrls;
+      const ta = q('#bve-gal-urls');
+      if (ta) ta.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey || !e.shiftKey)) { e.preventDefault(); addUrls(); } };
+      const file = q('#bve-gal-file');
+      if (q('#bve-gal-pick')) q('#bve-gal-pick').onclick = () => file.click();
+      if (file) file.onchange = ev => {
+        const files = [...ev.target.files]; ev.target.value = '';
+        const imgs = files.filter(f => /^image\//.test(f.type));
+        if (!imgs.length) return;
+        let done = 0; const out = [];
+        imgs.forEach((f, idx) => {
+          const rd = new FileReader();
+          rd.onload = e2 => {
+            const raw = String(e2.target.result || '');
+            const keep = src => { out[idx] = src; if (++done === imgs.length) this._setGallery(id, this._gallery(id).concat(out.filter(Boolean)), rerender); };
+            // Un GIF reste animé ; le reste est compressé en WebP.
+            if (f.type === 'image/gif' || typeof compressImageSrc !== 'function') keep(raw);
+            else compressImageSrc(raw, c => keep(c || raw));
+          };
+          rd.onerror = () => { if (++done === imgs.length) this._setGallery(id, this._gallery(id).concat(out.filter(Boolean)), rerender); };
+          rd.readAsDataURL(f);
+        });
+      };
+      sec.querySelectorAll('[data-gdel]').forEach(b => b.onclick = () => { const g = this._gallery(id); g.splice(+b.dataset.gdel, 1); this._setGallery(id, g, rerender); });
+      sec.querySelectorAll('[data-gup]').forEach(b => b.onclick = () => { const i = +b.dataset.gup, g = this._gallery(id); if (i > 0) { [g[i - 1], g[i]] = [g[i], g[i - 1]]; this._setGallery(id, g, rerender); } });
+      if (q('#bve-gal-clear')) q('#bve-gal-clear').onclick = () => { if (confirm('Retirer toutes les images de ce projet ?')) this._setGallery(id, [], rerender); };
     },
   };
 

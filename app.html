@@ -1261,6 +1261,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .bve-adv summary{cursor:pointer;font-size:10px;color:var(--muted3);font-weight:700}
 .bve-try{flex-wrap:nowrap;align-items:center}.bve-try select{flex:1 1 50%;min-width:0;margin:0}.bve-try .edw-ok{width:auto;flex:0 0 auto;margin:0;padding-left:12px;padding-right:12px}
 .bve-proj{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.bve-gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin:6px 0}
+.bve-gal-it{position:relative;border-radius:6px;overflow:hidden;background:var(--s2);aspect-ratio:1}
+.bve-gal-it img{width:100%;height:100%;object-fit:cover;display:block}
+.bve-gal-act{position:absolute;top:2px;right:2px;display:flex;gap:2px}
+.bve-gal-act button{width:20px;height:20px;border:none;border-radius:4px;background:rgba(6,6,6,.78);color:#fff;font-size:11px;cursor:pointer;line-height:1}
+.bve-gal-act button:disabled{opacity:.35;cursor:default}
 @media(max-width:560px){.bve-grid{grid-template-columns:1fr}}
 </style>
 </head>

@@ -104,17 +104,28 @@
     if (/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(v)) return v;
     return safeHttp(v);
   };
-  /** Projet du portfolio → entrée publiée, ou null s'il n'est pas un projet Behance. */
+  const GALLERY_MAX = 40;
+  /** Liste d'images (URLs ou data: déjà validées) → sources sûres, bornée. */
+  function sanitizeGallery(list) {
+    return (Array.isArray(list) ? list : []).map(it => {
+      const src = typeof it === 'string' ? it : (it && it.src);
+      return safeImage(src);
+    }).filter(Boolean).slice(0, GALLERY_MAX);
+  }
+  /** Projet du portfolio → entrée publiée. Non nul si projet Behance OU galerie
+      d'images du créateur (le « vrai déroulé » que Behance ne fournit pas). */
   function projectEntry(p, cfg) {
     if (!p) return null;
     const pv = p.preview && typeof p.preview === 'object' ? p.preview : {};
     const id = (ID_RE.test(String(pv.beId || '')) && String(pv.beId)) || projectId(p.url);
-    if (!id) return null;
+    const gallery = sanitizeGallery(pv.gallery);
+    if (!id && !gallery.length) return null;
     return {
-      be: id,
-      url: safeHttp(p.url) || 'https://www.behance.net/gallery/' + id,
+      be: id || '',
+      url: safeHttp(p.url) || (id ? 'https://www.behance.net/gallery/' + id : ''),
       title: String(p.title || 'Projet').slice(0, 140),
       cover: safeImage(p.cover),
+      gallery,
       crop: sanitizeCrops(pv.crop, (cfg && cfg.crop) || CROP),
     };
   }
@@ -160,10 +171,16 @@
 #bv .bv-crop iframe{position:absolute;left:0;top:0;width:100%;height:calc((100% + var(--y) * 1px) / var(--z));border:0;background:#fff;
   transform-origin:50% 0;transform:translate(calc(var(--x) * (var(--z) - 1) * 1%),calc(var(--y) * -1px)) scale(var(--z))}
 #bv.bv-fx-on.bv-fx-saturate .bv-crop iframe{filter:saturate(calc(1 + var(--i) * .35))}
+/* Galerie du créateur : les images du projet empilées, défilement vertical. */
+#bv .bv-crop.bv-scroll{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#0c0c0c;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
+#bv .bv-crop.bv-scroll::-webkit-scrollbar{width:6px}#bv .bv-crop.bv-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.28);border-radius:3px}
+#bv .bv-g-img{display:block;width:100%;height:auto}
+#bv.bv-fx-on.bv-fx-saturate .bv-crop.bv-scroll .bv-g-img{filter:saturate(calc(1 + var(--i) * .35))}
 #bv .bv-fx{position:absolute;inset:0;pointer-events:none;z-index:2}
 #bv .bv-dof{position:absolute;left:0;right:0;height:16%;backdrop-filter:blur(calc(var(--i) * 6px));-webkit-backdrop-filter:blur(calc(var(--i) * 6px))}
 #bv .bv-dof.t{top:0;-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)}
 #bv .bv-dof.b{bottom:0;-webkit-mask-image:linear-gradient(transparent,#000);mask-image:linear-gradient(transparent,#000)}
+#bv.bv-gal .bv-dof{display:none}
 #bv .bv-vig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 55%,rgba(0,0,0,calc(var(--i) * .9)) 100%)}
 #bv .bv-glare{position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,calc(var(--i) * .09)) 0,rgba(255,255,255,0) 38%)}
 #bv .bv-grain{position:absolute;inset:0;pointer-events:none;background-image:${GRAIN};background-size:180px;mix-blend-mode:soft-light;opacity:calc(var(--i) * .43);z-index:4}
@@ -247,13 +264,28 @@
       clearTimeout(timer);
       var f = crop.querySelector('iframe'); if (f) { f.src = 'about:blank'; f.remove(); }
       crop.innerHTML = '';
+      crop.classList.remove('bv-scroll'); root.classList.remove('bv-gal');
       var s = $('.bv-slow'); if (s) s.remove();
     }
-    function behanceBtn() { return C.showLink ? '<a class="bv-btn" href="' + cur.url.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">↗ Voir sur Behance</a>' : ''; }
-    /* Un seul mode : le projet Behance en direct, dans le cadre recadré. */
+    function behanceBtn() { return C.showLink && cur.url ? '<a class="bv-btn" href="' + cur.url.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">↗ Voir sur Behance</a>' : ''; }
+    /* Galerie du créateur (le vrai déroulé) si elle existe, sinon la carte Behance. */
     function load() {
       if (!cur) return;
       clearFrame(); applyCrop();
+      if (cur.gallery && cur.gallery.length) {
+        state.hidden = true;
+        crop.classList.add('bv-scroll'); root.classList.add('bv-gal');   // flou de profondeur coupé : on lit les images
+        var frag = document.createDocumentFragment();
+        cur.gallery.forEach(function (src, i) {
+          var img = document.createElement('img');
+          img.className = 'bv-g-img'; img.loading = i < 2 ? 'eager' : 'lazy'; img.decoding = 'async';
+          img.alt = cur.title + ' — ' + (i + 1); img.src = src;
+          frag.appendChild(img);
+        });
+        crop.appendChild(frag);
+        return;
+      }
+      if (!cur.be) { say('<p>Aucun contenu pour ce projet.</p>' + behanceBtn()); return; }
       {
         say('<p>Chargement du projet Behance…</p>', true);
         var f = document.createElement('iframe');
