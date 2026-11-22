@@ -1330,6 +1330,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.17.0', "Connexion haunt.gg : envoie et choisis tes images, vidéos et sons sur ton hébergement haunt.gg (galerie du projet, musique du site)."],
   ['3.16.0', "Ambiance du site (style haunt.gg) : écran d'entrée qui lance la musique, particules, curseur, machine à écrire, barre de défilement, grain, badge en coin."],
   ['3.15.1', "Mode aperçu (code admin) : la dernière nouveauté s'ouvre directement en démo, bouton « Voir la nouveauté »."],
   ['3.15.0', "Fenêtre projet : galerie d'images qui défile (tes propres images, par adresse ou import), à la place de la carte Behance figée."],

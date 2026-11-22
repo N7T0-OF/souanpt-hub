@@ -961,8 +961,8 @@ function edWinBrand() {
 function edWinAudio() {
   const c = SiteConfig.get();
   EdWin.open(null, '🔊 Son du site', `
-    <div class="edw-l">Musique de fond</div><input class="edw-in" id="audio-music" type="url" placeholder="https://…/musique.mp3" value="${_eesc(c.backgroundMusic || '')}"><input type="file" id="audio-music-file" accept="audio/*">
-    <div class="edw-l">Son de clic (optionnel)</div><input class="edw-in" id="audio-click" type="url" placeholder="https://…/clic.mp3" value="${_eesc(c.clickSound || '')}"><input type="file" id="audio-click-file" accept="audio/*">
+    <div class="edw-l">Musique de fond</div><input class="edw-in" id="audio-music" type="url" placeholder="https://…/musique.mp3" value="${_eesc(c.backgroundMusic || '')}"><input type="file" id="audio-music-file" accept="audio/*"> <button class="edw-sec-rst" data-haunt="audio-music" type="button">👻 Choisir sur haunt.gg</button>
+    <div class="edw-l">Son de clic (optionnel)</div><input class="edw-in" id="audio-click" type="url" placeholder="https://…/clic.mp3" value="${_eesc(c.clickSound || '')}"><input type="file" id="audio-click-file" accept="audio/*"> <button class="edw-sec-rst" data-haunt="audio-click" type="button">👻 Choisir sur haunt.gg</button>
     <p class="edw-hint">Le visiteur active le son avec 🔇 près du badge Souanpt HUB. La musique démarre en fondu, tourne en boucle et se coupe sur connexion lente ou économie de données.</p><button class="edw-ok" id="audio-save">Enregistrer</button>`, w => {
     [['audio-music-file','audio-music'],['audio-click-file','audio-click']].forEach(([fileId,urlId]) => {
       w.querySelector('#'+fileId).onchange = async e => {
@@ -971,6 +971,11 @@ function edWinAudio() {
         catch(err) { showToast?.(err.message,'#c0392b',4000); }
         input.placeholder = 'https://…';
       };
+    });
+    w.querySelectorAll('[data-haunt]').forEach(b => b.onclick = () => {
+      if (typeof HauntPicker === 'undefined') return;
+      HauntPicker.open({ type: 'audio', multiple: false, title: 'Sons — haunt.gg',
+        onPick: items => { const u = items[0] && Haunt.src(items[0]); if (u) w.querySelector('#' + b.dataset.haunt).value = u; } });
     });
     w.querySelector('#audio-save').onclick = () => {
       const music = w.querySelector('#audio-music').value.trim(), click = w.querySelector('#audio-click').value.trim();

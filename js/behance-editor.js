@@ -152,9 +152,9 @@
         <div class="bve-gal" id="bve-gal">${gallery.length ? gallery.map((src, i) => `
           <div class="bve-gal-it" data-i="${i}"><img src="${esc(src)}" alt="" loading="lazy">
             <div class="bve-gal-act"><button type="button" data-gup="${i}" title="Monter" ${i === 0 ? 'disabled' : ''}>↑</button><button type="button" data-gdel="${i}" title="Retirer">✕</button></div></div>`).join('')
-          : '<p class="edw-hint" style="margin:0">Aucune image. Colle les adresses de tes images (clic droit → « Copier l’adresse de l’image » sur ton projet Behance) ou importe des fichiers.</p>'}</div>
+          : '<p class="edw-hint" style="margin:0">Aucune image. Colle les adresses de tes images (clic droit → « Copier l’adresse de l’image » sur ton projet Behance), importe des fichiers ou choisis-les sur ton haunt.gg.</p>'}</div>
         <textarea class="edw-in" id="bve-gal-urls" rows="2" placeholder="Colle une ou plusieurs adresses d'images (une par ligne), puis Entrée"></textarea>
-        <div class="edw-row"><button class="edw-sec-rst" id="bve-gal-add">＋ Ajouter les adresses</button><button class="edw-sec-rst" id="bve-gal-pick">📁 Importer des fichiers</button>
+        <div class="edw-row"><button class="edw-sec-rst" id="bve-gal-add">＋ Ajouter les adresses</button><button class="edw-sec-rst" id="bve-gal-pick">📁 Importer des fichiers</button><button class="edw-sec-rst" id="bve-gal-haunt" title="Choisir ou envoyer des images sur ton hébergement haunt.gg">👻 Depuis haunt.gg</button>
           ${gallery.length ? '<button class="edw-sec-rst" id="bve-gal-clear">✖ Tout retirer</button>' : ''}
           <input type="file" id="bve-gal-file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>
         <p class="edw-hint">Avec des images, la fenêtre affiche le projet qui défile. Sans, elle montre la carte Behance (couverture seule : Behance ne fournit pas le contenu complet aux autres sites).</p>
@@ -219,10 +219,28 @@
       if (ta) ta.onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey || !e.shiftKey)) { e.preventDefault(); addUrls(); } };
       const file = q('#bve-gal-file');
       if (q('#bve-gal-pick')) q('#bve-gal-pick').onclick = () => file.click();
-      if (file) file.onchange = ev => {
+      if (q('#bve-gal-haunt')) q('#bve-gal-haunt').onclick = () => {
+        if (typeof HauntPicker === 'undefined') return;
+        HauntPicker.open({ type: 'image', multiple: true, title: 'Images du projet — haunt.gg',
+          onPick: items => { const urls = items.map(it => Haunt.src(it)).filter(Boolean); if (urls.length) this._setGallery(id, this._gallery(id).concat(urls), rerender); } });
+      };
+      if (file) file.onchange = async ev => {
         const files = [...ev.target.files]; ev.target.value = '';
         const imgs = files.filter(f => /^image\//.test(f.type));
         if (!imgs.length) return;
+        /* haunt.gg connecté : les fichiers partent sur l'hébergement de
+           l'utilisateur et seules leurs adresses sont gardées (pas de limite
+           de stockage du navigateur, GIF intacts). */
+        if (typeof Haunt !== 'undefined' && Haunt.connected()) {
+          const urls = [];
+          for (let i = 0; i < imgs.length; i++) {
+            showToast?.('Envoi sur haunt.gg ' + (i + 1) + '/' + imgs.length + '…', '#888', 1500);
+            try { const it = await Haunt.upload(imgs[i]); const u = Haunt.src(it); if (u) urls.push(u); }
+            catch (err) { showToast?.(imgs[i].name + ' : ' + err.message, '#c0392b', 4500); break; }
+          }
+          if (urls.length) { this._setGallery(id, this._gallery(id).concat(urls), rerender); showToast?.(urls.length + ' image' + (urls.length > 1 ? 's' : '') + ' envoyée' + (urls.length > 1 ? 's' : '') + ' sur haunt.gg ✓', '#2e9a63', 2500); }
+          return;
+        }
         let done = 0; const out = [];
         imgs.forEach((f, idx) => {
           const rd = new FileReader();
