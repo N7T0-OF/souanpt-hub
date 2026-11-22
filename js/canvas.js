@@ -983,6 +983,59 @@ function edWinAudio() {
 }
 window.edWinBrand = edWinBrand; window.edWinAudio = edWinAudio;
 
+/* ── 🌌 Ambiance (v3.16, js/site-ambiance.js) : écran d'entrée, particules,
+   curseur, machine à écrire, barre de défilement, grain, badge en coin. ── */
+function edWinAmbiance(btn) {
+  const S = SiteAmbiance.sanitize(SiteConfig.get().ambiance);
+  const opt = (list, cur) => list.map(([v, n]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${n}</option>`).join('');
+  const html = `
+    <div class="edw-l">Écran d'entrée <span class="edw-hint">un clic pour entrer, lance la musique du site</span></div>
+    <label class="edw-tog"><input type="checkbox" id="amb-enter-on"${S.enter.on ? ' checked' : ''}> Afficher un écran « cliquer pour entrer »</label>
+    <input class="edw-in" id="amb-enter-text" maxlength="40" placeholder="cliquer pour entrer" value="${_eesc(S.enter.text)}">
+    <input class="edw-in" id="amb-enter-sub" maxlength="60" placeholder="Petite ligne sous le texte (facultatif)" value="${_eesc(S.enter.sub)}">
+    <div class="edw-row"><button class="edw-sec-rst" id="amb-enter-test">▶ Tester l'écran d'entrée</button></div>
+    <div class="edw-l">Particules animées</div>
+    <select class="edw-in" id="amb-particles">${opt([['none', 'Aucune'], ['snow', '❄ Neige'], ['stars', '✦ Étoiles scintillantes'], ['embers', '🔥 Braises qui montent'], ['rain', '🌧 Pluie'], ['dust', '· Poussière flottante'], ['bubbles', '○ Bulles']], S.particles)}</select>
+    <div class="edw-row"><label class="edw-tog" style="flex:1">Densité <input type="range" id="amb-density" min="1" max="3" value="${S.density}"></label>
+      <select class="edw-in" id="amb-pcolor" style="flex:1">${opt([['accent', "Couleur d'accent"], ['white', 'Blanc'], ['mix', 'Mélange']], S.pColor)}</select></div>
+    <div class="edw-l">Curseur <span class="edw-hint">ordinateur uniquement</span></div>
+    <select class="edw-in" id="amb-cursor">${opt([['none', 'Normal'], ['dot', '● Point lumineux'], ['ring', '◎ Point + anneau qui suit'], ['trail', '∴ Traînée lumineuse']], S.cursor)}</select>
+    <div class="edw-l">Accroche « machine à écrire » <span class="edw-hint">remplace la phrase sous le titre</span></div>
+    <label class="edw-tog"><input type="checkbox" id="amb-tw-on"${S.typewriter.on ? ' checked' : ''}> Activer</label>
+    <textarea class="edw-in" id="amb-tw-lines" rows="3" placeholder="Une phrase par ligne (6 max)&#10;Designer graphique&#10;Miniatures YouTube">${_eesc(S.typewriter.lines.join('\n'))}</textarea>
+    <label class="edw-tog">Vitesse <input type="range" id="amb-tw-speed" min="1" max="3" value="${S.typewriter.speed}"></label>
+    <div class="edw-l">Détails</div>
+    <label class="edw-tog"><input type="checkbox" id="amb-progress"${S.progress ? ' checked' : ''}> Barre de défilement lumineuse (côté droit)</label>
+    <label class="edw-tog"><input type="checkbox" id="amb-grain"${S.grain ? ' checked' : ''}> Grain animé sur le fond</label>
+    <label class="edw-tog"><input type="checkbox" id="amb-corner-on"${S.corner.on ? ' checked' : ''}> Badge en bas à gauche</label>
+    <input class="edw-in" id="amb-corner-text" maxlength="40" placeholder="📍 FR · disponible" value="${_eesc(S.corner.text)}">
+    <p class="edw-hint">Tout est désactivé par défaut. Le mouvement réduit du visiteur est respecté (pas de particules ni d'animation). Sur téléphone : pas de curseur, moins de particules.</p>`;
+  EdWin.open(btn, '🌌 Ambiance du site', html, w => {
+    const v = id => w.querySelector('#' + id);
+    const read = () => ({
+      enter: { on: v('amb-enter-on').checked, text: v('amb-enter-text').value, sub: v('amb-enter-sub').value },
+      particles: v('amb-particles').value, density: +v('amb-density').value, pColor: v('amb-pcolor').value,
+      cursor: v('amb-cursor').value,
+      typewriter: { on: v('amb-tw-on').checked, lines: v('amb-tw-lines').value.split('\n'), speed: +v('amb-tw-speed').value },
+      progress: v('amb-progress').checked, grain: v('amb-grain').checked,
+      corner: { on: v('amb-corner-on').checked, text: v('amb-corner-text').value },
+    });
+    const save = () => edSet('ambiance', SiteAmbiance.sanitize(read()));
+    w.querySelectorAll('input[type=checkbox],select,input[type=range]').forEach(i => i.onchange = save);
+    w.querySelectorAll('input.edw-in,textarea').forEach(i => i.onchange = save);
+    v('amb-enter-test').onclick = () => {
+      if (!v('amb-enter-on').checked) { v('amb-enter-on').checked = true; save(); }
+      // L'aperçu se régénère après save() : on attend qu'il expose ambEnter.
+      let n = 0; const t = setInterval(() => {
+        const f = document.getElementById('ed-preview-frame');
+        const fw = f && f.contentWindow;
+        if ((fw && typeof fw.ambEnter === 'function') || ++n > 30) { clearInterval(t); if (fw && fw.ambEnter) fw.ambEnter(); else showToast?.("Aperçu indisponible : publie puis ouvre le site", '#e4b24a', 3000); }
+      }, 150);
+    };
+  });
+}
+window.edWinAmbiance = edWinAmbiance;
+
 /* Réglages de la barre latérale publique, raccordés au SiteConfig actuel.
    La fenêtre est distincte de la colonne historique « Blocs ». */
 function edWinSidebar() {

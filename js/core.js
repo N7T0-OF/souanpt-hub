@@ -1482,6 +1482,8 @@ function generateSite(cfg, projects, reviews, opts) {
     return !(b && bHidden(b));
   });
   const bvData = typeof BehanceViewer !== 'undefined' ? BehanceViewer.dataScript(bvVisible, cfg.behancePreview) : '';
+  // Ambiance (écran d'entrée, particules, curseur…) : js/site-ambiance.js, rien si tout est désactivé.
+  const amb = typeof SiteAmbiance !== 'undefined' ? SiteAmbiance.inject(cfg.ambiance, { editor }) : { css: '', body: '' };
   const heroImage   = String(cfg.heroImage || '').trim();
   const siteLogo = publicMediaUrl(cfg.siteLogo);
   const favicon = publicMediaUrl(cfg.favicon);
@@ -2085,7 +2087,7 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .sb-hero-in .hsub{color:rgba(255,255,255,.8);margin-bottom:0}
 @media(max-width:820px){.sb-side{position:fixed;${side.position === 'right' ? 'right' : 'left'}:-${sideWidth + 30}px;top:14px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{${side.position === 'right' ? 'right' : 'left'}:14px}.sb-main{padding:0}}
 @media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}.navcta{display:none}.burger{display:flex}}
-${bvData ? BehanceViewer.css() : ''}
+${bvData ? BehanceViewer.css() : ''}${amb.css}
 </style></head><body>
 ${layoutStyle === 'bento' ? `
 <div class="bn-page">
@@ -2265,6 +2267,7 @@ ${fx.mouseglow?`
 </script>
 ${cfg.ownerUid ? `<script>(function(){var U=${JSON.stringify(String(cfg.ownerUid))},EP=${JSON.stringify(ANALYTICS_URL)};if(!U||location.protocol.indexOf('http')!==0||location.hostname==='localhost'||location.hostname==='127.0.0.1'){return;}var td=new Date().toISOString().slice(0,10),vid,ld,uq=true;try{vid=localStorage.getItem('_shv');if(!vid){vid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('_shv',vid);}ld=localStorage.getItem('_shd');uq=ld!==td;localStorage.setItem('_shd',td);}catch(e){}function S(p){p.uid=U;p.eid=(window.crypto&&window.crypto.randomUUID?window.crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon(EP,b);}else{fetch(EP,{method:'POST',body:b,keepalive:true,mode:'no-cors'});}}catch(e){}}S({t:'pv',u:uq?1:0,ua:navigator.userAgent});var seen={};try{var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){var t=en.target.getAttribute('data-p');if(t){seen[t]=1;}io.unobserve(en.target);}});},{threshold:.5});document.querySelectorAll('[data-p]').forEach(function(el){io.observe(el);});}catch(e){}function F(){var ps=Object.keys(seen);for(var i=0;i<ps.length;i+=20){S({t:'pj',projects:ps.slice(i,i+20)});}seen={};}setTimeout(F,4500);addEventListener('pagehide',F);document.querySelectorAll('[data-p]').forEach(function(el){el.addEventListener('click',function(){var t=el.getAttribute('data-p');if(t){S({t:'click',project:t});}});});})();</script>` : ''}
 ${bvData}${bvData ? BehanceViewer.scriptTag() : ''}
+${amb.body}
 </body></html>`;
 }
 

@@ -1604,6 +1604,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <span id="ed-canvas-status" style="font-size:9px;color:var(--muted2);min-width:54px;text-align:right"></span>
           <button class="btn btn-ghost edtb-b" onclick="edWinTheme(this)" title="Style, couleurs, colonnes — raccourci T">🎨<span class="edtb-t"> Thème</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinFx(this)" title="Animations & effets — raccourci E">⚡<span class="edtb-t"> Effets</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinAmbiance(this)" title="Ambiance : écran d'entrée, particules, curseur, machine à écrire, grain">🌌<span class="edtb-t"> Ambiance</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinBanner(this)" title="Image, accroche et action de la bannière principale — raccourci B">🖼<span class="edtb-t"> Bannière</span></button>
           <button class="btn btn-ghost edtb-b" onclick="EdBehance.openSettings(this)" title="Fenêtre Behance : aperçu des projets sur le site, effets, cadrage">🅱<span class="edtb-t"> Behance</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinSections(this)" title="Nom, ordre et visibilité des sections — raccourci S">☰<span class="edtb-t"> Sections</span></button>
@@ -2346,6 +2347,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/cloud.js"></script>
 <script src="js/registry.js"></script>
 <script src="js/behance-viewer.js"></script>
+<script src="js/site-ambiance.js"></script>
 <script src="js/core.js"></script>
 <!-- T5 : connexion GitHub SANS jeton dans le navigateur (relais + device flow).
      Doit suivre core.js (GH, Auth, connectGitHubRelay) et précéder l'UI qui
@@ -3783,7 +3785,7 @@ const PreviewMode = {
     if (!this.sandbox() || typeof generateSite !== 'function') return;
     this.closeNew();
     const wrap = document.createElement('div'); wrap.id = 'pv-new';
-    wrap.innerHTML = '<div class="pv-new-bar"><span>✨ Nouveauté 3.15.0 — la fenêtre projet défile : fais défiler les images</span>'
+    wrap.innerHTML = '<div class="pv-new-bar"><span>✨ Nouveautés 3.16 — ambiance (écran d’entrée, braises, curseur, machine à écrire, grain) · la fenêtre projet défile</span>'
       + '<button type="button" data-reopen>↻ Rouvrir le projet</button><button type="button" data-close>✕ Fermer la démo</button></div>';
     const f = document.createElement('iframe'); f.title = 'Site de démonstration';
     wrap.appendChild(f); document.body.appendChild(wrap);

@@ -106,6 +106,13 @@
         siteName: 'Portfolio démo', bio: 'Créatif · Designer · Motion', accentColor: '#C8FF00',
         theme: '#060606', layout: '3', heroText: 'Créatif · Designer · Motion', repo: '',
         behancePreview: { enabled: true, style: 'perspective' },
+        // Nouveautés 3.16 : ambiance type haunt.gg, visible dès l'aperçu.
+        ambiance: {
+          enter: { on: true, text: 'cliquer pour entrer', sub: 'Aperçu des nouveautés' },
+          particles: 'embers', density: 2, pColor: 'mix', cursor: 'ring',
+          typewriter: { on: true, lines: ['Créatif · Designer · Motion', 'Miniatures YouTube', 'Identités visuelles'], speed: 2 },
+          progress: true, grain: true, corner: { on: true, text: '📍 FR · disponible' },
+        },
       },
     };
   }
