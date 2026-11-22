@@ -137,7 +137,7 @@
         <div class="prop-row"><div class="prop-label">Page au démarrage</div><select class="prop-input prop-select" id="pref-start" onchange="HubSystem.setPref('start',this.value)">${START_PAGES.map(([v, l]) => `<option value="${v}"${(p.start || 'overview') === v ? ' selected' : ''}>${e(l)}</option>`).join('')}</select></div>
         <div class="setting-row"><div class="setting-info"><div class="setting-name">Animations réduites</div><div class="setting-desc">Tableau de bord plus sobre (le site publié n'est pas concerné)</div></div><div class="toggle${p.calm ? ' on' : ''}" role="switch" tabindex="0" aria-checked="${!!p.calm}" onclick="HubSystem.setPref('calm',!this.classList.contains('on'));HubSystem.renderPrefs()" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();this.click()}"></div></div>
         <div class="setting-group-title" style="margin-top:14px">Raccourcis clavier</div>
-        <div class="sys-keys"><span><kbd>Ctrl</kbd>+<kbd>K</kbd> Recherche globale</span><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> Annuler (éditeur)</span><span><kbd>T</kbd> Thème</span><span><kbd>E</kbd> Effets</span><span><kbd>B</kbd> Bannière</span><span><kbd>S</kbd> Sections</span><span><kbd>Échap</kbd> Fermer</span></div>`;
+        <div class="sys-keys"><span><kbd>Ctrl</kbd>+<kbd>K</kbd> ou <kbd>/</kbd> Recherche globale</span><span><kbd>G</kbd> puis <kbd>F</kbd> Facturation (O, E, C, D, A, S, T, L, P)</span><span><kbd>N</kbd> Nouvelle prestation</span><span><kbd>?</kbd> Tous les raccourcis</span><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> Annuler (éditeur)</span><span><kbd>T</kbd> Thème</span><span><kbd>E</kbd> Effets</span><span><kbd>B</kbd> Bannière</span><span><kbd>S</kbd> Sections</span><span><kbd>Échap</kbd> Fermer</span></div>`;
     },
   };
 

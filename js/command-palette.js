@@ -24,7 +24,7 @@
   const PAGES = [
     ['overview', '🏠', 'Vue d\'ensemble'], ['editor', '✏️', 'Éditeur de site'], ['storage', '💾', 'Stockage'],
     ['cp', '🗂️', 'Clients & Projets'], ['devis', '📥', 'Demandes & Devis'], ['portals', '🔗', 'Portails'],
-    ['facturation', '💶', 'Facturation'], ['avis', '⭐', 'Avis'], ['settings', '⚙️', 'Paramètres'],
+    ['facturation', '💶', 'Facturation'], ['avis', '⭐', 'Avis'], ['settings', '⚙️', 'Paramètres'], ['tools', '🧰', 'Outils (image, palette, contraste, QR)'],
   ];
   const ACTIONS = [
     { ic: '👤', t: 'Nouveau client', k: 'creer ajouter client fiche', run: () => window.openClientForm && openClientForm() },
@@ -39,6 +39,10 @@
     { ic: '🔎', t: 'Référencement (SEO)', k: 'seo google referencement partage', run: () => { page('editor'); later(() => window.edWinSEO && edWinSEO(), 500); } },
     { ic: '👻', t: 'Relier haunt.gg', k: 'haunt profil liens folio', run: () => { page('editor'); later(() => window.edWinHaunt && edWinHaunt(), 500); } },
     { ic: '🎨', t: 'Thème du site', k: 'theme couleur style design accent', run: () => { page('editor'); later(() => window.edWinTheme && edWinTheme(), 500); } },
+    { ic: '🗜', t: 'Compresser une image', k: 'image compresser redimensionner convertir webp jpg exif filigrane', run: () => { page('tools'); later(() => window.Toolbox && Toolbox.go('image'), 120); } },
+    { ic: '🎨', t: 'Palette de couleurs d\'une image', k: 'palette couleur extraire logo accent', run: () => { page('tools'); later(() => window.Toolbox && Toolbox.go('palette'), 120); } },
+    { ic: '◐', t: 'Vérifier un contraste', k: 'contraste lisibilite wcag accessibilite', run: () => { page('tools'); later(() => window.Toolbox && Toolbox.go('contrast'), 120); } },
+    { ic: '⌨', t: 'Raccourcis clavier', k: 'raccourcis clavier aide touches', run: () => window.Shortcuts && Shortcuts.help() },
     { ic: '⬇', t: 'Exporter les prestations (CSV)', k: 'export csv excel comptable', run: () => window.exportInvoicesCSV && exportInvoicesCSV() },
   ];
 
