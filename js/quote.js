@@ -1336,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.26.0', "Raccourcis vers les projets open source (outils sans envoi, bibliothèques d’interface) dans Outils et la recherche : par défaut, masquables, et tes propres raccourcis."],
   ['3.25.0', "Page Outils (image : compresser, convertir, filigrane, sans métadonnées ; palette de couleurs ; contraste ; QR) — rien n’est envoyé. Raccourcis clavier : G puis une lettre, / pour chercher, ? pour l’aide."],
   ['3.24.0', "Factures détaillées : plusieurs lignes, quantités, dates, note, modèles réutilisables ; rappels d’échéance dans les notifications ; montants à 2 décimales."],
   ['3.23.0', "Connexion du téléphone par QR code depuis l’ordinateur connecté : scanne, autorise sur le PC, c’est connecté (aucune clé, QR à usage unique). QR codes générés localement."],

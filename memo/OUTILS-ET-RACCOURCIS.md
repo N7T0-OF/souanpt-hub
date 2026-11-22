@@ -17,3 +17,12 @@ Barre latérale (Contenu), recherche globale ou `G` puis `T`. Tout se fait dans 
 - `G` puis `O` Vue d'ensemble, `E` Éditeur, `C` Clients & Projets, `D` Demandes & Devis, `F` Facturation, `A` Avis, `S` Stockage, `T` Outils, `L` Portails, `P` Paramètres (1,2 s pour la 2ᵉ touche).
 - `/` recherche globale (comme Ctrl/⌘K), `?` aide (liste complète, Échap ferme), `N` nouvelle prestation sur Facturation.
 - Éditeur inchangé : `T` `E` `B` `S` ; `G` puis `E` n'ouvre pas « Effets ».
+
+## Raccourcis vers les projets open source (3.26.0)
+
+Demande du propriétaire : ne pas refaire les outils que ces sites proposent déjà, mais y donner accès. Onglet **🔗 Raccourcis** (ouvert par défaut dans la page Outils) :
+- **Par défaut** (`DEFAULT_LINKS`, 2 catégories) : Outils sans envoi — ihate.tools, NeverUpload, Aimg ; Interfaces open source — Opensource UI, PinUI, Wensity UI, EasyUI, Wobli, Ryan Aque, Nexvyn UI (crazyui.vercel.app). Masquables (✕) et rétablissables.
+- **Personnels** : nom, adresse, icône (emoji), catégorie (libre ou existante), description ; modifier (✎), supprimer (confirmation).
+- Stockage `hub_shortcuts` `{ hidden: [ids], custom: [...] }` (registre `HubData`, sauvegarde GitHub privée, `sync: null`). Adresses **https uniquement**, sans identifiants, 300 caractères max (`Toolbox.safeUrl`, revalidées à l'affichage et à l'ouverture) ; ouverture `noopener,noreferrer`.
+- Aucune icône chargée depuis ces sites (pastille locale : emoji ou initiale) → aucune requête vers un tiers tant qu'on ne clique pas.
+- Recherche globale (Ctrl/⌘K) : groupe « Raccourcis ».

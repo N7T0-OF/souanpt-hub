@@ -75,6 +75,8 @@ const HubData = {
     { key: 'expenses',  ls: 'hub_expenses',     file: 'expenses.json',  sync: null,        type: 'array' },
     // Modèles de facture (3.24, js/business.js) : sauvegarde GitHub privée uniquement.
     { key: 'invtemplates', ls: 'hub_inv_templates', file: 'invoice-templates.json', sync: null, type: 'array' },
+    // Raccourcis vers des projets open source (3.26, js/toolbox.js) : défauts masqués + raccourcis personnels.
+    { key: 'shortcuts', ls: 'hub_shortcuts', file: 'shortcuts.json', sync: null, type: 'raw' },
     // La config du site est poussée vers Firestore par pushConfig() dans un
     // champ `cfg` (pas `items`) : `mirror:false` évite de la traiter 2 fois.
     { key: 'config',    ls: 'souanpt_site_cfg', file: 'config.json',    sync: 'config',    mirror: 'cfg', type: 'raw' },

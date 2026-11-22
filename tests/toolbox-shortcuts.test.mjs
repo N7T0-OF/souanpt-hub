@@ -65,3 +65,33 @@ test('the Outils page is reachable from the sidebar, the search and G then T', (
   assert.match(readFileSync(new URL('../js/ui.js', import.meta.url), 'utf8'), /if \(id === 'tools'\) window\.Toolbox && Toolbox\.render\(\);/);
   assert.match(readFileSync(new URL('../js/command-palette.js', import.meta.url), 'utf8'), /\['tools', '🧰'/);
 });
+
+test('open-source shortcuts: https-only addresses, defaults can be hidden and restored, custom ones edited', () => {
+  const store = new Map();
+  const opened = [];
+  const ctx = { window: null, document: { getElementById: () => null }, Math, Number, String, Map, Set, Array, Object, Promise, URL, JSON, Date,
+    localStorage: { getItem: k => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)) } };
+  ctx.window = ctx; ctx.window.open = (u, t, f) => opened.push([u, t, f]);
+  vm.createContext(ctx);
+  vm.runInContext(readFileSync(new URL('../js/toolbox.js', import.meta.url), 'utf8'), ctx);
+  const L = ctx.Toolbox.links, safe = ctx.Toolbox.safeUrl;
+  assert.equal(safe('coolors.co'), 'https://coolors.co/');
+  for (const bad of ['http://x.fr', 'javascript:alert(1)', 'https://user:pw@x.fr', 'ftp://x.fr', '']) assert.equal(safe(bad), '', bad);
+  const ids = L.all().map(l => l.id);
+  for (const id of ['ihate', 'neverupload', 'animg', 'opensourceui', 'pinui', 'wensity', 'easyui', 'wobli', 'ryanaque', 'nexvyn']) assert.ok(ids.includes(id), id + ' by default');
+  assert.ok(L.all().every(l => l.url.startsWith('https://')));
+  assert.equal(L.add({ name: 'X', url: 'http://insecure.test' }), null);
+  const c = L.add({ name: 'Coolors', url: 'coolors.co', icon: '🎨', cat: 'Couleurs' });
+  assert.equal(c.url, 'https://coolors.co/');
+  L.add({ id: c.id, name: 'Coolors palettes', url: 'https://coolors.co/' });
+  assert.equal(L.all().filter(l => l.custom).length, 1); assert.equal(L.all().find(l => l.custom).name, 'Coolors palettes');
+  L.remove('pinui'); assert.ok(!L.all().some(l => l.id === 'pinui')); assert.equal(L.hiddenCount(), 1);
+  L.restore(); assert.ok(L.all().some(l => l.id === 'pinui'));
+  L.remove(c.id); assert.equal(L.all().filter(l => l.custom).length, 0);
+  L.open('https://neverupload.lol/'); L.open('javascript:alert(1)');
+  assert.deepEqual(JSON.parse(JSON.stringify(opened)), [['https://neverupload.lol/', '_blank', 'noopener,noreferrer']], 'unsafe address never opened');
+  const src = readFileSync(new URL('../js/toolbox.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /s2\/favicons|favicon\.ico|icon\.horse|<img src="https:/i, 'no icon fetched from third parties');
+  assert.match(readFileSync(new URL('../js/hub-data.js', import.meta.url), 'utf8'), /key: 'shortcuts', ls: 'hub_shortcuts'/);
+  assert.match(readFileSync(new URL('../js/command-palette.js', import.meta.url), 'utf8'), /g: 'Raccourcis'/);
+});

@@ -78,6 +78,8 @@
         k: norm([i.number, i.name, i.client, i.price, st, late ? 'retard impaye' : ''].join(' ')), id: 'inv:' + i.id, bad: late,
         run: () => { page('facturation'); later(() => { const s = document.getElementById('inv-search'); if (s) { s.value = i.number || i.name || ''; window._invPage = 1; window.renderInvoices && renderInvoices(); } }, 150); } });
     });
+    // Raccourcis de la page Outils (défauts + personnels) : ouverture dans un nouvel onglet.
+    try { (window.Toolbox && Toolbox.links ? Toolbox.links.all() : []).forEach(l => out.push({ g: 'Raccourcis', ic: l.icon || '🔗', t: l.name, s: l.desc || l.url, k: norm([l.name, l.desc, l.cat, l.url].join(' ')), id: 'lk:' + l.id, run: () => Toolbox.links.open(l.url) })); } catch {}
     arr('hub_reviews').forEach(r => {
       if (!r || !r.author) return;
       out.push({ g: 'Avis', ic: '⭐', t: r.author + (r.rating ? ' · ' + '★'.repeat(Math.min(5, r.rating | 0)) : ''), s: String(r.text || '').slice(0, 70) + (r.status === 'pending' ? ' · à valider' : ''),
