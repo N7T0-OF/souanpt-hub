@@ -65,7 +65,7 @@ test('the entry screen is hidden in the editor and starts the site sound on clic
 test('generateSite injects the ambiance only when something is on', () => {
   const core = readFileSync(new URL('../js/core.js', import.meta.url), 'utf8');
   assert.match(core, /SiteAmbiance\.inject\(cfg\.ambiance, \{ editor \}\)/);
-  assert.match(core, /\$\{amb\.css\}\n<\/style><\/head><body>/);
+  assert.match(core, /\$\{amb\.css\}\$\{hgBack\.css\}\n<\/style><\/head><body>/);
   assert.match(core, /\$\{amb\.body\}\n<\/body><\/html>/);
   const app = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
   assert.match(app, /<script src="js\/site-ambiance\.js"><\/script>/);

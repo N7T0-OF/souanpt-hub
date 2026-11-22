@@ -106,6 +106,9 @@
         siteName: 'Portfolio démo', bio: 'Créatif · Designer · Motion', accentColor: '#C8FF00',
         theme: '#060606', layout: '3', heroText: 'Créatif · Designer · Motion', repo: '',
         behancePreview: { enabled: true, style: 'perspective' },
+        // Nouveautés 3.18 : référencement + liaison haunt.gg (adresse fictive de démo).
+        siteUrl: 'https://demo-souanpt.github.io/portfolio/', hauntUser: 'souanpt', hauntBack: 'always',
+        seo: { jobTitle: 'Graphiste · Miniatures YouTube', city: 'Lyon' },
         // Nouveautés 3.16 : ambiance type haunt.gg, visible dès l'aperçu.
         ambiance: {
           enter: { on: true, text: 'cliquer pour entrer', sub: 'Aperçu des nouveautés' },

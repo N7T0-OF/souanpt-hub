@@ -249,16 +249,10 @@ test('published-site activation accepts only the Pages build for its own commit'
   assert.equal(matches(null, current), false);
 });
 
-test('published tracker batches 21–40 project IDs into accepted groups of 20', () => {
+test('published sites carry no visit tracker (3.18: views are read on haunt.gg)', () => {
   const source = readFileSync(new URL('../js/core.js', import.meta.url), 'utf8');
-  const start = source.indexOf('function F(){var ps=Object.keys(seen);');
-  const end = source.indexOf('setTimeout(F,4500)', start);
-  assert.ok(start >= 0 && end > start, 'project tracker found in the generated site');
-  const seen = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`project-${i}`, 1]));
-  const events = [];
-  const remaining = new Function('seen', 'S', source.slice(start, end) + '\nF(); return Object.keys(seen).length;')(seen, event => events.push(event));
-  assert.deepEqual(events.map(event => event.projects.length), [20, 20]);
-  assert.equal(remaining, 0);
+  assert.equal(source.includes('sendBeacon'), false, 'no beacon in the site generator');
+  assert.equal(source.includes("localStorage.setItem('_shv'"), false, "no visitor id stored in visitors' browsers");
 });
 
 test('event IDs are idempotent and the Durable Object also limits profile/IP quotas', async t => {

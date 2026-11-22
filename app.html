@@ -603,6 +603,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 #gate-preview-entry{margin-top:12px;background:var(--s2);color:var(--text);border:1px solid var(--border2)}
 #preview-mode-banner{position:fixed;right:16px;bottom:16px;z-index:849;display:flex;align-items:center;gap:12px;max-width:min(440px,calc(100vw - 32px));padding:10px 12px;border:1px solid var(--accent);border-radius:10px;background:var(--s1);box-shadow:0 8px 30px #0009;color:var(--text);font-size:11px}
 #preview-mode-banner[hidden]{display:none}
+.seo-score{display:flex;align-items:baseline;gap:4px;margin-bottom:8px}.seo-score b{font-size:28px;font-weight:800}.seo-score span{font-size:11px;color:var(--muted2)}
+.seo-bar{flex:1;height:5px;margin-left:10px;border-radius:5px;background:var(--s2);overflow:hidden;align-self:center}.seo-bar i{display:block;height:100%}
+.seo-g{padding:10px;border-radius:8px;background:#fff;margin-bottom:8px;font-family:arial,sans-serif}
+.seo-g-url{font-size:11px;color:#4d5156}.seo-g-t{font-size:15px;color:#1a0dab;margin:2px 0;line-height:1.3}.seo-g-d{font-size:12px;color:#4d5156;line-height:1.45}
+.seo-share{display:flex;gap:8px;align-items:center;padding:6px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+.seo-share img{width:84px;height:44px;object-fit:cover;border-radius:4px}.seo-share b{display:block;font-size:11px}.seo-share span{font-size:10px;color:var(--muted2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.seo-list{list-style:none;margin:0 0 10px;padding:0;font-size:11px}.seo-list li{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)}
+.seo-list li>span{width:14px;color:var(--muted2)}.seo-list li.ok>span{color:var(--green)}.seo-list small{display:block;color:var(--muted2);font-size:10px}
+.hg-link{display:grid;grid-template-columns:1fr auto;gap:2px 6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
+.hg-link code{grid-column:1;font-size:9px;color:var(--muted2);word-break:break-all}.hg-link button{grid-row:1/3;grid-column:2}
 #hp-modal{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
 #hp-modal .hp-card{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border2);border-radius:12px;box-shadow:0 20px 60px #000a}
 #hp-modal .hp-head,#hp-modal .hp-foot{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:12px}
@@ -1540,20 +1550,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
     <div class="page active" id="page-overview">
       <div class="section-header">
         <div class="section-title">Vue d'ensemble</div><div class="section-line"></div>
-        <span id="an-live" class="an-live" style="display:none"><span class="an-live-dot"></span><b id="an-live-n">0</b>&nbsp;en ligne</span>
-        <select id="an-range" class="prop-input" style="width:auto;font-size:10px;padding:6px 10px" onchange="Analytics.render()">
-          <option value="7">7 jours</option>
-          <option value="30" selected>30 jours</option>
-          <option value="365">Total</option>
-        </select>
-        <span class="an-sync" id="an-sync" title="Les statistiques se mettent à jour toutes seules"><i></i><b>En direct</b></span>
       </div>
-      <div id="an-ingest-status" class="infobox" style="display:none;margin-bottom:12px"></div>
 
       <!-- Ligne 1 : cartes résumé -->
       <div class="ov-cards">
-        <div class="ov-card"><div class="ov-ic">👁️</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-views">—</div><div class="ov-c-l">Vues totales</div></div></div>
-        <div class="ov-card"><div class="ov-ic">👤</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-uniq">—</div><div class="ov-c-l">Visiteurs uniques</div></div></div>
         <div class="ov-card"><div class="ov-ic">📂</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-projects">0</div><div class="ov-c-l">Projets publiés</div></div></div>
         <div class="ov-card"><div class="ov-ic">🗂️</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-client-projects">0</div><div class="ov-c-l">Projets clients</div></div></div>
         <div class="ov-card"><div class="ov-ic">⭐</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-reviews">0</div><div class="ov-c-l">Avis reçus</div></div></div>
@@ -1562,21 +1562,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
         <div class="ov-card"><div class="ov-ic">💾</div><div class="ov-c-txt"><div class="ov-c-v" id="ov-storage">0%</div><div class="ov-c-l">Stockage utilisé</div></div></div>
       </div>
 
-      <!-- Ligne 2 : graphique des vues -->
-      <div class="an-card">
-        <div class="an-card-h"><span>Évolution des vues</span><span id="an-trend-sub" class="an-card-sub"></span></div>
-        <div id="an-trend"></div>
-        <div id="an-empty" class="ov-hint" style="display:none"><b>Aucune statistique pour le moment.</b><br>Publie ton site et partage-le pour commencer à recevoir des données.</div>
+      <!-- Vues et clics : sur haunt.gg (le site est le complément du profil haunt.gg) -->
+      <div class="an-card ov-haunt"><div class="an-card-h"><span>👻 Vues et clics</span><span class="an-card-sub">sur ton profil haunt.gg</span></div>
+        <p class="ov-hint" style="margin:0">Ton site est la suite de ton profil haunt.gg : les visiteurs y arrivent par tes liens (Folio, Contact…). Les vues et les clics de ces liens se consultent dans ton tableau de bord haunt.gg.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><a class="btn btn-ghost" style="font-size:10px" href="https://haunt.gg/fr/dashboard" target="_blank" rel="noopener noreferrer">Ouvrir haunt.gg ↗</a><button class="btn btn-ghost" style="font-size:10px" onclick="showPage('editor');setTimeout(function(){window.edWinHaunt&&edWinHaunt()},600)">🔗 Liens à mettre sur haunt.gg</button></div>
       </div>
-
-      <!-- Ligne 3 : pays + projets populaires -->
-      <div class="an-2col">
-        <div class="an-card"><div class="an-card-h"><span>🌍 Pays</span><span class="an-card-sub">visiteurs par pays</span></div><div id="an-co"></div></div>
-        <div class="an-card"><div class="an-card-h"><span>🔥 Projets populaires</span><span class="an-card-sub">vues · clics</span></div><div id="an-proj"></div></div>
-      </div>
-
-      <!-- Ligne 3b : appareils -->
-      <div class="an-card"><div class="an-card-h"><span>🖥️ Appareils</span></div><div id="an-dev"></div></div>
 
       <!-- Ligne 4 : activité récente -->
       <div class="an-card"><div class="an-card-h"><span>Activité récente</span></div><div id="ov-activity"></div></div>
@@ -1617,6 +1607,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button class="btn btn-ghost edtb-b" onclick="edWinTheme(this)" title="Style, couleurs, colonnes — raccourci T">🎨<span class="edtb-t"> Thème</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinFx(this)" title="Animations & effets — raccourci E">⚡<span class="edtb-t"> Effets</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinAmbiance(this)" title="Ambiance : écran d'entrée, particules, curseur, machine à écrire, grain">🌌<span class="edtb-t"> Ambiance</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinSEO(this)" title="Référencement Google, aperçus de partage, score SEO">🔎<span class="edtb-t"> SEO</span></button>
+          <button class="btn btn-ghost edtb-b" onclick="edWinHaunt(this)" title="Relier le site à ton profil haunt.gg">👻<span class="edtb-t"> haunt.gg</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinBanner(this)" title="Image, accroche et action de la bannière principale — raccourci B">🖼<span class="edtb-t"> Bannière</span></button>
           <button class="btn btn-ghost edtb-b" onclick="EdBehance.openSettings(this)" title="Fenêtre Behance : aperçu des projets sur le site, effets, cadrage">🅱<span class="edtb-t"> Behance</span></button>
           <button class="btn btn-ghost edtb-b" onclick="edWinSections(this)" title="Nom, ordre et visibilité des sections — raccourci S">☰<span class="edtb-t"> Sections</span></button>
@@ -2371,7 +2363,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/registry.js"></script>
 <script src="js/behance-viewer.js"></script>
 <script src="js/site-ambiance.js"></script>
+<script src="js/site-seo.js"></script>
 <script src="js/haunt.js"></script>
+<script src="js/editor-seo.js"></script>
 <script src="js/core.js"></script>
 <!-- T5 : connexion GitHub SANS jeton dans le navigateur (relais + device flow).
      Doit suivre core.js (GH, Auth, connectGitHubRelay) et précéder l'UI qui
@@ -3925,7 +3919,7 @@ function finishLogin(pseudo) {
   // affichent les vraies données au lieu de rester sur « connecte-toi » / vide.
   // (Analytics se recharge tout seul via son abonnement onAuth.)
   try {
-    window.Analytics && Analytics.refresh();
+   
     window.QuoteUI && QuoteUI.loadAcceptances && QuoteUI.loadAcceptances();
     window.Notify && Notify.loadInbox && Notify.loadInbox().then(() => Notify.renderInbox && Notify.renderInbox()).catch(() => {});
   } catch (e) { console.warn('[finishLogin] refresh', e); }
@@ -4216,7 +4210,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderIntegrations();
   renderLoginLog(); renderGoat(); refreshRealStats(true);
   // Vue d'ensemble d'abord : c'est la page visible au chargement.
-  syncKPIs(); renderActivity(); window.Analytics && Analytics.refresh();
+  syncKPIs(); renderActivity();
   // Les pages secondières se peignent dès que le navigateur se repose (et, si
   // l'utilisateur y va avant, à la première visite — cf. renderOnce).
   hubIdle(renderBackgroundPages);

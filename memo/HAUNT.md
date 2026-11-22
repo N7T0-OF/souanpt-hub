@@ -18,3 +18,14 @@ But : héberger images, vidéos et sons sur l'ImageHost haunt.gg du propriétair
 ## Sécurité
 
 La clé a été collée une fois dans la conversation avec l'assistant le 22 novembre 2026 : elle n'est écrite dans aucun fichier du dépôt (test : aucune chaîne `haunt_` réelle). Si elle fuit, la révoquer sur haunt.gg (Compte → Développeur) et en créer une nouvelle, puis « Oublier la clé » et la ressaisir dans Paramètres.
+
+## Liaison profil ↔ site (3.18.0)
+
+Le site est la suite du profil haunt.gg (tuiles « Folio », « Contact »…). Fenêtre éditeur 👻 haunt.gg (`js/editor-seo.js`) :
+- pseudo haunt.gg (`cfg.hauntUser`, validé `[A-Za-z0-9._-]{1,32}`) → `rel="me"`, `sameAs` du JSON-LD, bouton retour ;
+- bouton « ← haunt.gg/pseudo » (`cfg.hauntBack` : `auto` = visiteur venu de haunt.gg par le référent ou `?from=haunt`, retenu pour l'onglet ; `always` ; `off`) — `SiteSEO.hauntBack` ;
+- liens prêts à copier pour les tuiles haunt.gg : accueil, `#projects`, `#contact`, `#avis`, tous avec `?from=haunt` (retiré de l'adresse à l'arrivée).
+
+Vues et clics : lus sur le tableau de bord haunt.gg. Les statistiques de visite du hub sont retirées de la Vue d'ensemble, le mouchard des sites publiés supprimé (aucune requête ni identifiant visiteur), le sondage Firestore de `Analytics` arrêté. Le Worker d'analyse reste déployé mais ne reçoit plus rien.
+
+Complément, pas doublon : réseaux, musique, Discord et curseurs existent déjà sur haunt.gg ; côté site, la section Réseaux et l'ambiance restent désactivées par défaut. Le site se concentre sur le portfolio, les avis, les devis et le référencement.

@@ -292,4 +292,6 @@ const Analytics = {
   }
 };
 window.Analytics = Analytics;
-document.addEventListener('DOMContentLoaded', () => Analytics.startLive());
+/* 3.18 : les statistiques de visite sont retirées de la Vue d'ensemble (la
+   collecte est désactivée ; les vues se lisent sur haunt.gg). Plus de sondage
+   Firestore toutes les minutes. */

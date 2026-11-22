@@ -1484,6 +1484,8 @@ function generateSite(cfg, projects, reviews, opts) {
   const bvData = typeof BehanceViewer !== 'undefined' ? BehanceViewer.dataScript(bvVisible, cfg.behancePreview) : '';
   // Ambiance (écran d'entrée, particules, curseur…) : js/site-ambiance.js, rien si tout est désactivé.
   const amb = typeof SiteAmbiance !== 'undefined' ? SiteAmbiance.inject(cfg.ambiance, { editor }) : { css: '', body: '' };
+  // Liaison haunt.gg : bouton « ← haunt.gg/pseudo » pour les visiteurs venus du profil (js/site-seo.js).
+  const hgBack = typeof SiteSEO !== 'undefined' ? SiteSEO.hauntBack(cfg) : { css: '', body: '' };
   const heroImage   = String(cfg.heroImage || '').trim();
   const siteLogo = publicMediaUrl(cfg.siteLogo);
   const favicon = publicMediaUrl(cfg.favicon);
@@ -1818,8 +1820,11 @@ function generateSite(cfg, projects, reviews, opts) {
   return `<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="description" content="${esc(cfg.bio)}">
-<title>${esc(cfg.siteName)} — Portfolio</title>
+${typeof SiteSEO !== 'undefined'
+  // Référencement complet (js/site-seo.js) : seulement les projets, avis et liens VISIBLES.
+  ? SiteSEO.head(cfg, bvVisible, sec.avis ? approved : [], socItems)
+  : `<meta name="description" content="${esc(cfg.bio)}">
+<title>${esc(cfg.siteName)} — Portfolio</title>`}
 ${favicon ? `<link rel="icon" href="${esc(favicon)}">` : ''}
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
@@ -2087,7 +2092,7 @@ ${fx.mouseglow?`.pc::after{content:'';position:absolute;inset:0;z-index:2;pointe
 .sb-hero-in .hsub{color:rgba(255,255,255,.8);margin-bottom:0}
 @media(max-width:820px){.sb-side{position:fixed;${side.position === 'right' ? 'right' : 'left'}:-${sideWidth + 30}px;top:14px;transition:.25s;z-index:100}.sb-wrap.open .sb-side{${side.position === 'right' ? 'right' : 'left'}:14px}.sb-main{padding:0}}
 @media(max-width:640px){.pg{grid-template-columns:1fr!important}.nl{display:none}.navcta{display:none}.burger{display:flex}}
-${bvData ? BehanceViewer.css() : ''}${amb.css}
+${bvData ? BehanceViewer.css() : ''}${amb.css}${hgBack.css}
 </style></head><body>
 ${layoutStyle === 'bento' ? `
 <div class="bn-page">
@@ -2265,8 +2270,8 @@ ${fx.mouseglow?`
   });`:''}
 }`:''}
 </script>
-${cfg.ownerUid ? `<script>(function(){var U=${JSON.stringify(String(cfg.ownerUid))},EP=${JSON.stringify(ANALYTICS_URL)};if(!U||location.protocol.indexOf('http')!==0||location.hostname==='localhost'||location.hostname==='127.0.0.1'){return;}var td=new Date().toISOString().slice(0,10),vid,ld,uq=true;try{vid=localStorage.getItem('_shv');if(!vid){vid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('_shv',vid);}ld=localStorage.getItem('_shd');uq=ld!==td;localStorage.setItem('_shd',td);}catch(e){}function S(p){p.uid=U;p.eid=(window.crypto&&window.crypto.randomUUID?window.crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon(EP,b);}else{fetch(EP,{method:'POST',body:b,keepalive:true,mode:'no-cors'});}}catch(e){}}S({t:'pv',u:uq?1:0,ua:navigator.userAgent});var seen={};try{var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){var t=en.target.getAttribute('data-p');if(t){seen[t]=1;}io.unobserve(en.target);}});},{threshold:.5});document.querySelectorAll('[data-p]').forEach(function(el){io.observe(el);});}catch(e){}function F(){var ps=Object.keys(seen);for(var i=0;i<ps.length;i+=20){S({t:'pj',projects:ps.slice(i,i+20)});}seen={};}setTimeout(F,4500);addEventListener('pagehide',F);document.querySelectorAll('[data-p]').forEach(function(el){el.addEventListener('click',function(){var t=el.getAttribute('data-p');if(t){S({t:'click',project:t});}});});})();</script>` : ''}
 ${bvData}${bvData ? BehanceViewer.scriptTag() : ''}
+${hgBack.body}
 ${amb.body}
 </body></html>`;
 }
@@ -2349,7 +2354,9 @@ async function deployPortfolio(onLog, onStep, options = {}) {
   // lastDeploy is local bookkeeping. Publishing it made every repeat publish
   // produce a different tree and an unnecessary GitHub Pages build.
   const { lastDeploy: _previousDeploy, ...publicCfg } = cfg;
-  const cfgToUse = { ...publicCfg, ownerUid: publisherUid || '', repo: owner + '/' + repoName };
+  const cfgToUse = { ...publicCfg, ownerUid: publisherUid || '', repo: owner + '/' + repoName,
+    // Adresse publique pour le lien canonique, le plan du site et les aperçus.
+    siteUrl: publicCfg.siteUrl || `https://${owner.toLowerCase()}.github.io/${repoName}/` };
   /* Les images vivent sur GitHub (media/) : localStorage ne garde qu'une
      miniature. Avant de générer, on remet le PLEIN FORMAT en mémoire — sinon
      le site publié recevrait les miniatures. Le manifeste JSON public reste
@@ -2385,6 +2392,8 @@ async function deployPortfolio(onLog, onStep, options = {}) {
     { path: 'projects.json',    content: JSON.stringify({ version: 1, projects: publicFeed.projects }, null, 2) },
     { path: 'site-config.json', content: JSON.stringify(siteManifest, null, 2) },
     { path: '.nojekyll',        content: '' },
+    // SEO : plan du site (avec images des projets) et robots.txt.
+    ...(typeof SiteSEO !== 'undefined' ? SiteSEO.files(pubCfg, publicFeed.projects && publicFeed.projects.length ? pubProjects.filter(p => publicFeed.projects.some(q => String(q.id) === String(p.id))) : []) : []),
   ], 'deploy: ' + new Date().toISOString().slice(0,16).replace('T',' '));
   onLog?.('  → commit ' + commitSha.slice(0, 7) + ' (index.html + config)'); onStep?.('commit', 'done');
 

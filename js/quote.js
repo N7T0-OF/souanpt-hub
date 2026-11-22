@@ -1330,6 +1330,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.18.0', "Référencement Google complet (titre, partage, données structurées, avis, plan du site) avec score SEO ; site relié au profil haunt.gg (bouton retour, liens Folio/Contact) ; stats de visite retirées (lues sur haunt.gg)."],
   ['3.17.0', "Connexion haunt.gg : envoie et choisis tes images, vidéos et sons sur ton hébergement haunt.gg (galerie du projet, musique du site)."],
   ['3.16.0', "Ambiance du site (style haunt.gg) : écran d'entrée qui lance la musique, particules, curseur, machine à écrire, barre de défilement, grain, badge en coin."],
   ['3.15.1', "Mode aperçu (code admin) : la dernière nouveauté s'ouvre directement en démo, bouton « Voir la nouveauté »."],
