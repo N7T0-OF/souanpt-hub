@@ -11,7 +11,7 @@
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const HASH_RE = /^#pair=([A-Za-z0-9_-]{16,64})\.([A-Za-z0-9_-]{24,96})$/;
   const MESSAGES = {
-    NO_KV: 'La connexion par QR sera active après la prochaine mise en ligne (stockage Cloudflare à activer).',
+    NO_KV: 'Connexion par QR indisponible sur ce serveur (relais sans stockage). Connecte-toi avec GitHub, ou réessaie depuis souanptjub.pages.dev.',
     AUTH: 'Connecte-toi d\'abord sur cet ordinateur.',
     EXPIRED: 'QR code expiré — génères-en un nouveau sur l\'ordinateur.',
     USED: 'Ce QR code a déjà été utilisé.',

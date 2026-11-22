@@ -1336,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.27.0', "Business plus clair : Projets, Demandes & Devis et Portails réunis dans « Clients & Projets » (onglets, une seule entrée) ; la connexion du téléphone par QR code est activée."],
   ['3.26.0', "Raccourcis vers les projets open source (outils sans envoi, bibliothèques d’interface) dans Outils et la recherche : par défaut, masquables, et tes propres raccourcis."],
   ['3.25.0', "Page Outils (image : compresser, convertir, filigrane, sans métadonnées ; palette de couleurs ; contraste ; QR) — rien n’est envoyé. Raccourcis clavier : G puis une lettre, / pour chercher, ? pour l’aide."],
   ['3.24.0', "Factures détaillées : plusieurs lignes, quantités, dates, note, modèles réutilisables ; rappels d’échéance dans les notifications ; montants à 2 décimales."],

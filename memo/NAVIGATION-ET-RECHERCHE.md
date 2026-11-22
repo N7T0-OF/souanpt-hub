@@ -11,3 +11,5 @@ Bouton « 🔍 Rechercher » dans la barre du haut (toutes les pages) ou Ctrl/�
 ## Stabilité
 
 Les minuteurs périodiques sont uniques par session (garde existante). Le relevé des avis toutes les 5 min est sauté quand l'onglet est caché et relancé au retour (plus de 5 min après le dernier).
+
+- 3.27.0 : la barre latérale Business compte trois entrées (Clients & Projets, Facturation, Avis). Demandes & Devis et Portails sont des onglets de Clients & Projets (`js/business-nav.js`, détail dans `CLIENTS-ET-PROJETS.md`) ; la recherche les affiche comme « Clients & Projets › … ». Le titre de la barre du haut est tronqué avec « … » sur mobile.

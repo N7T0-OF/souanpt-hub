@@ -23,7 +23,7 @@
   /* ── Ce que la palette sait ouvrir ── */
   const PAGES = [
     ['overview', '🏠', 'Vue d\'ensemble'], ['editor', '✏️', 'Éditeur de site'], ['storage', '💾', 'Stockage'],
-    ['cp', '🗂️', 'Clients & Projets'], ['devis', '📥', 'Demandes & Devis'], ['portals', '🔗', 'Portails'],
+    ['cp', '🗂️', 'Clients & Projets'], ['devis', '📥', 'Clients & Projets › Demandes & Devis'], ['portals', '🔗', 'Clients & Projets › Portails'],
     ['facturation', '💶', 'Facturation'], ['avis', '⭐', 'Avis'], ['settings', '⚙️', 'Paramètres'], ['tools', '🧰', 'Outils (image, palette, contraste, QR)'],
   ];
   const ACTIONS = [

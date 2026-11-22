@@ -738,6 +738,17 @@ html.hub-calm *,html.hub-calm *::before,html.hub-calm *::after{animation-duratio
 .lk-act button{width:20px;height:20px;border:none;border-radius:5px;background:var(--s1);color:var(--muted2);font-size:10px;cursor:pointer;padding:0}.lk-act button:hover{color:var(--text)}
 .lk-form{margin-top:6px;padding-top:12px;border-top:1px solid var(--border)}.lk-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 @media(hover:none){.lk-act{display:flex}}
+/* 3.27 : Clients & Projets fusionné (js/business-nav.js) */
+.ni[hidden]{display:none!important}
+#topbar-title{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.biz-tabs{display:flex;gap:4px;margin:20px 24px 0;padding:3px;border:1px solid var(--border);border-radius:11px;background:var(--s1);overflow-x:auto;scrollbar-width:none}
+.biz-tabs::-webkit-scrollbar{display:none}.biz-tabs[hidden]{display:none}
+.biz-tabs button{display:inline-flex;align-items:center;gap:6px;flex:1 0 auto;justify-content:center;border:none;background:none;color:var(--muted2);font-family:inherit;font-size:11px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.biz-tabs button:hover{color:var(--text)}.biz-tabs button.on{background:var(--accent);color:var(--on-accent)}
+.biz-tabs button.on .nbadge{background:var(--on-accent);color:var(--accent)}.biz-tab-b .nbadge{position:static;margin-left:2px}
+#page-cp>.section-header>.section-title,#page-devis>.section-header>.section-title,#page-portals>.section-header>.section-title,
+#page-cp>.section-header>.section-line,#page-devis>.section-header>.section-line,#page-portals>.section-header>.section-line{display:none}
+#page-cp>.section-header,#page-devis>.section-header,#page-portals>.section-header{justify-content:flex-end}
 #kbd-help{position:fixed;inset:0;z-index:1350;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
 .kbd-card{width:min(520px,100%);background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:14px 16px;box-shadow:0 20px 60px #000a}
 .kbd-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px}.kbd-row small{color:var(--muted2);text-align:right}
@@ -2560,6 +2571,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
 <script src="js/device-pair.js"></script>
 <script src="js/toolbox.js"></script>
 <script src="js/shortcuts.js"></script>
+<script src="js/business-nav.js"></script>
 <script src="js/editor-seo.js"></script>
 <script src="js/editor-toolbar.js"></script>
 <script src="js/core.js"></script>

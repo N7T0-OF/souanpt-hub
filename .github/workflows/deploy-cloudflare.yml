@@ -63,6 +63,8 @@ jobs:
           out="$RUNNER_TEMP/souanpt-cloudflare-${GITHUB_SHA}"
           node scripts/prepare-deploy.mjs --channel=cloudflare --output="$out"
           echo "directory=$out" >> "$GITHUB_OUTPUT"
+          # Liaisons du projet Pages (KV HUB_PAIR…) : wrangler.toml écrit À CÔTÉ du dossier publié.
+          node scripts/write-pages-config.mjs "$out"
       - name: Stamp Analytics Worker source commit
         env:
           GITHUB_SHA: ${{ github.sha }}
@@ -82,7 +84,9 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 3812fed3ef304d1dea00c6498d09aa52
-          command: pages deploy ${{ steps.package.outputs.directory }} --project-name=souanpthub --branch=main --commit-hash=${{ github.sha }}
+          # Lancé depuis le dossier parent pour lire le wrangler.toml des liaisons.
+          workingDirectory: ${{ runner.temp }}
+          command: pages deploy souanpt-cloudflare-${{ github.sha }} --project-name=souanpthub --branch=main --commit-hash=${{ github.sha }}
       - name: Verify production commit marker
         env:
           EXPECTED_SHA: ${{ github.sha }}

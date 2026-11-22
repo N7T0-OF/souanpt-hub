@@ -1,0 +1,20 @@
+# Configuration du projet Cloudflare Pages « souanpthub » (3.27.0).
+#
+# Ce fichier est un MODÈLE : scripts/write-pages-config.mjs l'écrit, sous le nom
+# wrangler.toml, À CÔTÉ du dossier publié (jamais dedans : il ne doit pas être
+# servi), puis `wrangler pages deploy` est lancé depuis ce dossier parent.
+#
+# Il devient la source des liaisons du projet. Vérifié le 22/11/2026 : aucune
+# variable ni secret n'était réglé dans le tableau de bord (relais `configured:
+# false`, `wrangler pages secret list` vide) — rien n'est perdu. Si une variable
+# est ajoutée un jour (ex. GH_CLIENT_ID pour le device flow), la déclarer ICI
+# ([vars]) ou en secret (`wrangler pages secret put`), pas dans le tableau de bord.
+
+name = "souanpthub"
+compatibility_date = "2025-06-01"
+pages_build_output_dir = "__DIST__"
+
+# Connexion du téléphone par QR code (functions/api/pair.js) : appairages de 2 min.
+[[kv_namespaces]]
+binding = "HUB_PAIR"
+id = "136c3216c64349b2a98904667f0c151a"
