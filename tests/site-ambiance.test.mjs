@@ -69,5 +69,5 @@ test('generateSite injects the ambiance only when something is on', () => {
   assert.match(core, /\$\{amb\.body\}\n<\/body><\/html>/);
   const app = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
   assert.match(app, /<script src="js\/site-ambiance\.js"><\/script>/);
-  assert.match(app, /onclick="edWinAmbiance\(this\)"/);
+  assert.match(app, /onclick="EdMenu\.run\('edWinAmbiance',true\)"/, 'Ambiance is in the 🎨 Design menu');
 });

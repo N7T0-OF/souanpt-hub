@@ -178,7 +178,8 @@ test('dashboard inline scripts remain valid JavaScript after adding import contr
     if (script.trim()) new vm.Script(script);
   }
   assert.match(html, /id="cp-search"/);
-  assert.match(html, /ClientImport\.open\(\)/);
+  // 3.19 : l'import est dans le menu « ＋ Ajouter » (EdMenu.run résout la fonction au clic).
+  assert.match(html, /EdMenu\.run\('ClientImport\.open'\)/);
 });
 
 test('bulk changes affect only private workspaces and trash is recoverable', () => {

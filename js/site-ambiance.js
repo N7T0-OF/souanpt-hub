@@ -53,6 +53,9 @@
     if (s.particles !== 'none') out += '#amb-fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:150}\n';
     if (s.grain) out += `#amb-grain{position:fixed;inset:-50%;width:200%;height:200%;pointer-events:none;z-index:151;opacity:.07;background:${GRAIN};animation:amb-grain 1s steps(4) infinite}
 @keyframes amb-grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(0,0)}}\n`;
+    // Barre lumineuse active → la barre de défilement classique de la page est
+    // masquée (sinon deux barres). Le défilement reste intact (molette, tactile, clavier).
+    if (s.progress) out += 'html{scrollbar-width:none!important;-ms-overflow-style:none}html::-webkit-scrollbar,body::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}\n';
     if (s.progress) out += '#amb-prog{position:fixed;right:6px;top:50%;transform:translateY(-50%);width:4px;height:min(220px,40vh);border-radius:4px;background:rgba(128,128,128,.22);z-index:190;pointer-events:none}\n#amb-prog i{display:block;width:100%;height:0;border-radius:4px;background:var(--a);box-shadow:0 0 10px var(--a)}\n';
     if (s.corner.on) out += '#amb-corner{position:fixed;left:14px;bottom:14px;z-index:190;padding:6px 11px;border-radius:999px;font:600 11px system-ui,sans-serif;color:var(--t);background:color-mix(in srgb,var(--bg) 70%,transparent);border:1px solid var(--b);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:none}\n';
     if (s.typewriter.on) out += '.amb-tw::after{content:"";display:inline-block;width:2px;height:1em;margin-left:3px;vertical-align:-2px;background:var(--a);animation:amb-caret 1s steps(1) infinite}\n@keyframes amb-caret{50%{opacity:0}}\n';

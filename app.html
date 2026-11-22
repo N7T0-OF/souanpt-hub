@@ -157,9 +157,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .prop-row{margin-bottom:10px}
 
 /* ── SECTION HEADER ── */
-.section-header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
-.section-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800}
-.section-line{flex:1;height:1px;background:var(--border)}
+.section-header{display:flex;align-items:center;gap:8px 14px;margin-bottom:18px;flex-wrap:wrap}
+.section-header .btn,.section-header .ed-modes button{white-space:nowrap}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.section-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;white-space:nowrap}
+.section-line{flex:1;min-width:24px;height:1px;background:var(--border)}
 
 /* ── KPIS ── */
 .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
@@ -883,6 +885,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .edtb{height:46px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:10px;
   background:var(--bg);flex-shrink:0;min-width:0}
 .edtb-cmds{margin-left:auto;display:flex;gap:5px;align-items:center;flex-shrink:0;min-width:0}
+/* v3.19 : jauge compacte (détail au clic) + menus groupés, plus aucun chevauchement */
+button.edperf{display:flex;align-items:center;gap:8px;flex:0 0 auto;background:none;border:1px solid transparent;border-radius:8px;padding:3px 8px;cursor:pointer;color:inherit;font-family:inherit}
+button.edperf:hover,button.edperf.on{border-color:var(--border);background:var(--s2)}
+button.edperf{position:relative}button.edperf.has-tips::after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--gold-l,#e4b24a)}
+button.edperf .edperf-gauge{width:74px;display:block}
+button.edperf .edperf-top{display:flex}
+button.edperf .edperf-track{display:block}
+button.edperf .edperf-track span{display:block;height:100%;background:var(--green);border-radius:3px;transition:width .3s,background .3s}
+.edm-pop{position:fixed;z-index:950;min-width:250px;max-width:min(340px,calc(100vw - 16px));padding:6px;border:1px solid var(--border2);border-radius:10px;background:var(--s1);box-shadow:0 14px 40px #000a}
+.edm-pop[hidden]{display:none}
+.edm-pop [role=menuitem]{display:flex;align-items:center;gap:10px;width:100%;padding:7px 9px;border:none;border-radius:7px;background:none;color:var(--text);font-family:inherit;text-align:left;cursor:pointer}
+.edm-pop [role=menuitem]:hover,.edm-pop [role=menuitem]:focus-visible{background:var(--s2);outline:none}
+.edm-ic{width:22px;text-align:center;font-size:14px;flex-shrink:0}.edm-tx{display:flex;flex-direction:column;min-width:0}
+.edm-tx b{font-size:11px;font-weight:700}.edm-tx small{font-size:9px;color:var(--muted2)}
+.edm-h{font-size:11px;font-weight:700;padding:4px 6px 8px;display:flex;justify-content:space-between;gap:10px}.edm-h span{font-weight:400;color:var(--muted2)}
+.edperf-pop .edperf-times{display:flex!important;flex-direction:row;gap:12px;padding:0 6px 8px}
+.edperf-pop .edperf-tips{flex-direction:column;align-items:flex-start;gap:6px;padding:0 6px 4px;overflow:visible}
+.edperf-pop .edperf-tips .ptip{white-space:normal}
+.edm-btn.on{border-color:var(--accent)!important;color:var(--accent)}.edm-car{font-size:8px;margin-left:4px;opacity:.7}
+.edtb-i{min-width:30px;justify-content:center}
+.edtb-auto{max-width:150px;overflow:hidden;text-overflow:ellipsis}
 .edtb-b{font-size:10px;padding:5px 9px!important;white-space:nowrap}
 .edtb-sep{width:1px;height:15px;background:var(--border);flex-shrink:0}
 .edperf{min-width:0}
@@ -1253,6 +1276,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cw-val-a{display:flex;flex-wrap:wrap;gap:6px;padding:0 13px 10px}
 .cw-val-a .cw-btn{flex:0 0 auto;font-size:9px;padding:5px 9px}
 .cw-val-f{padding:8px 13px 10px;border-top:1px dashed var(--border);font-size:9px;color:var(--muted2);line-height:1.6}
+.cw-val-more>summary{padding:6px 13px 9px;font-size:9px;color:var(--muted2);cursor:pointer;list-style:none}.cw-val-more>summary::-webkit-details-marker{display:none}
+.cw-val-more>summary::before{content:'▸ '}.cw-val-more[open]>summary::before{content:'▾ '}.cw-val-more>summary:hover{color:var(--text)}
 .cw-val-f code{color:var(--muted3)}
 .cw-warn{margin-top:7px;font-size:9px;color:var(--gold-l);line-height:1.9}
 .cw-warn .cw-mini-btn{margin-left:4px}
@@ -1593,42 +1618,54 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
       <!-- Commandes globales ; les commandes de structure sont aussi injectées
            dans la navigation réelle de l'aperçu par EdCanvas. -->
       <div class="edtb">
-        <div class="edperf">
+        <button type="button" class="edperf" id="ed-perf-chip" onclick="EdMenu.toggle('perf',this)" aria-haspopup="true" aria-expanded="false" title="Performance du site — cliquer pour le détail">
           <span class="edperf-ic">⚡</span>
-          <div class="edperf-gauge">
-            <div class="edperf-top"><b id="ed-perf-num">98/100</b><span id="ed-perf-label">Ultra rapide</span></div>
-            <div class="edperf-track"><div id="ed-perf-bar" style="width:98%"></div></div>
-          </div>
-          <div class="edperf-times"><span id="ed-perf-load">≈0.6s desktop</span><span id="ed-perf-mob">≈1.0s mobile</span></div>
+          <span class="edperf-gauge">
+            <span class="edperf-top"><b id="ed-perf-num">98/100</b></span>
+            <span class="edperf-track"><span id="ed-perf-bar" style="width:98%"></span></span>
+          </span>
+        </button>
+        <div class="edm-pop edperf-pop" id="edm-perf" hidden>
+          <div class="edm-h">Performance du site <span id="ed-perf-label">Ultra rapide</span></div>
+          <div class="edperf-times"><span id="ed-perf-load">≈0.6s ordinateur</span><span id="ed-perf-mob">≈1.0s mobile</span></div>
           <div class="edperf-tips" id="ed-tips"></div>
         </div>
+        <span id="ed-canvas-status" style="font-size:9px;color:var(--muted2);min-width:0;text-align:right"></span>
         <div class="edtb-cmds">
-          <span id="ed-canvas-status" style="font-size:9px;color:var(--muted2);min-width:54px;text-align:right"></span>
-          <button class="btn btn-ghost edtb-b" onclick="edWinTheme(this)" title="Style, couleurs, colonnes — raccourci T">🎨<span class="edtb-t"> Thème</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinFx(this)" title="Animations & effets — raccourci E">⚡<span class="edtb-t"> Effets</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinAmbiance(this)" title="Ambiance : écran d'entrée, particules, curseur, machine à écrire, grain">🌌<span class="edtb-t"> Ambiance</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinSEO(this)" title="Référencement Google, aperçus de partage, score SEO">🔎<span class="edtb-t"> SEO</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinHaunt(this)" title="Relier le site à ton profil haunt.gg">👻<span class="edtb-t"> haunt.gg</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinBanner(this)" title="Image, accroche et action de la bannière principale — raccourci B">🖼<span class="edtb-t"> Bannière</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="EdBehance.openSettings(this)" title="Fenêtre Behance : aperçu des projets sur le site, effets, cadrage">🅱<span class="edtb-t"> Behance</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinSections(this)" title="Nom, ordre et visibilité des sections — raccourci S">☰<span class="edtb-t"> Sections</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edAddBlock()" title="Ajouter un bloc au site">＋<span class="edtb-t"> Bloc</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinTags()" title="Créer des tags et classer les projets">🏷<span class="edtb-t"> Tags</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinBrand()" title="Logo, favicon et effet du nom">✳<span class="edtb-t"> Identité</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edWinAudio()" title="Musique de fond et son de clic">🔊<span class="edtb-t"> Son</span></button>
-          <button class="btn btn-ghost edtb-b" id="ed-auto-publish" onclick="SiteAutoPublish.toggle()" title="Publier automatiquement les contenus publics après leur sauvegarde">Auto : désactivé</button>
+          <button type="button" class="btn btn-ghost edtb-b edm-btn" onclick="EdMenu.toggle('design',this)" aria-haspopup="menu" aria-expanded="false" title="Design : thème, bannière, identité, effets, ambiance, son">🎨<span class="edtb-t"> Design</span><span class="edm-car">▾</span></button>
+          <div class="edm-pop" id="edm-design" role="menu" hidden>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinTheme',true)"><span class="edm-ic">🎨</span><span class="edm-tx"><b>Thème</b><small>Style, couleurs, colonnes · T</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinBanner',true)"><span class="edm-ic">🖼</span><span class="edm-tx"><b>Bannière</b><small>Image, accroche, action · B</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinBrand')"><span class="edm-ic">✳</span><span class="edm-tx"><b>Identité</b><small>Logo, favicon, effet du nom</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinFx',true)"><span class="edm-ic">⚡</span><span class="edm-tx"><b>Effets</b><small>Animations, survol, défilement · E</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinAmbiance',true)"><span class="edm-ic">🌌</span><span class="edm-tx"><b>Ambiance</b><small>Entrée, particules, curseur, grain</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinAudio')"><span class="edm-ic">🔊</span><span class="edm-tx"><b>Son</b><small>Musique de fond, son de clic</small></span></button>
+          </div>
+          <button type="button" class="btn btn-ghost edtb-b edm-btn" onclick="EdMenu.toggle('content',this)" aria-haspopup="menu" aria-expanded="false" title="Contenu : sections, blocs, tags, fenêtre projet">🧱<span class="edtb-t"> Contenu</span><span class="edm-car">▾</span></button>
+          <div class="edm-pop" id="edm-content" role="menu" hidden>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinSections',true)"><span class="edm-ic">☰</span><span class="edm-tx"><b>Sections</b><small>Nom, ordre, visibilité · S</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edAddBlock')"><span class="edm-ic">＋</span><span class="edm-tx"><b>Ajouter un bloc</b><small>Lien, texte, image, projet…</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinTags')"><span class="edm-ic">🏷</span><span class="edm-tx"><b>Tags</b><small>Classer les projets</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('EdBehance.openSettings',true)"><span class="edm-ic">🅱</span><span class="edm-tx"><b>Fenêtre projet</b><small>Behance en direct, galerie, effets</small></span></button>
+          </div>
+          <button type="button" class="btn btn-ghost edtb-b edm-btn" onclick="EdMenu.toggle('reach',this)" aria-haspopup="menu" aria-expanded="false" title="Visibilité : référencement Google, liaison haunt.gg">🚀<span class="edtb-t"> Visibilité</span><span class="edm-car">▾</span></button>
+          <div class="edm-pop" id="edm-reach" role="menu" hidden>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinSEO',true)"><span class="edm-ic">🔎</span><span class="edm-tx"><b>Référencement (SEO)</b><small>Google, partage, score</small></span></button>
+            <button type="button" role="menuitem" onclick="EdMenu.run('edWinHaunt',true)"><span class="edm-ic">👻</span><span class="edm-tx"><b>haunt.gg</b><small>Pseudo, bouton retour, liens Folio</small></span></button>
+          </div>
+          <button type="button" class="btn btn-ghost edtb-b edtb-auto" id="ed-auto-publish" onclick="SiteAutoPublish.toggle()" title="Publication automatique des contenus publics après leur sauvegarde (cliquer pour activer ou couper)">Auto : désactivé</button>
           <span class="edtb-sep"></span>
-          <button class="btn btn-ghost edtb-b" id="ed-undo" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" disabled>↶</button>
-          <button class="btn btn-ghost edtb-b" id="ed-redo" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" disabled>↷</button>
+          <button type="button" class="btn btn-ghost edtb-b edtb-i" id="ed-undo" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled>↶</button>
+          <button type="button" class="btn btn-ghost edtb-b edtb-i" id="ed-redo" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" aria-label="Rétablir" disabled>↷</button>
           <span class="edtb-sep"></span>
           <div class="ed-modes">
             <button id="ed-mode-edit" class="active" onclick="EdCanvas.setMode('edit')" title="Modifier les blocs">✎<span class="edtb-t"> Édition</span></button>
             <button id="ed-mode-prev" onclick="EdCanvas.setMode('preview')" title="Voir le site comme un visiteur">👁<span class="edtb-t"> Aperçu</span></button>
           </div>
           <span class="edtb-sep"></span>
-          <button class="btn btn-ghost edtb-b" onclick="edSaveConfig()" title="Enregistrer la configuration">↑<span class="edtb-t"> Sauver</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edPreviewExternal()" title="Ouvrir le site dans un nouvel onglet">⬚<span class="edtb-t"> Ouvrir</span></button>
-          <button class="btn btn-ghost edtb-b" onclick="edExportSite()" title="Télécharger ton site en un seul fichier — hébergeable partout, sans souanpt.hub">⬇<span class="edtb-t"> Exporter</span></button>
+          <button type="button" class="btn btn-ghost edtb-b edtb-i" onclick="edSaveConfig()" title="Enregistrer la configuration" aria-label="Enregistrer">💾</button>
+          <button type="button" class="btn btn-ghost edtb-b edtb-i" onclick="edPreviewExternal()" title="Ouvrir le site dans un nouvel onglet" aria-label="Ouvrir le site">↗</button>
+          <button type="button" class="btn btn-ghost edtb-b edtb-i" onclick="edExportSite()" title="Télécharger ton site en un seul fichier — hébergeable partout, sans souanpt.hub" aria-label="Exporter le site">⬇</button>
         </div>
       </div>
       <!-- Body -->
@@ -1663,11 +1700,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
           <button data-v="list" onclick="CP.setView('list')">Liste</button>
           <button data-v="clients" onclick="CP.setView('clients')">Clients</button>
         </div>
-        <button class="btn btn-ghost" id="cp-sort" style="font-size:10px" onclick="CP.setSort()">Trier : Plus récent</button>
+        <button class="btn btn-ghost" id="cp-sort" style="font-size:10px" onclick="CP.setSort()" title="Changer l'ordre de tri">Trier : Plus récent</button>
         <button class="btn btn-ghost" id="cp-trash-btn" style="font-size:10px" onclick="CP.toggleTrash()">Corbeille</button>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="openClientForm()">+ Client</button>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="ClientImport.open()">📁 Importer un dossier</button>
-        <button class="btn btn-ghost" style="font-size:10px" onclick="CP.startManual()">+ Dossier de projet</button>
+        <button class="btn btn-ghost edm-btn" style="font-size:10px" onclick="EdMenu.toggle('cpadd',this)" aria-haspopup="menu" aria-expanded="false" title="Ajouter un client, un dossier de projet ou importer un dossier">＋ Ajouter<span class="edm-car">▾</span></button>
+        <div class="edm-pop" id="edm-cpadd" role="menu" hidden>
+          <button type="button" role="menuitem" onclick="EdMenu.run('openClientForm')"><span class="edm-ic">👤</span><span class="edm-tx"><b>Client</b><small>Nouvelle fiche client</small></span></button>
+          <button type="button" role="menuitem" onclick="EdMenu.run('CP.startManual')"><span class="edm-ic">🗂️</span><span class="edm-tx"><b>Dossier de projet</b><small>Projet saisi à la main, relié à un client</small></span></button>
+          <button type="button" role="menuitem" onclick="EdMenu.run('ClientImport.open')"><span class="edm-ic">📁</span><span class="edm-tx"><b>Importer un dossier</b><small>Créer les fiches depuis un dossier de ton ordinateur</small></span></button>
+        </div>
         <button class="btn btn-accent" style="font-size:10px" onclick="CP.newProject()">+ Nouveau projet</button>
       </div>
       <div class="infobox">🗂️ <strong>Tout ton relationnel client au même endroit.</strong> Chaque demande, devis et mission d'un même projet vit sur <strong>un seul lien</strong> qui suit son cycle de vie — de la première prise de contact à la livraison. Les outils détaillés (analyse, grille tarifaire, portail) restent accessibles depuis chaque projet.</div>
@@ -2366,6 +2406,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 <script src="js/site-seo.js"></script>
 <script src="js/haunt.js"></script>
 <script src="js/editor-seo.js"></script>
+<script src="js/editor-toolbar.js"></script>
 <script src="js/core.js"></script>
 <!-- T5 : connexion GitHub SANS jeton dans le navigateur (relais + device flow).
      Doit suivre core.js (GH, Auth, connectGitHubRelay) et précéder l'UI qui

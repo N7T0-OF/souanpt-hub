@@ -431,15 +431,16 @@ function edPerf() {
   if (bar) { bar.style.width = score + '%'; bar.style.background = col; }
   if (num) { num.textContent = score + '/100'; num.style.color = col; }
   if (lbl) lbl.textContent = score >= 85 ? 'Ultra rapide' : score >= 65 ? 'Rapide' : 'Animations lourdes';
-  if (ld)  ld.textContent  = '≈' + (0.4 + load / 90).toFixed(1) + 's desktop';
+  if (ld)  ld.textContent  = '≈' + (0.4 + load / 90).toFixed(1) + 's ordinateur';
   if (mob) mob.textContent = '≈' + (0.6 + load / 55).toFixed(1) + 's mobile';
   // Suggestions dans la barre (avec bouton Optimiser)
   const tips = [];
   if (heavyCovers) tips.push(`🖼 ${heavyCovers} couverture(s) encore dans le navigateur <button onclick="offloadImages();return false">Sortir</button>`);
   if (g.animLevel === 'premium') tips.push('⚡ Animations intenses activées');
-  if (g.layoutStyle !== 'bento' && !g.heroImage) tips.push('🌄 Bannière sans image — ouvre 🖼 Bannière');
+  if (g.layoutStyle !== 'bento' && !g.heroImage) tips.push('🌄 Bannière sans image — 🎨 Design → Bannière');
   const box = document.getElementById('ed-tips');
-  if (box) box.innerHTML = tips.slice(0, 2).map(t => `<span class="ptip">${t}</span>`).join('');
+  if (box) box.innerHTML = tips.length ? tips.slice(0, 3).map(t => `<span class="ptip">${t}</span>`).join('') : '<span class="ptip" style="color:var(--muted2)">Rien à optimiser ✓</span>';
+  document.getElementById('ed-perf-chip')?.classList.toggle('has-tips', tips.length > 0);
 }
 
 /* ══════════════════════════════════════════════════════

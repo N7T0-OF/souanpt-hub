@@ -183,6 +183,8 @@ const GH = {
     // puis un seul arbre — les blobs sont réutilisés s'ils existent déjà.
     const entries = [];
     for (const f of files) {
+      // { path, delete: true } : retire le fichier dans le même commit (arbre Git, sha null).
+      if (f.delete) { entries.push({ path: f.path, mode: '100644', type: 'blob', sha: null }); continue; }
       if (f.b64) {
         const blob = await this.api(token, `/repos/${owner}/${repo}/git/blobs`, {
           method: 'POST',
@@ -2387,13 +2389,26 @@ async function deployPortfolio(onLog, onStep, options = {}) {
   onStep?.('commit', 'active'); onLog?.(`Envoi vers ${owner}/${repoName}…`);
   await GH.ensureRepo(token, owner, repoName, false);
   await GH.enablePages(token, owner, repoName); // activer Pages AVANT le push
+  /* SEO : une page par projet visible (projets/<titre>-<id>/). Les pages des
+     projets retirés ou masqués sont supprimées dans le même commit — sinon
+     Google continuerait d'afficher un projet que l'on ne veut plus montrer. */
+  const publicIds = new Set((publicFeed.projects || []).map(q => String(q.id)));
+  const seoFiles = typeof SiteSEO !== 'undefined' ? SiteSEO.files(pubCfg, pubProjects.filter(p => publicIds.has(String(p.id)))) : [];
+  const keepDirs = new Set(seoFiles.filter(f => /^projets\/[^/]+\/index\.html$/.test(f.path)).map(f => f.path.split('/')[1]));
+  let staleProjectPages = [];
+  try {
+    const listing = await GH.api(token, `/repos/${owner}/${repoName}/contents/projets`);
+    if (Array.isArray(listing)) staleProjectPages = listing.filter(e => e.type === 'dir' && /^[a-z0-9-]+-[A-Za-z0-9_-]+$/.test(e.name) && !keepDirs.has(e.name))
+      .map(e => ({ path: 'projets/' + e.name + '/index.html', delete: true }));
+  } catch { /* 404 : aucune page projet publiée jusqu'ici */ }
+  if (seoFiles.length) onLog?.(`  → SEO : ${keepDirs.size} page(s) projet, plan du site${staleProjectPages.length ? `, ${staleProjectPages.length} ancienne(s) page(s) retirée(s)` : ''}`);
   const commitSha = await GH.commitFiles(token, owner, repoName, [
     { path: 'index.html',       content: siteHTML },
     { path: 'projects.json',    content: JSON.stringify({ version: 1, projects: publicFeed.projects }, null, 2) },
     { path: 'site-config.json', content: JSON.stringify(siteManifest, null, 2) },
     { path: '.nojekyll',        content: '' },
     // SEO : plan du site (avec images des projets) et robots.txt.
-    ...(typeof SiteSEO !== 'undefined' ? SiteSEO.files(pubCfg, publicFeed.projects && publicFeed.projects.length ? pubProjects.filter(p => publicFeed.projects.some(q => String(q.id) === String(p.id))) : []) : []),
+    ...seoFiles, ...staleProjectPages,
   ], 'deploy: ' + new Date().toISOString().slice(0,16).replace('T',' '));
   onLog?.('  → commit ' + commitSha.slice(0, 7) + ' (index.html + config)'); onStep?.('commit', 'done');
 

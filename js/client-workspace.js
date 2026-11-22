@@ -616,11 +616,12 @@
       const last = a.runs[0];
       return `
         <div class="cw-val-h">
-          <span><b>🔍 Validation des rattachements</b>
+          <span><b>🔍 Vérification des dossiers</b>
             <span class="cw-val-sub">${n(a.ws.total)} dossier${a.ws.total > 1 ? 's' : ''} ·
               ${a.inv.total} facture${a.inv.total > 1 ? 's' : ''} · ${a.por.total} portail${a.por.total > 1 ? 's' : ''}</span></span>
           <span class="cw-val-ok ${a.ok ? 'yes' : 'no'}">${a.ok ? '✔ cohérent' : '⚠ à vérifier'}</span>
         </div>
+        ${a.ok ? '<details class="cw-val-more"><summary>Détails techniques</summary>' : ''}
         <div class="cw-val-b">
           <div class="cw-val-li">• ${n(attached)} pièce${attached > 1 ? 's' : ''} rattachée${attached > 1 ? 's' : ''}${viaTxt ? ` <span class="cw-val-via">(${esc(viaTxt)})</span>` : ''}</div>
           ${a.inv.aAttacher + a.por.aAttacher ? `<div class="cw-val-li">• ${n(a.inv.aAttacher + a.por.aAttacher)} à rattacher à la prochaine passe <span class="cw-val-via">(nom de client à dossier unique)</span></div>` : ''}
@@ -635,7 +636,7 @@
           <button class="cw-btn sm" onclick="ClientWorkspace.copyReport()">📋 Copier le rapport</button>
         </div>
         <div class="cw-val-f">${last ? `dernière passe ${window.timeAgo ? timeAgo(last.at) : new Date(last.at).toLocaleString('fr-FR')}` : 'aucune passe enregistrée'} —
-          jointures par nom tolérées jusqu'en v3.9, où <code>workspaceId</code> + <code>refs</code> deviennent la seule voie.</div>`;
+          factures et portails sont reliés à leur dossier client.</div>${a.ok ? '</details>' : ''}`;
     },
     async rerunMigration() {
       const rep = await this.migrate({ force: true });

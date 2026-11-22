@@ -73,3 +73,50 @@ test('the generator uses only visible projects, shown reviews and visible links'
   assert.match(core, /SiteSEO\.head\(cfg, bvVisible, sec\.avis \? approved : \[\], socItems\)/);
   assert.match(core, /SiteSEO\.files\(pubCfg,/, 'sitemap and robots published');
 });
+
+test('one indexable page per project, with readable slugs and its own SEO', () => {
+  assert.equal(SEO.projectSlug({ id: 'p1', title: 'Miniatures | 2026' }), 'miniatures-2026-p1');
+  assert.equal(SEO.projectSlug({ id: 'x', title: 'Identité — Atelier Nova' }), 'identite-atelier-nova-x');
+  assert.equal(SEO.projectSlug({ id: '../../etc', title: 'a' }), 'a-etc', 'id cleaned, no path traversal');
+  assert.equal(SEO.projectSlug({ title: 'sans id' }), '');
+  const ps = [...projects, { id: 'p2', title: 'Identité Nova', cover: 'https://cdn.test/b.webp', sub: 'Logo et charte', preview: { gallery: ['https://cdn.test/g1.png', 'javascript:x'] } }];
+  const files = Object.fromEntries(SEO.files(cfg, ps).map(f => [f.path, f.content]));
+  const page = files['projets/identite-nova-p2/index.html'];
+  assert.ok(page, 'page generated');
+  assert.match(page, /<title>Identité Nova — Souanpt<\/title>/);
+  assert.match(page, /<link rel="canonical" href="https:\/\/souanpt\.github\.io\/site\/projets\/identite-nova-p2\/">/);
+  assert.match(page, /<p class="sub">Logo et charte<\/p>/);
+  assert.match(page, /href="\.\.\/\.\.\/#contact"/, 'contact / quote button');
+  assert.match(page, /href="\.\.\/miniatures-2026-p1\/"/, 'links to the other projects');
+  assert.match(page, /cdn\.test\/g1\.png/); assert.doesNotMatch(page, /javascript:/);
+  assert.match(files['sitemap.xml'], /<loc>https:\/\/souanpt\.github\.io\/site\/projets\/identite-nova-p2\/<\/loc>/);
+  const ld = JSON.parse(SEO.head(cfg, ps, [], []).match(/application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(ld['@graph'].find(n => n['@type'] === 'ItemList').itemListElement[1].item.url, 'https://souanpt.github.io/site/projets/identite-nova-p2/');
+});
+
+test('project pages escape everything', () => {
+  const evil = '</title><script>alert(1)</script>';
+  const page = SEO.projectPage(cfg, { id: 'e1', title: evil, sub: evil, tags: [evil], url: 'javascript:alert(1)' }, []);
+  assert.doesNotMatch(page, /<script>alert/);
+  assert.doesNotMatch(page, /href="javascript:/);
+});
+
+test('publication deletes pages of projects that are no longer public', () => {
+  const core = readFileSync(new URL('../js/core.js', import.meta.url), 'utf8');
+  assert.match(core, /if \(f\.delete\) \{ entries\.push\(\{ path: f\.path, mode: '100644', type: 'blob', sha: null \}\)/);
+  assert.match(core, /contents\/projets`\)/);
+  assert.match(core, /\.\.\.seoFiles, \.\.\.staleProjectPages,/);
+});
+
+test('editor toolbar: grouped menus call existing functions, no long labels left', () => {
+  const app = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
+  for (const m of ['design', 'content', 'reach']) assert.match(app, new RegExp(`id="edm-${m}" role="menu"`));
+  const calls = [...app.matchAll(/EdMenu\.run\('([\w.]+)'/g)].map(x => x[1]);
+  for (const fn of ['edWinTheme', 'edWinBanner', 'edWinBrand', 'edWinFx', 'edWinAmbiance', 'edWinAudio', 'edWinSections', 'edAddBlock', 'edWinTags', 'EdBehance.openSettings', 'edWinSEO', 'edWinHaunt'])
+    assert.ok(calls.includes(fn), fn + ' reachable from a menu');
+  assert.doesNotMatch(app, /<span class="edtb-t"> Son<\/span>|<span class="edtb-t"> Exporter<\/span>/, 'secondary buttons are icon-only');
+  const tb = readFileSync(new URL('../js/editor-toolbar.js', import.meta.url), 'utf8');
+  assert.match(tb, /e\.key === 'Escape'/); assert.match(tb, /ArrowDown/);
+  const amb = readFileSync(new URL('../js/site-ambiance.js', import.meta.url), 'utf8');
+  assert.match(amb, /html\{scrollbar-width:none!important/, 'glowing bar replaces the classic scrollbar');
+});

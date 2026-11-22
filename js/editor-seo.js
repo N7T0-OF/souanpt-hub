@@ -31,7 +31,7 @@
       <input class="edw-in" id="seo-img" type="url" placeholder="https://…" value="${e(s.shareImage)}">
       <div class="edw-row"><button class="edw-sec-rst" id="seo-img-haunt" type="button">👻 Choisir sur haunt.gg</button></div>
       <label class="edw-tog"><input type="checkbox" id="seo-index"${s.index ? ' checked' : ''}> Autoriser Google à indexer le site</label>
-      <p class="edw-hint">Publiés avec le site : balises de titre et de partage, données structurées (toi, tes projets, tes avis validés et leur note), plan du site avec les images des projets, robots.txt. Google affiche les étoiles d'avis à sa discrétion.</p>`;
+      <p class="edw-hint">Publiés avec le site : balises de titre et de partage, données structurées (toi, tes projets, tes avis validés et leur note), une page par projet (projets/…, avec bouton contact), plan du site avec les images, robots.txt. Google affiche les étoiles d'avis à sa discrétion.</p>`;
     EdWin.open(btn, '🔎 Référencement (SEO)', html, w => {
       const v = id => w.querySelector('#' + id);
       const save = () => {

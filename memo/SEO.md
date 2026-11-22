@@ -16,3 +16,11 @@ Textes nettoyés et échappés ; `<` échappé dans le JSON-LD ; seules les imag
 ## Audit
 
 11 vérifications (indexation, adresse, longueur du titre et de la description, métier, ville, image de partage, ≥ 3 projets, tags, avis validés, haunt.gg relié) → score sur 100 et conseils, avec aperçu du résultat Google et de la carte de partage.
+
+## Une page par projet (3.19.0)
+
+Inspiré des plateformes de portfolio (Contra, Behance) : chaque projet visible devient `projets/<titre-sans-accents>-<id>/index.html` (`SiteSEO.projectSlug/projectPath/projectPage`). Page légère et autonome aux couleurs du site : titre, sous-titre (`p.sub`), tags, bouton « ✉ Me contacter / devis » (`../../#contact`), lien Behance/projet, couverture + galerie, liens vers 6 autres projets (maillage interne), bouton retour haunt.gg. SEO propre : titre « projet — nom », description, canonique, Open Graph `article`, JSON-LD `CreativeWork` + `BreadcrumbList`. Le plan du site liste chaque page avec son image ; dans le JSON-LD de l'accueil, la liste des projets pointe vers ces pages.
+
+Publication (`deployPortfolio`) : pages incluses dans le commit (300 max) ; les dossiers `projets/*` qui ne correspondent plus à un projet public sont supprimés dans le même commit (`GH.commitFiles` accepte `{ path, delete: true }` → entrée d'arbre `sha: null`), pour qu'un projet masqué ne reste pas sur Google. Les portails clients gardent `p/<id>/` (dépôt des portails) : pas de collision.
+
+Choix assumé : pas de grandes tuiles-liens en image sur le site, elles existent déjà sur le profil haunt.gg.
