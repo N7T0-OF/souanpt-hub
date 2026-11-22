@@ -514,6 +514,8 @@ window.edSetSectionVisible = edSetSectionVisible;
 function edUpdatePreview() { try{ edPerf(); }catch{} clearTimeout(_edTimer); _edTimer=setTimeout(edRefreshPreview,600); }
 
 async function edRefreshPreview() {
+  // 3.29 : sur téléphone, pas d'aperçu en direct (mémoire) — édition rapide (js/editor-lite.js).
+  if (window.EdLite && EdLite.active()) return;
   const frame=document.getElementById('ed-preview-frame');
   const loading=document.getElementById('ed-preview-loading');
   if (!frame) return;
@@ -830,7 +832,7 @@ function showPage(id) {
   if (id === 'tools') window.Toolbox && Toolbox.render();
   document.querySelector('.scroll-area')?.scrollTo({top:0});
   if(id==='github') setTimeout(()=>GHPage.init(),50);
-  if(id==='editor') { edResetPanels(); edLoad(); setTimeout(edRefreshPreview,100); }
+  if(id==='editor') { edResetPanels(); edLoad(); if (window.EdLite) EdLite.sync(); setTimeout(edRefreshPreview,100); }
   if(id==='overview') { window.Analytics?.refresh(); if(typeof syncKPIs==='function')syncKPIs(); if(typeof renderActivity==='function')renderActivity(); window.QuoteUI?.loadAcceptances?.(); window.Notify?.loadInbox?.(); }
   if(id==='storage')  { window.StorageUI?.init(); window.StorageUI?.render(); }
   if(id==='cp')       { window.CP?.render(); }

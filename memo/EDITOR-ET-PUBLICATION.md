@@ -25,3 +25,7 @@ Le sélecteur ✎ Édition / 👁 Aperçu a disparu : l’aperçu est toujours �
 ## Zones de dépôt (3.28.0)
 
 `js/hub-drop.js` habille tout `<input type="file">` visible (pas `hidden`, pas déjà dans une étiquette) d’une zone « Dépose un fichier ici ou clique pour parcourir » avec formats et taille max (`data-max` en Mo, `data-label`). Le dépôt remplit `input.files` puis déclenche `change` : les gestionnaires existants (envoi du logo, du favicon, de la musique, du son de clic) n’ont pas changé. Fichier refusé si hors `accept`.
+
+## Édition rapide sur téléphone (3.29.0)
+
+Sous 820 px, `edRefreshPreview` ne génère plus l’aperçu (`EdLite.active()`) : l’iframe avec tout le site, ses images et ses effets pesait trop en mémoire sur un téléphone. `js/editor-lite.js` (`EdLite`) affiche à la place une page façon Linktree, en sections repliables : 🔗 Liens (ajout avec détection de la plateforme, modification, ↑↓ = ordre des blocs Lien, retrait avec son bloc), 📁 Projets (＋ Nouveau projet, 🅱 Depuis Behance, liste), 🏷 Tags (créer ; toucher un tag ouvre le gestionnaire), 🎵 Musique & son (lien ou fichier, retirer la musique), ✳ Profil (nom, bio, e-mail). Mêmes données que l’éditeur complet (`hub_links` + `placeBlocks(getBlocks())`, `hub_projects`, `SiteConfig`), publication automatique selon son réglage. « Éditeur complet » le force pour la session (`sessionStorage.hub_ed_full`) ; un aperçu chargé sur grand écran est libéré (`about:blank`) en passant sur petit écran. Mise en page, thème, effets : sur ordinateur.

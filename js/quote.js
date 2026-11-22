@@ -1336,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.29.0', "Téléphone : barre d’onglets flottante en bas (une icône par section), onglets de section en haut, édition rapide du site sans aperçu (liens, projets, tags, musique, profil). Tablette : barre latérale en rail d’icônes."],
   ['3.28.0', "Ajout rapide depuis Behance (tu coches les projets), gestionnaire de tags (projets, présentation barre ou cartes), éditeur en un seul espace (double-clic = ouvrir), dossiers et recommandations selon ton profil dans Outils, zones de dépôt de fichiers."],
   ['3.27.0', "Business plus clair : Projets, Demandes & Devis et Portails réunis dans « Clients & Projets » (onglets, une seule entrée) ; la connexion du téléphone par QR code est activée."],
   ['3.26.0', "Raccourcis vers les projets open source (outils sans envoi, bibliothèques d’interface) dans Outils et la recherche : par défaut, masquables, et tes propres raccourcis."],
