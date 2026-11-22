@@ -18,3 +18,13 @@ Inspiré des outils libres de facturation pour indépendants (Invoice Ninja, Cra
 
 - Tableau de bord : `--green` vaut `var(--accent)` ; les `#2e9a63` fixes sont devenus `var(--green)` ; les toasts « succès » prennent l'accent avec une encre lisible (`showToast`) ; les statuts Terminé/Actif (couleurs combinées à une opacité hexadécimale) lisent l'accent via `hubAccentHex()`.
 - Pages vues par le client (devis en ligne `functions/estimate`, formulaire de demande `functions/request`) : l'accent du site est enregistré dans le document à sa création (`accent`, déjà public) et appliqué par `accentVars()` (accent, encre WCAG, teintes). Les anciens liens sans `accent` gardent le citron.
+
+## Compléments 3.21.0
+
+- **Dépenses** (`hub_expenses`, registre `HubData` `sync: null` → sauvegarde GitHub privée uniquement) : libellé, montant (virgule acceptée, arrondi au centime), date, catégorie (Logiciels & abonnements, Matériel, Formation, Déplacements, Publicité, Frais bancaires, Sous-traitance, Autre). Entrée refusée sans libellé ou montant positif. « ＋ Dépense » dans le tableau de bord, la recherche globale ou la fiche.
+- **Périodes** : Ce mois, Ce trimestre, Cette année (défaut), 12 mois, Personnalisé (du… au…, bornes incluses) ; choix mémorisé sur l'appareil (`hub_biz_period`). Indicateurs de la période : Encaissé (date d'encaissement), Dépenses, **Résultat** (encaissé − dépenses, arrondi au centime) ; « À encaisser » reste global (dont en retard). Graphique 12 mois : encaissements (accent) + dépenses (gris).
+- **Meilleurs clients** de la période (5) avec étiquette « récurrent » (≥ 2 factures non annulées au total) ; liste des dernières dépenses (suppression confirmée).
+- **Rapport CSV** de la période (résumé, encaissements, dépenses ; séparateur « ; », décimales à virgule, BOM pour Excel).
+- **Dossier client → facture** (`Biz.fromWorkspace`) : dans le dossier, « Facturer · reste » (mission − déjà facturé, factures annulées exclues) ou « Acompte X % » (portail, si rien n'est encore facturé). Le formulaire est prérempli (projet, client, montant, rappel du dossier) ; à l'ajout, la facture est rattachée **au dossier par son jeton** (`Biz.consumeWorkspace` → `ClientWorkspace.attach`), sans proposer de portail. « Annuler » oublie le dossier (aucun rattachement fantôme).
+- **Fiche client** (Annuaire) : « X € réglés · N en retard » dans le résumé ; section Facturation (réglé, à encaisser, en retard, 3 dernières factures) et bouton « + Facture » prérempli.
+- La recherche de la page Facturation trouve aussi les numéros (FA-…).

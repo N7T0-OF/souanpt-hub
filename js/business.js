@@ -143,7 +143,8 @@ ${s.b2b ? '<p>En cas de retard de paiement : pénalités au taux de trois fois l
       const months = [];
       for (let k = 11; k >= 0; k--) {
         const md = new Date(y, m - k, 1), next = new Date(y, m - k + 1, 1);
-        months.push({ label: md.toLocaleDateString('fr-FR', { month: 'short' }), total: sum(paid.filter(i => paidAt(i) >= +md && paidAt(i) < +next)) });
+        months.push({ label: md.toLocaleDateString('fr-FR', { month: 'short' }), total: sum(paid.filter(i => paidAt(i) >= +md && paidAt(i) < +next)),
+          spent: this.expenses().filter(x => Number(x.date) >= +md && Number(x.date) < +next).reduce((n, x) => n + (Number(x.amount) || 0), 0) });
       }
       const open = list.filter(i => this.isOpen(i)), late = open.filter(i => this.isLate(i));
       const year = sum(paid.filter(i => new Date(paidAt(i)).getFullYear() === y));
@@ -152,21 +153,180 @@ ${s.b2b ? '<p>En cas de retard de paiement : pénalités au taux de trois fois l
         late: sum(late), lateCount: late.length, months, ceiling: this.get().ceiling,
       };
     },
+    /* ── Dépenses (3.21, inspiré d'Akaunting / Crater) : hub_expenses ── */
+    EXP_CATS: ['Logiciels & abonnements', 'Matériel', 'Formation', 'Déplacements', 'Publicité', 'Frais bancaires', 'Sous-traitance', 'Autre'],
+    expenses() { const v = readJSON('hub_expenses', []); return Array.isArray(v) ? v.filter(x => x && Number(x.amount) > 0) : []; },
+    saveExpenses(list) { localStorage.setItem('hub_expenses', JSON.stringify(list)); },
+    addExpense(x) {
+      const amount = Math.round((Number(String(x.amount).replace(',', '.')) || 0) * 100) / 100;
+      const label = String(x.label || '').trim().slice(0, 120);
+      if (!label || !(amount > 0)) return null;
+      const date = Number(x.date) || Date.now();
+      const item = { id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), label, amount, date,
+        category: this.EXP_CATS.includes(x.category) ? x.category : 'Autre', createdAt: Date.now() };
+      const list = this.expenses(); list.push(item); this.saveExpenses(list);
+      return item;
+    },
+    removeExpense(id) { this.saveExpenses(this.expenses().filter(x => x.id !== id)); },
+
+    /* ── Périodes ── */
+    PERIODS: [['month', 'Ce mois'], ['quarter', 'Ce trimestre'], ['year', 'Cette année'], ['12m', '12 mois'], ['custom', 'Personnalisé']],
+    period() { try { const p = JSON.parse(localStorage.getItem('hub_biz_period') || '{}'); return p && p.k ? p : { k: 'year' }; } catch { return { k: 'year' }; } },
+    setPeriod(k, from, to) { try { localStorage.setItem('hub_biz_period', JSON.stringify({ k, from, to })); } catch {} this.renderDash(); },
+    range(p, now) {
+      const d = new Date(now || Date.now()), y = d.getFullYear(), m = d.getMonth();
+      if (p.k === 'month') return [+new Date(y, m, 1), +new Date(y, m + 1, 1)];
+      if (p.k === 'quarter') { const q = Math.floor(m / 3) * 3; return [+new Date(y, q, 1), +new Date(y, q + 3, 1)]; }
+      if (p.k === '12m') return [+new Date(y, m - 11, 1), +new Date(y, m + 1, 1)];
+      if (p.k === 'custom' && p.from && p.to) { const a = Date.parse(p.from), b = Date.parse(p.to); if (a && b && b >= a) return [a, b + DAY]; }
+      return [+new Date(y, 0, 1), +new Date(y + 1, 0, 1)];
+    },
+    periodStats(p, now) {
+      const [from, to] = this.range(p || this.period(), now);
+      const inP = t => t >= from && t < to;
+      const paid = this.invoices().filter(i => i.status === 'paid' && inP(Number(i.paidAt) || Number(i.createdAt) || 0));
+      const exps = this.expenses().filter(x => inP(Number(x.date) || 0));
+      const sum = (a, f) => a.reduce((n, x) => n + (Number(x[f]) || 0), 0);
+      const cents = n => Math.round(n * 100) / 100;   // 29,99 + 10 = 39,99 (pas 39,989999…)
+      const income = cents(sum(paid, 'price')), spent = cents(sum(exps, 'amount'));
+      const byClient = new Map();
+      paid.forEach(i => { const k = String(i.client || '').trim() || '—'; const c = byClient.get(k) || { name: k, total: 0, n: 0 }; c.total += Number(i.price) || 0; c.n++; byClient.set(k, c); });
+      const allByClient = new Map(); this.invoices().filter(i => i.status !== 'cancelled').forEach(i => { const k = String(i.client || '').trim(); if (k) allByClient.set(k, (allByClient.get(k) || 0) + 1); });
+      const top = [...byClient.values()].sort((a, b) => b.total - a.total).slice(0, 5).map(c => ({ ...c, recurring: (allByClient.get(c.name) || 0) >= 2 }));
+      const cats = {}; exps.forEach(x => { cats[x.category] = (cats[x.category] || 0) + (Number(x.amount) || 0); });
+      return { from, to, income, spent, result: Math.round((income - spent) * 100) / 100, paidCount: paid.length, expenses: exps, paid, top, cats };
+    },
+
     renderDash() {
       const box = document.getElementById('biz-dash'); if (!box) return;
-      const st = this.stats(), max = Math.max(1, ...st.months.map(x => x.total));
+      const st = this.stats(), p = this.period(), ps = this.periodStats(p);
+      const max = Math.max(1, ...st.months.map(x => Math.max(x.total, x.spent || 0)));
       const pct = st.ceiling ? Math.min(100, Math.round(st.year / st.ceiling * 100)) : 0;
       const s = this.get();
+      const dIso = t => new Date(t).toISOString().slice(0, 10);
       box.innerHTML = `
+        <div class="biz-d-bar1"><div class="biz-d-per" role="tablist" aria-label="Période">${this.PERIODS.map(([k, l]) => `<button type="button" role="tab" aria-selected="${p.k === k}" class="${p.k === k ? 'on' : ''}" onclick="Biz.setPeriod('${k}')">${l}</button>`).join('')}</div>
+          ${p.k === 'custom' ? `<span class="biz-d-cus"><input type="date" class="prop-input" id="biz-from" value="${e(p.from || dIso(ps.from))}"> → <input type="date" class="prop-input" id="biz-to" value="${e(p.to || dIso(ps.to - DAY))}"> <button class="btn btn-ghost" style="font-size:10px" onclick="Biz.setPeriod('custom',document.getElementById('biz-from').value,document.getElementById('biz-to').value)">OK</button></span>` : ''}
+          <span class="biz-d-sp"></span><button class="btn btn-ghost" style="font-size:10px" onclick="Biz.openExpense()">＋ Dépense</button><button class="btn btn-ghost" style="font-size:10px" onclick="Biz.exportReport()" title="Rapport CSV de la période (encaissements + dépenses)">⬇ Rapport</button></div>
         <div class="biz-d-kpis">
-          <div><span>Encaissé ce mois</span><b>${eur(st.month)}</b></div>
-          <div><span>Encaissé ${new Date().getFullYear()}</span><b>${eur(st.year)}</b></div>
-          <div><span>En attente</span><b>${eur(st.pending)}</b><small>${st.pendingCount} prestation${st.pendingCount > 1 ? 's' : ''}</small></div>
-          <div class="${st.lateCount ? 'is-late' : ''}"><span>En retard</span><b>${eur(st.late)}</b><small>${st.lateCount ? st.lateCount + ' à relancer' : 'aucune'}</small></div>
+          <div><span>Encaissé</span><b>${eur(ps.income)}</b><small>${ps.paidCount} paiement${ps.paidCount > 1 ? 's' : ''}</small></div>
+          <div><span>Dépenses</span><b>${eur(ps.spent)}</b><small>${ps.expenses.length} ligne${ps.expenses.length > 1 ? 's' : ''}</small></div>
+          <div class="${ps.result < 0 ? 'is-late' : 'is-good'}"><span>Résultat</span><b>${eur(ps.result)}</b><small>encaissé − dépenses</small></div>
+          <div class="${st.lateCount ? 'is-late' : ''}"><span>À encaisser</span><b>${eur(st.pending)}</b><small>${st.lateCount ? st.lateCount + ' en retard · ' + eur(st.late) : st.pendingCount + ' en attente'}</small></div>
         </div>
-        <div class="biz-d-chart" role="img" aria-label="Encaissements des 12 derniers mois">${st.months.map(x => `<div class="biz-d-col" title="${e(x.label)} : ${eur(x.total)}"><i style="height:${Math.round(x.total / max * 100)}%"></i><span>${e(x.label.replace('.', ''))}</span></div>`).join('')}</div>
-        ${st.ceiling ? `<div class="biz-d-ceil"><div class="biz-d-ceil-h"><span>Plafond micro-entreprise</span><span>${eur(st.year)} / ${eur(st.ceiling)} · ${pct} %</span></div><div class="biz-d-bar"><i style="width:${pct}%;${pct >= 90 ? 'background:var(--red)' : ''}"></i></div></div>` : ''}
+        <div class="biz-d-chart" role="img" aria-label="Encaissements et dépenses des 12 derniers mois">${st.months.map(x => `<div class="biz-d-col" title="${e(x.label)} : encaissé ${eur(x.total)}${x.spent ? ' · dépenses ' + eur(x.spent) : ''}"><span class="biz-d-pair"><i style="height:${Math.round(x.total / max * 100)}%"></i>${x.spent ? `<i class="sp" style="height:${Math.round(x.spent / max * 100)}%"></i>` : ''}</span><span>${e(x.label.replace('.', ''))}</span></div>`).join('')}</div>
+        <div class="biz-d-two">
+          <div><div class="biz-d-h">Meilleurs clients <small>sur la période</small></div>${ps.top.length ? ps.top.map(c => `<div class="biz-d-li"><span>${e(c.name)}${c.recurring ? ' <em class="biz-rec">récurrent</em>' : ''}</span><b>${eur(c.total)}</b><small>${c.n} paiement${c.n > 1 ? 's' : ''}</small></div>`).join('') : '<p class="biz-d-none">Aucun encaissement sur la période.</p>'}</div>
+          <div><div class="biz-d-h">Dépenses <small>sur la période</small></div>${ps.expenses.length ? ps.expenses.slice().sort((a, b) => b.date - a.date).slice(0, 6).map(x => `<div class="biz-d-li"><span>${e(x.label)} <em>${e(x.category)}</em></span><b>${eur(x.amount)}</b><small>${fr(x.date)} <button type="button" class="biz-x" onclick="if(confirm('Supprimer cette dépense ?')){Biz.removeExpense('${e(x.id)}');Biz.renderDash()}" aria-label="Supprimer la dépense">✕</button></small></div>`).join('') + (ps.expenses.length > 6 ? `<p class="biz-d-none">+ ${ps.expenses.length - 6} autre(s) dans le rapport</p>` : '') : '<p class="biz-d-none">Aucune dépense. <button type="button" class="biz-link" onclick="Biz.openExpense()">En ajouter une</button></p>'}</div>
+        </div>
+        ${st.ceiling ? `<div class="biz-d-ceil"><div class="biz-d-ceil-h"><span>Plafond micro-entreprise ${new Date().getFullYear()}</span><span>${eur(st.year)} / ${eur(st.ceiling)} · ${pct} %</span></div><div class="biz-d-bar"><i style="width:${pct}%;${pct >= 90 ? 'background:var(--red)' : ''}"></i></div></div>` : ''}
         ${!s.name ? '<div class="biz-d-warn">⚠ Ajoute tes informations de facturation pour générer des factures. <button class="btn btn-ghost" style="font-size:10px" onclick="Biz.openSettings()">Compléter</button></div>' : ''}`;
+    },
+
+    openExpense() {
+      document.getElementById('biz-modal')?.remove();
+      const box = document.createElement('div'); box.id = 'biz-modal'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+      box.innerHTML = `<div class="biz-card"><div class="biz-card-h"><b>📉 Nouvelle dépense</b><button class="btn btn-ghost" data-x aria-label="Fermer">✕</button></div>
+        <label class="biz-f"><span>Libellé *</span><input class="prop-input" id="bx-label" maxlength="120" placeholder="Abonnement Adobe, tablette…"></label>
+        <div class="biz-row"><label class="biz-f"><span>Montant (€) *</span><input class="prop-input" id="bx-amount" inputmode="decimal" placeholder="29,99"></label>
+          <label class="biz-f"><span>Date</span><input class="prop-input" id="bx-date" type="date" value="${new Date().toISOString().slice(0, 10)}"></label></div>
+        <label class="biz-f"><span>Catégorie</span><select class="prop-input" id="bx-cat">${this.EXP_CATS.map(c => `<option>${e(c)}</option>`).join('')}</select></label>
+        <div class="biz-card-f"><button class="btn btn-accent" data-ok>Ajouter</button></div></div>`;
+      document.body.appendChild(box);
+      const v = id => box.querySelector('#bx-' + id);
+      const close = () => box.remove();
+      box.querySelector('[data-x]').onclick = close;
+      box.addEventListener('click', ev => { if (ev.target === box) close(); });
+      box.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') box.querySelector('[data-ok]').click(); });
+      box.querySelector('[data-ok]').onclick = () => {
+        const it = this.addExpense({ label: v('label').value, amount: v('amount').value, date: Date.parse(v('date').value) || Date.now(), category: v('cat').value });
+        if (!it) return showToast?.('Libellé et montant positif requis', '#c0392b', 2500);
+        close(); this.renderDash(); showToast?.('Dépense ajoutée ✓', 'var(--green)', 1800);
+      };
+      setTimeout(() => v('label').focus(), 30);
+    },
+
+    /** Rapport CSV de la période : résumé, encaissements, dépenses (Excel, « ; »). */
+    reportCSV(p) {
+      const ps = this.periodStats(p || this.period());
+      const d = t => new Date(t).toLocaleDateString('fr-FR'), n = x => String(Math.round((Number(x) || 0) * 100) / 100).replace('.', ',');
+      const rows = [
+        ['Rapport', 'Du ' + d(ps.from), 'au ' + d(ps.to - DAY)],
+        ['Encaissé', n(ps.income)], ['Dépenses', n(ps.spent)], ['Résultat', n(ps.result)], [],
+        ['Encaissements'], ['Numéro', 'Date d\'encaissement', 'Client', 'Prestation', 'Montant'],
+        ...ps.paid.map(i => [i.number || '', d(Number(i.paidAt) || Number(i.createdAt)), i.client || '', i.name || '', n(i.price)]), [],
+        ['Dépenses'], ['Date', 'Catégorie', 'Libellé', 'Montant'],
+        ...ps.expenses.map(x => [d(x.date), x.category, x.label, n(x.amount)]),
+      ];
+      return '﻿' + rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+    },
+    exportReport() {
+      const blob = new Blob([this.reportCSV()], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'rapport-souanpt-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      showToast?.('Rapport CSV téléchargé ✓', 'var(--green)', 2200);
+    },
+
+    /* ── Dossier client → facture, sans ressaisie (3.21) ──
+       mode 'balance' : reste à facturer (mission − déjà facturé) ;
+       mode 'deposit' : acompte du portail (%). Le formulaire est prérempli,
+       l'utilisateur valide ; la facture est rattachée AU dossier (jeton),
+       jamais par simple correspondance de nom. */
+    workspaceAmounts(token) {
+      const ws = (readJSON('hub_workspaces', []) || []).find(w => w && w.token === token); if (!ws) return null;
+      const por = (readJSON('hub_portals', []) || []).find(p => p && (p.id === token || p.workspaceId === token)) || null;
+      const inv = this.invoices().filter(i => i.workspaceId === token && i.status !== 'cancelled');
+      const invoiced = inv.reduce((n, i) => n + (Number(i.price) || 0), 0);
+      const mission = Number(por && por.total) || Number(ws.total) || 0;
+      const pct = Math.max(0, Math.min(100, Number(por && por.acomptePct) || 0));
+      return { ws, mission, invoiced, balance: Math.max(0, mission - invoiced), pct, deposit: pct ? Math.round(mission * pct) / 100 : 0 };
+    },
+    fromWorkspace(token, mode) {
+      const a = this.workspaceAmounts(token); if (!a) return showToast?.('Dossier introuvable', '#c0392b', 2500);
+      const deposit = mode === 'deposit' && a.deposit > 0;
+      const name = (a.ws.projectName || 'Prestation') + (deposit ? ' — acompte ' + a.pct + ' %' : (a.invoiced > 0 ? ' — solde' : ''));
+      const price = deposit ? a.deposit : (a.balance || a.mission || '');
+      window._invFromWorkspace = token;
+      try { window.ClientWorkspace && ClientWorkspace.close(); } catch {}
+      if (typeof showPage === 'function') showPage('facturation');
+      setTimeout(() => {
+        try { window.toggleForm && toggleForm('add-inv-form', true); } catch {}
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        set('inv-name', name); set('inv-client', a.ws.clientName || ''); set('inv-price', price);
+        const h = document.getElementById('inv-price-hint');
+        if (h) h.textContent = '📁 Dossier « ' + (a.ws.projectName || 'projet') + ' » — mission ' + eur(a.mission) + (a.invoiced ? ', déjà facturé ' + eur(a.invoiced) : '');
+        document.getElementById('inv-price')?.focus();
+      }, 160);
+    },
+    /** Fiche client : ce qu'il a réglé, ce qu'il doit, ses dernières factures (3.21). */
+    clientSummary(name) {
+      const k = String(name || '').trim().toLowerCase(); if (!k) return null;
+      const list = this.invoices().filter(i => i.status !== 'cancelled' && String(i.client || '').trim().toLowerCase() === k);
+      const sum = a => a.reduce((n, i) => n + (Number(i.price) || 0), 0);
+      const open = list.filter(i => this.isOpen(i)), late = open.filter(i => this.isLate(i));
+      return { count: list.length, paid: sum(list.filter(i => i.status === 'paid')), open: sum(open), late: sum(late), lateCount: late.length,
+        last: list.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 3) };
+    },
+    clientBlock(name) {
+      const s = this.clientSummary(name); if (!s) return '';
+      const st = i => i.status === 'paid' ? 'Payée' : this.isLate(i) ? 'En retard' : i.status === 'acompte' ? 'Acompte' : 'En attente';
+      return `<h4>Facturation (${s.count})</h4>`
+        + (s.count ? `<div class="client-biz"><span>Réglé <b>${eur(s.paid)}</b></span><span>À encaisser <b>${eur(s.open)}</b></span>${s.lateCount ? `<span class="late">En retard <b>${eur(s.late)}</b></span>` : ''}</div>`
+          + s.last.map(i => `<div class="client-item">${i.number ? `<span style="color:var(--muted2);font-size:9px">${e(i.number)}</span> ` : ''}<b>${e(i.name)}</b> · ${eur(i.price)} · <span style="color:${i.status === 'paid' ? 'var(--accent)' : this.isLate(i) ? 'var(--red)' : 'var(--muted2)'}">${st(i)}</span></div>`).join('')
+          : '<div class="client-sub">Aucune facture.</div>');
+    },
+    newForClient(name) {
+      window._invFromWorkspace = null;
+      if (typeof showPage === 'function') showPage('facturation');
+      setTimeout(() => { try { window.toggleForm && toggleForm('add-inv-form', true); } catch {} const c = document.getElementById('inv-client'); if (c) c.value = name || ''; document.getElementById('inv-name')?.focus(); }, 160);
+    },
+
+    /** Appelé par addInvoice : rattache la facture au dossier d'origine. */
+    consumeWorkspace(inv) {
+      const token = window._invFromWorkspace; window._invFromWorkspace = null;
+      if (!token || !inv || !window.ClientWorkspace) return false;
+      try { return ClientWorkspace.attach(inv.id, token, 'invoice'); } catch { return false; }
     },
 
     /* ── Vue d'ensemble : ce qui attend une action, toutes pages confondues ── */

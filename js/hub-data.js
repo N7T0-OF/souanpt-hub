@@ -71,6 +71,8 @@ const HubData = {
     // Informations de facturation (3.20, js/business.js) : sauvegarde GitHub
     // privée uniquement — SIRET/IBAN n'ont rien à faire dans un miroir temps réel.
     { key: 'business',  ls: 'hub_business',     file: 'business.json',  sync: null,        type: 'raw' },
+    // Dépenses (3.21, js/business.js) : sauvegarde GitHub privée, pas de miroir Firestore.
+    { key: 'expenses',  ls: 'hub_expenses',     file: 'expenses.json',  sync: null,        type: 'array' },
     // La config du site est poussée vers Firestore par pushConfig() dans un
     // champ `cfg` (pas `items`) : `mirror:false` évite de la traiter 2 fois.
     { key: 'config',    ls: 'souanpt_site_cfg', file: 'config.json',    sync: 'config',    mirror: 'cfg', type: 'raw' },

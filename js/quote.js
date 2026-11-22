@@ -1336,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.21.0', "Recherche globale Ctrl+K (clients, dossiers, factures, projets, actions) ; dossier client → facture préremplie ; dépenses, périodes, résultat, meilleurs clients et rapport CSV ; fiche client avec réglé / à encaisser ; navigation mobile en tiroir."],
   ['3.20.0', "Facturation complète : numéros FA-AAAA-NNN, facture PDF aux mentions légales, échéances et relances, tableau du chiffre d’affaires, « À traiter » ; couleur du site partout (fini le vert fixe, y compris pages devis client) ; éditeur allégé."],
   ['3.19.0', "Une page Google par projet (avec bouton contact/devis), barre de l’éditeur regroupée en menus Design · Contenu · Visibilité, en-têtes sans chevauchement, une seule barre de défilement avec la barre lumineuse."],
   ['3.18.0', "Référencement Google complet (titre, partage, données structurées, avis, plan du site) avec score SEO ; site relié au profil haunt.gg (bouton retour, liens Folio/Contact) ; stats de visite retirées (lues sur haunt.gg)."],

@@ -107,6 +107,10 @@
         { id: 'demo-i3', number: 'FA-2026-003', name: 'Charte graphique', client: 'Atelier Nova', price: 1200, status: 'acompte', createdAt: t - 5 * day, dueAt: t + 25 * day },
         { id: 'demo-i4', number: 'FA-2026-004', name: 'Bannière Twitch', client: 'Camille Martin', price: 180, status: 'pending', createdAt: t - 40 * day, dueAt: t - 10 * day },
       ]; })(),
+      hub_expenses: (() => { const t = Date.now(); return [
+        { id: 'demo-e1', label: 'Abonnement logiciel de retouche', amount: 26.99, category: 'Logiciels & abonnements', date: t - 3 * day },
+        { id: 'demo-e2', label: 'Tablette graphique', amount: 189, category: 'Matériel', date: t - 50 * day },
+      ]; })(),
       hub_business: { name: 'Souanpt (démo)', siret: '000 000 000 00000', address: '1 rue de la Démo\n69000 Lyon', email: 'demo@example.com', terms: 30, ceiling: 77700, b2b: true, seq: { 2026: 4 } },
       hub_estimates: [], hub_portals: [], hub_catalog: [], hub_links: [],
       hub_media: [], hub_files: [], hub_pricing: {}, hub_ws_runs: [],

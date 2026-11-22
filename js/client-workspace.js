@@ -761,7 +761,7 @@
         ${this._sec('Demande', '📥', req, `<button class="cw-sec-a" onclick="ClientWorkspace.newRequest()">+ Lien</button>`)}
         ${this._sec('Devis', '📄', est, `<button class="cw-sec-a" onclick="ClientWorkspace.go('devis')">Ouvrir</button>`)}
         ${this._sec('Mission / Portail', '🚀', portal, `<button class="cw-sec-a" onclick="ClientWorkspace.editPortal('${esc(d.portal ? d.portal.id : '')}')">${d.portal ? 'Modifier' : 'Créer'}</button>`)}
-        ${this._sec('Facturation', '💶', inv + cand, `<button class="cw-sec-a" onclick="ClientWorkspace.go('facturation', true)">+ Facture</button>`)}
+        ${this._sec('Facturation', '💶', inv + cand, this._billActions(w.token, d))}
         ${this._sec('Livraison', '✅', deliv, `<button class="cw-sec-a" onclick="ClientWorkspace.go('portals')">Portail</button>`)}
 
         <footer class="cw-foot">
@@ -776,6 +776,15 @@
     /* ── actions du dossier ─────────────────────────────────────────────── */
     copyLink(t) { window.CP ? CP.copyLink(t) : navigator.clipboard?.writeText(location.origin + '/c/' + t); },
     showLink(t) { window.CP ? CP.openLink(t) : window.open(location.origin + '/c/' + t, '_blank'); },
+    /** Boutons de facturation du dossier : solde prérempli, acompte du portail (3.21). */
+    _billActions(token, d) {
+      const t = esc(token), m = d.totals || {};
+      const pct = Number(d.portal && d.portal.acomptePct) || 0;
+      const left = Math.max(0, (m.mission || 0) - (m.invoiced || 0));
+      if (!window.Biz) return `<button class="cw-sec-a" onclick="ClientWorkspace.go('facturation', true)">+ Facture</button>`;
+      return (pct && !m.invoiced && m.mission ? `<button class="cw-sec-a" onclick="Biz.fromWorkspace('${t}','deposit')" title="Facture d'acompte préremplie">Acompte ${pct} %</button> ` : '')
+        + `<button class="cw-sec-a" onclick="Biz.fromWorkspace('${t}','balance')" title="Facture préremplie : client, projet, montant restant">${m.mission ? (m.invoiced ? 'Facturer le solde' : 'Facturer') + (left ? ' · ' + this._money(left) : '') : '+ Facture'}</button>`;
+    },
     go(page, openForm) {
       this.close();
       window.showPage?.(page);

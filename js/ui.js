@@ -105,7 +105,12 @@ const GHPage = {
       setTimeout(() => autoBackup({ force: true }), 3000);
       setInterval(autoBackup, 5*60*1000);
       setTimeout(() => fetchVisitorReviews(true), 4000);
-      setInterval(() => fetchVisitorReviews(true), 5*60*1000);
+      // 3.21 : pas de relevé quand l'onglet est caché (quota, batterie) ; relevé au retour.
+      setInterval(() => { if (!document.hidden) fetchVisitorReviews(true); }, 5*60*1000);
+      let lastShow = Date.now();
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && Date.now() - lastShow > 5*60*1000) { lastShow = Date.now(); fetchVisitorReviews(true); }
+      });
     }
     // Bubble
     BubbleWidget?.init?.();
