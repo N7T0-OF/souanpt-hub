@@ -34,6 +34,7 @@
     { ic: '🚀', t: 'Publier le site', k: 'publier deployer mettre en ligne site', run: () => window.edDeploy && edDeploy() },
     { ic: '↻', t: 'Synchroniser Behance', k: 'behance sync importer projets rss', run: () => window.syncBehance && syncBehance() },
     { ic: '🧾', t: 'Mes infos de facturation', k: 'siret adresse mentions iban facturation reglages', run: () => { page('facturation'); later(() => window.Biz && Biz.openSettings(), 150); } },
+    { ic: '🧾', t: 'Facture détaillée (plusieurs lignes)', k: 'facture lignes quantite modele devis', run: () => { page('facturation'); later(() => window.Biz && Biz.newDetailed(), 150); } },
     { ic: '📉', t: 'Ajouter une dépense', k: 'depense charge achat frais', run: () => { page('facturation'); later(() => window.Biz && Biz.openExpense && Biz.openExpense(), 150); } },
     { ic: '🔎', t: 'Référencement (SEO)', k: 'seo google referencement partage', run: () => { page('editor'); later(() => window.edWinSEO && edWinSEO(), 500); } },
     { ic: '👻', t: 'Relier haunt.gg', k: 'haunt profil liens folio', run: () => { page('editor'); later(() => window.edWinHaunt && edWinHaunt(), 500); } },

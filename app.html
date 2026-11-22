@@ -294,7 +294,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
 /* ── INVOICES ── */
 .fac-row{
-  display:grid;grid-template-columns:2fr 1fr 80px 80px 84px 96px;
+  display:grid;grid-template-columns:2fr 1fr 80px 80px 84px 120px;
   gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);font-size:10px;
 }
 /* Sous ~760 px, la tableau se replie sur deux colonnes au lieu d'écraser les
@@ -708,6 +708,13 @@ html.hub-calm *,html.hub-calm *::before,html.hub-calm *::after{animation-duratio
 .pair-msg{font-size:11px;color:var(--muted2);line-height:1.6;margin:8px 0}.pair-msg b{color:var(--text)}.pair-msg.bad,.pair-msg .bad{color:var(--red)}
 .pair-act{display:flex;gap:8px;justify-content:center;margin-top:10px}.pair-act .btn{font-size:11px}
 .pair-big{font-size:38px;margin-bottom:6px}#pair-phone b{display:block;font-size:14px;margin-bottom:4px}
+#biz-modal .biz-card-w{width:min(680px,100%)}
+.be-lines{border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-top:6px}
+.be-lh,.be-row{display:grid;grid-template-columns:1fr 64px 92px 84px 22px;gap:6px;align-items:center;padding:6px 8px}
+.be-lh{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);background:var(--s2);font-weight:700}
+.be-row{border-top:1px solid var(--border)}.be-row .prop-input{font-size:11px;padding:6px 8px}.be-lt{font-size:10px;text-align:right;color:var(--muted2)}
+.be-total{font-size:13px}
+@media(max-width:600px){.be-lh{display:none}.be-row{grid-template-columns:1fr 1fr;}.be-row [data-k=label]{grid-column:1/-1}.be-lt{text-align:left}}
 #hp-modal{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
 #hp-modal .hp-card{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border2);border-radius:12px;box-shadow:0 20px 60px #000a}
 #hp-modal .hp-head,#hp-modal .hp-foot{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:12px}
@@ -1897,6 +1904,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
         <input class="prop-input" id="inv-search" placeholder="🔍 Rechercher…" style="width:180px;font-size:10px" oninput="_invPage=1;renderInvoices()">
         <button class="btn btn-ghost" style="font-size:10px" onclick="Biz.openSettings()" title="Nom, SIRET, adresse, mentions, délai de paiement">⚙ Mes infos</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="exportInvoicesCSV()" title="Exporter en CSV (Excel)">⬇ CSV</button>
+        <button class="btn btn-ghost" style="font-size:10px" onclick="Biz.newDetailed()" title="Plusieurs lignes, quantités, modèles">🧾 Facture détaillée</button>
         <button class="btn btn-accent" style="font-size:10px" onclick="toggleForm('add-inv-form')">+ Prestation</button>
       </div>
       <div class="biz-kpis">
@@ -3374,7 +3382,7 @@ function renderInvoices() {
       const st=INV_STATUS[i.status]||INV_STATUS.pending;
       const late=window.Biz ? Biz.isLate(i) : ((i.status==='pending'||i.status==='acompte') && (Date.now()-(i.createdAt||0))>14*86400000);
       const due=window.Biz ? Biz.dueAt(i) : 0;
-      return `<div class="fac-row"><div class="fac-name">${i.number?'<span class="fac-num">'+esc(i.number)+'</span> ':''}${esc(i.name)}${late?' <span style="color:var(--red);font-size:8px;font-weight:700">· EN RETARD</span>':''}${i.reminders?' <span class="fac-rem" title="Dernière relance le '+new Date(i.remindedAt).toLocaleDateString('fr-FR')+'">relancée ×'+i.reminders+'</span>':''}</div><div class="fac-client">${esc(i.client||'—')}</div><div class="fac-price">${(i.price||0).toLocaleString('fr')} €</div><div class="fac-date" title="Échéance : ${due?new Date(due).toLocaleDateString('fr-FR'):'—'}">${new Date(i.createdAt).toLocaleDateString('fr-FR')}${due&&i.status!=='paid'&&i.status!=='cancelled'?'<small>éch. '+new Date(due).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})+'</small>':''}</div><div class="fac-status ${st.cls}" onclick="toggleInvStatus('${i.id}')" style="cursor:pointer" title="Cliquer : En attente → Acompte → Payée → Annulée">${st.label}</div><div class="fac-act"><button onclick="Biz.print('${i.id}')" title="Facture PDF (imprimer)" aria-label="Facture PDF">🧾</button>${(i.status==='pending'||i.status==='acompte')?`<button onclick="Biz.remind('${i.id}')" title="${late?'Relancer le client (e-mail pré-rédigé)':'Envoyer un rappel'}" aria-label="Relancer">✉</button>`:''}<button onclick="Biz.duplicate('${i.id}')" title="Dupliquer" aria-label="Dupliquer">⧉</button><button onclick="if(confirm('Supprimer cette prestation ?'))deleteInv('${i.id}')" title="Supprimer" aria-label="Supprimer">✕</button></div></div>`;
+      return `<div class="fac-row"><div class="fac-name">${i.number?'<span class="fac-num">'+esc(i.number)+'</span> ':''}${esc(i.name)}${late?' <span style="color:var(--red);font-size:8px;font-weight:700">· EN RETARD</span>':''}${i.reminders?' <span class="fac-rem" title="Dernière relance le '+new Date(i.remindedAt).toLocaleDateString('fr-FR')+'">relancée ×'+i.reminders+'</span>':''}</div><div class="fac-client">${esc(i.client||'—')}</div><div class="fac-price">${(i.price||0).toLocaleString('fr')} €</div><div class="fac-date" title="Échéance : ${due?new Date(due).toLocaleDateString('fr-FR'):'—'}">${new Date(i.createdAt).toLocaleDateString('fr-FR')}${due&&i.status!=='paid'&&i.status!=='cancelled'?'<small>éch. '+new Date(due).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})+'</small>':''}</div><div class="fac-status ${st.cls}" onclick="toggleInvStatus('${i.id}')" style="cursor:pointer" title="Cliquer : En attente → Acompte → Payée → Annulée">${st.label}</div><div class="fac-act"><button onclick="Biz.editInvoice('${i.id}')" title="Modifier : lignes, dates, note" aria-label="Modifier">✎</button><button onclick="Biz.print('${i.id}')" title="Facture PDF (imprimer)" aria-label="Facture PDF">🧾</button>${(i.status==='pending'||i.status==='acompte')?`<button onclick="Biz.remind('${i.id}')" title="${late?'Relancer le client (e-mail pré-rédigé)':'Envoyer un rappel'}" aria-label="Relancer">✉</button>`:''}<button onclick="Biz.duplicate('${i.id}')" title="Dupliquer" aria-label="Dupliquer">⧉</button><button onclick="if(confirm('Supprimer cette prestation ?'))deleteInv('${i.id}')" title="Supprimer" aria-label="Supprimer">✕</button></div></div>`;
     }).join('');
   }
   window.Biz && Biz.renderDash();

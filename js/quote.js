@@ -1336,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.24.0', "Factures détaillées : plusieurs lignes, quantités, dates, note, modèles réutilisables ; rappels d’échéance dans les notifications ; montants à 2 décimales."],
   ['3.23.0', "Connexion du téléphone par QR code depuis l’ordinateur connecté : scanne, autorise sur le PC, c’est connecté (aucune clé, QR à usage unique). QR codes générés localement."],
   ['3.22.0', "Paramètres → Système : version, mise à jour automatique, stockage, diagnostic ; préférences (page au démarrage, animations réduites) ; domaine personnalisé réellement publié ; interrupteur « Visible sur Google » ; paramètres lisibles sur téléphone."],
   ['3.21.0', "Recherche globale Ctrl+K (clients, dossiers, factures, projets, actions) ; dossier client → facture préremplie ; dépenses, périodes, résultat, meilleurs clients et rapport CSV ; fiche client avec réglé / à encaisser ; navigation mobile en tiroir."],
@@ -1533,6 +1534,7 @@ const Notify = {
           <div class="nt-d">${QuoteUI._when(n.createdAt)}</div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
+          ${['facturation', 'avis', 'devis', 'cp'].includes(n.page) ? `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.markRead('${esc(n.id)}');Notify.toggleInbox();showPage('${n.page}')">Ouvrir</button>` : ''}
           ${n.link ? `<a class="btn btn-ghost" style="font-size:9px;padding:3px 7px" href="${esc(n.link)}" target="_blank" rel="noopener" onclick="Notify.markRead('${esc(n.id)}')">Voir la release</a>` : ''}
           ${n.workspaceId ? `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.open('${esc(n.id)}','${esc(n.workspaceId)}')">Ouvrir</button>` : ''}
           ${n.readAt ? '' : `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.markRead('${esc(n.id)}')" title="Marquer comme lu">✓</button>`}
