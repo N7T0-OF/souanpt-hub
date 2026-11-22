@@ -1336,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.23.0', "Connexion du téléphone par QR code depuis l’ordinateur connecté : scanne, autorise sur le PC, c’est connecté (aucune clé, QR à usage unique). QR codes générés localement."],
   ['3.22.0', "Paramètres → Système : version, mise à jour automatique, stockage, diagnostic ; préférences (page au démarrage, animations réduites) ; domaine personnalisé réellement publié ; interrupteur « Visible sur Google » ; paramètres lisibles sur téléphone."],
   ['3.21.0', "Recherche globale Ctrl+K (clients, dossiers, factures, projets, actions) ; dossier client → facture préremplie ; dépenses, périodes, résultat, meilleurs clients et rapport CSV ; fiche client avec réglé / à encaisser ; navigation mobile en tiroir."],
   ['3.20.0', "Facturation complète : numéros FA-AAAA-NNN, facture PDF aux mentions légales, échéances et relances, tableau du chiffre d’affaires, « À traiter » ; couleur du site partout (fini le vert fixe, y compris pages devis client) ; éditeur allégé."],

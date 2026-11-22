@@ -698,6 +698,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 #hub-update .btn{font-size:10px}
 html.hub-calm *,html.hub-calm *::before,html.hub-calm *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
 @media(max-width:600px){.sys-ver{grid-template-columns:1fr}.sys-bar{grid-template-columns:90px 1fr 54px}}
+.qr-local{width:220px;height:220px;margin:0 auto;background:#fff;border-radius:12px;padding:8px}.qr-local svg{display:block;width:100%;height:100%}
+#pair-modal,#pair-phone{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px}
+#pair-phone{z-index:10050;background:var(--bg)}
+.pair-card{width:min(380px,100%);background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:16px 18px;box-shadow:0 20px 60px #000a;text-align:center}
+.pair-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:12px;text-align:left}
+.pair-qr{width:230px;height:230px;margin:4px auto 12px;background:#fff;border-radius:14px;padding:8px;transition:opacity .2s}.pair-qr svg{display:block;width:100%;height:100%}.pair-qr.used{opacity:.25}
+.pair-steps{text-align:left;font-size:10px;color:var(--muted2);margin:0 0 10px 18px;line-height:1.7}
+.pair-msg{font-size:11px;color:var(--muted2);line-height:1.6;margin:8px 0}.pair-msg b{color:var(--text)}.pair-msg.bad,.pair-msg .bad{color:var(--red)}
+.pair-act{display:flex;gap:8px;justify-content:center;margin-top:10px}.pair-act .btn{font-size:11px}
+.pair-big{font-size:38px;margin-bottom:6px}#pair-phone b{display:block;font-size:14px;margin-bottom:4px}
 #hp-modal{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
 #hp-modal .hp-card{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border2);border-radius:12px;box-shadow:0 20px 60px #000a}
 #hp-modal .hp-head,#hp-modal .hp-foot{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:12px}
@@ -2233,7 +2243,11 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
 
             <div class="setting-group">
               <div class="setting-group-title">Connexions</div>
-              <div class="hintbox" style="margin-bottom:12px">Lie plusieurs comptes pour te connecter comme tu veux — ils pointent tous vers le même espace souanpt.hub.</div>
+              <div class="conn-row conn-pair">
+                <div class="conn-ic" style="background:var(--accent);color:var(--on-accent);font-size:16px">📱</div>
+                <div class="conn-info"><div class="conn-name">Téléphone ou tablette</div><div class="conn-sub">Scanne un QR code, autorise ici : connecté sans clé</div></div>
+                <button class="btn btn-accent" style="font-size:10px" onclick="DevicePair.openPC()">Connecter</button>
+              </div>
               <div class="conn-row" id="conn-google">
                 <div class="conn-ic" style="background:#fff"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.2 35 26.7 36 24 36c-5.2 0-9.6-3.3-11.2-8l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.2 5.3C40.9 36 44 30.6 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg></div>
                 <div class="conn-info"><div class="conn-name">Google</div><div class="conn-sub" id="conn-google-sub">Non connecté</div></div>
@@ -2496,6 +2510,8 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
 <script src="js/command-palette.js"></script>
 <script src="js/mobile-nav.js"></script>
 <script src="js/system.js"></script>
+<script src="js/vendor/qrcode.min.js"></script>
+<script src="js/device-pair.js"></script>
 <script src="js/editor-seo.js"></script>
 <script src="js/editor-toolbar.js"></script>
 <script src="js/core.js"></script>
@@ -3460,10 +3476,24 @@ function shareSiteQR() {
   if (!url) { showToast('Publie ton site d\'abord (Éditeur → 🚀)','#e4b24a',2500); return; }
   showQR(url, 'Mon portfolio');
 }
+/* Exporte le QR (SVG local) en PNG 600 px, sans service tiers. */
+function downloadQRPng(svgEl) {
+  if (!svgEl) return;
+  const xml = new XMLSerializer().serializeToString(svgEl);
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas'); c.width = c.height = 600;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 600, 600); g.drawImage(img, 0, 0, 600, 600);
+    c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'qr.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }, 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+}
 /* ═══ QR CONTEXTUEL — vrai QR scannable (partage portfolio / site / portail) ═══ */
 function showQR(url, title) {
   if (!url) { showToast('Aucun lien à partager','#e4b24a',1500); return; }
-  const img = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=1&data=' + encodeURIComponent(url);
+  // 3.23 : QR généré dans le navigateur (js/vendor/qrcode.min.js) — le lien n'est plus envoyé à un service tiers.
+  let svg = '';
+  try { const q = qrcode(0, 'M'); q.addData(url); q.make(); svg = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); } catch {}
   let m = document.getElementById('qr-modal');
   if (!m) {
     m = document.createElement('div'); m.id = 'qr-modal';
@@ -3474,10 +3504,10 @@ function showQR(url, title) {
   m.innerHTML = `<div style="background:var(--s1);border:1px solid var(--border2);border-radius:18px;padding:24px;max-width:320px;text-align:center">
     <div style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(title||'Partager')}</div>
     <div style="font-size:9px;color:var(--muted2);margin-bottom:14px">Scanne pour ouvrir le lien</div>
-    <img src="${img}" alt="QR" style="width:220px;height:220px;background:#fff;border-radius:12px;padding:8px" onerror="this.parentElement.innerHTML='<div style=\\'color:var(--red);font-size:11px;padding:30px\\'>QR indisponible (hors ligne)</div>'">
+    <div class="qr-local" role="img" aria-label="QR code">${svg || '<div style="color:var(--red);font-size:11px;padding:30px">QR indisponible</div>'}</div>
     <div style="font-size:9px;color:var(--muted2);margin:12px 0 4px;word-break:break-all">${esc(url)}</div>
     <div style="display:flex;gap:8px;margin-top:10px">
-      <a class="btn btn-ghost" style="flex:1;justify-content:center;font-size:10px" href="${esc(img)}&download=1" download="qr.png" target="_blank">↓ PNG</a>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:10px" onclick="downloadQRPng(this.closest('div[style]').parentElement.querySelector('.qr-local svg'))">↓ PNG</button>
       <button class="btn btn-accent" style="flex:1;justify-content:center;font-size:10px" onclick="navigator.clipboard.writeText('${esc(url)}').then(()=>showToast('Lien copié ✓','var(--green)',1200))">Copier le lien</button>
     </div>
     <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:10px;margin-top:8px" onclick="document.getElementById('qr-modal').remove()">Fermer</button>
