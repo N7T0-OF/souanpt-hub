@@ -82,7 +82,7 @@ const GHPage = {
     set('gh-connect-name', '@' + user.login);
     set('gh-connect-sub',  user.name || 'Connecté avec GitHub');
     const badge = document.getElementById('gh-connect-badge');
-    if (badge) { badge.textContent='CONNECTÉ'; badge.style.cssText='background:rgba(46,154,99,.15);color:#2e9a63;font-size:9px;padding:3px 10px;border-radius:10px;font-weight:700'; }
+    if (badge) { badge.textContent='CONNECTÉ'; badge.style.cssText='background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green);font-size:9px;padding:3px 10px;border-radius:10px;font-weight:700'; }
     const btn = document.getElementById('gh-connect-btn');
     if (btn) { btn.textContent='✓ Connecté'; btn.disabled=true; btn.style.opacity='.5'; }
     const dBtn = document.getElementById('gh-disconnect-btn');
@@ -92,7 +92,7 @@ const GHPage = {
     // Sync editor badge
     const dot = document.getElementById('ed-gh-dot');
     const lbl = document.getElementById('ed-gh-label');
-    if (dot) dot.style.background='#2e9a63';
+    if (dot) dot.style.background='var(--green)';
     if (lbl) lbl.textContent='@'+user.login+' · connecté';
     const sb = document.getElementById('set-gh-badge');
     if (sb) sb.style.display='inline-block';
@@ -139,7 +139,7 @@ const GHPage = {
     const lnk = document.getElementById('gh-repo-link');
     try {
       const data = await GH.getRepo(token, owner, r);
-      if (dot) dot.style.background='#2e9a63';
+      if (dot) dot.style.background='var(--green)';
       if (lbl) lbl.textContent=data.full_name+' · '+data.visibility;
       if (lnk) { lnk.href=data.html_url; lnk.style.display=''; }
       const pd = document.getElementById('gh-pages-display');
@@ -163,7 +163,7 @@ const GHPage = {
     const runs = await GH.runs(token, owner, r, 5);
     if (!runs.length) { if(list) list.innerHTML='<div style="color:var(--muted2);font-size:10px">Aucun run — déploie pour commencer</div>'; return; }
     const ic = s => s==='success'?'✓':s==='failure'?'✗':s==='in_progress'?'⟳':'·';
-    const co = s => s==='success'?'#2e9a63':s==='failure'?'#c0392b':s==='in_progress'?'var(--accent)':'var(--muted2)';
+    const co = s => s==='success'?'var(--green)':s==='failure'?'#c0392b':s==='in_progress'?'var(--accent)':'var(--muted2)';
     const ago = ts => { const d=Math.floor((Date.now()-new Date(ts))/1000); if(d<60)return d+'s'; if(d<3600)return Math.floor(d/60)+'min'; if(d<86400)return Math.floor(d/3600)+'h'; return Math.floor(d/86400)+'j'; };
     if (list) list.innerHTML=runs.map(run=>`
       <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:6px">
@@ -214,7 +214,7 @@ async function ghStartConnect() {
     const user = await connectGitHub(val);
 
     if (inp) inp.value = '•'.repeat(24);
-    if (msg) { msg.style.color = '#2e9a63'; msg.textContent = '✓ Connecté — dépôt ' + user.login.toLowerCase() + '-hub-data créé'; }
+    if (msg) { msg.style.color = 'var(--green)'; msg.textContent = '✓ Connecté — dépôt ' + user.login.toLowerCase() + '-hub-data créé'; }
 
     GHPage.showConnected(user);
     GHPage.loadRepo();
@@ -223,7 +223,7 @@ async function ghStartConnect() {
     const ri = document.getElementById('gh-repo-inp');
     if (ri) ri.value = SiteConfig.get().repo || '';
 
-    showToast('✓ GitHub connecté — @' + user.login, '#2e9a63');
+    showToast('✓ GitHub connecté — @' + user.login, 'var(--green)');
     // T5 : propose de faire migrer cette PAT vers le relais (si présent)
     if (typeof renderGhConnectState === 'function') renderGhConnectState();
 
@@ -255,9 +255,9 @@ async function ghCreateRepo() {
     await GH.ensureRepo(token, owner, repo, false);
     await GH.enablePages(token, owner, repo);
     SiteConfig.set('repo', val);
-    if (dot) dot.style.background='#2e9a63';
+    if (dot) dot.style.background='var(--green)';
     if (lbl) lbl.textContent=val+' créé + GitHub Pages activé';
-    showToast('✓ '+val+' créé','#2e9a63');
+    showToast('✓ '+val+' créé','var(--green)');
     GHPage.loadRuns();
   } catch(e) {
     if (dot) dot.style.background='#c0392b';
@@ -285,7 +285,7 @@ async function ghDeploy() {
     const url = resultData.url;
     PublishUI.finish(resultData);
     if (result) result.innerHTML=(resultData.verified ? '✓ Déployé — ' : '⟳ En attente de Pages — ') + '<a href="'+url+'" target="_blank" style="color:var(--accent3)">'+url+'</a>';
-    showToast(resultData.verified ? '✓ Portfolio déployé !' : 'Publication envoyée, Pages en cours', resultData.verified ? '#2e9a63' : '#e4b24a');
+    showToast(resultData.verified ? '✓ Portfolio déployé !' : 'Publication envoyée, Pages en cours', resultData.verified ? 'var(--green)' : '#e4b24a');
     setTimeout(()=>GHPage.loadRuns(),3000);
     const pd=document.getElementById('gh-pages-display'); const pl=document.getElementById('gh-pages-link');
     if(pd)pd.style.display=''; if(pl){pl.href=url;pl.textContent=url;}
@@ -299,7 +299,7 @@ async function ghDeploy() {
   }
 }
 
-async function ghRefreshRuns() { await GHPage.loadRuns(); showToast('Actualisé','#2e9a63',1500); }
+async function ghRefreshRuns() { await GHPage.loadRuns(); showToast('Actualisé','var(--green)',1500); }
 
 function ghDisconnect() {
   if (!confirm('Déconnecter GitHub ?')) return;
@@ -359,7 +359,7 @@ function edLoad() {
   edSyncThemeCards();
   edPerf();
   const dot=document.getElementById('ed-gh-dot'); const lbl=document.getElementById('ed-gh-label');
-  if (Auth.ok()) { if(dot)dot.style.background='#2e9a63'; if(lbl)lbl.textContent='@'+(Auth.user()?.login||'?')+' · connecté'; }
+  if (Auth.ok()) { if(dot)dot.style.background='var(--green)'; if(lbl)lbl.textContent='@'+(Auth.user()?.login||'?')+' · connecté'; }
   else           { if(dot)dot.style.background='var(--muted)'; if(lbl)lbl.textContent='GitHub non connecté — cliquer'; }
 }
 
@@ -387,7 +387,7 @@ function edHeroImport(ev) {
   fileToDataURL(f, d => {
     const inp = document.getElementById('ep-hero-image'); if (inp) inp.value = d;
     edUpdatePreview();
-    showToast('Image hero importée & optimisée ✓', '#2e9a63', 2000);
+    showToast('Image hero importée & optimisée ✓', 'var(--green)', 2000);
   });
   ev.target.value = '';
 }
@@ -485,7 +485,7 @@ function edBlockDrop(e,i){
   if(_edBlockDrag===null||_edBlockDrag===i){ edRenderBlocks(); return; }
   const [m]=_edOrder.splice(_edBlockDrag,1); _edOrder.splice(i,0,m); _edBlockDrag=null;
   edRenderBlocks(); edUpdatePreview();
-  showToast('Ordre des sections mis à jour ✓','#2e9a63',1500);
+  showToast('Ordre des sections mis à jour ✓','var(--green)',1500);
 }
 function edToggleBlock(k){ edSetSectionVisible(k, _edVis[k] === false); }
 /**
@@ -543,7 +543,7 @@ function edSaveConfig(silent) {
   const cfg=edGetConfig(); const existing=SiteConfig.get(); SiteConfig.save({...existing,...cfg});
   const el=document.getElementById('ed-last-save');
   if (el) el.textContent=(silent?'Auto-sauvegardé à ':'Sauvegardé à ')+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-  if (!silent) showToast('Config sauvegardée ✓','#2e9a63');
+  if (!silent) showToast('Config sauvegardée ✓','var(--green)');
   if (!silent) SiteAutoPublish.queue();
 }
 
@@ -598,7 +598,7 @@ async function edExportSite() {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   const ko = Math.round(html.length / 1024);
-  showToast('✓ Site exporté (index.html · ' + ko + ' Ko) — hébergeable partout, il est à toi', '#2e9a63', 5000);
+  showToast('✓ Site exporté (index.html · ' + ko + ' Ko) — hébergeable partout, il est à toi', 'var(--green)', 5000);
 }
 
 async function edDeploy() {
@@ -614,7 +614,7 @@ async function edDeploy() {
     const resultData=await deployPortfolio((m)=>{if(status)status.textContent=m;PublishUI.message(m);},(s,st)=>PublishUI.step(s,st));
     PublishUI.finish(resultData);
     if(status)status.innerHTML=(resultData.verified?'✓ ':'⟳ En attente de Pages · ')+'<a href="'+resultData.url+'" target="_blank" style="color:var(--accent3)">'+resultData.url+'</a>';
-    showToast(resultData.verified?'✓ Déployé !':'Publication envoyée, Pages en cours',resultData.verified?'#2e9a63':'#e4b24a');
+    showToast(resultData.verified?'✓ Déployé !':'Publication envoyée, Pages en cours',resultData.verified?'var(--green)':'#e4b24a');
   } catch(e) {
     PublishUI.fail(e);
     if(status)status.textContent='✗ '+e.message;
@@ -685,9 +685,9 @@ const BubbleWidget = {
     if(name==='profile')this.loadProfileTab();
   },
   siteUrl(){ const cfg=SiteConfig.get(); return cfg.lastDeploy?.url||(Auth.owner()?`https://${Auth.owner().toLowerCase()}.github.io/${SITE_REPO_NAME}`:''); },
-  copyUrl()    { navigator.clipboard.writeText(this.siteUrl()).then(()=>showToast('URL copiée ✓','#2e9a63',1500)); },
+  copyUrl()    { navigator.clipboard.writeText(this.siteUrl()).then(()=>showToast('URL copiée ✓','var(--green)',1500)); },
   openSite()   { window.open(this.siteUrl(),'_blank'); },
-  copyHandle() { const u='@'+(Auth.user()?.login||'souanpt'); navigator.clipboard.writeText(u).then(()=>showToast(u+' copié','#2e9a63',1500)); },
+  copyHandle() { const u='@'+(Auth.user()?.login||'souanpt'); navigator.clipboard.writeText(u).then(()=>showToast(u+' copié','var(--green)',1500)); },
   shareNative(){ const url=this.siteUrl(); if(navigator.share)navigator.share({title:'Mon Portfolio',url}); else this.copyUrl(); },
   toggleQR(){
     this._qrOn=!this._qrOn;
@@ -710,7 +710,7 @@ const BubbleWidget = {
       else if(!f&&h(text+r+','+c+h(text))%3===0){ctx.beginPath();ctx.roundRect(c*cs+1,r*cs+1,cs-2,cs-2,2);ctx.fill();}
     }
   },
-  dlQR(){ const cv=document.getElementById('sp-qr-canvas2');if(!cv)return;const a=document.createElement('a');a.href=cv.toDataURL('image/png');a.download='qr-portfolio.png';a.click();showToast('QR téléchargé','#2e9a63',1500); },
+  dlQR(){ const cv=document.getElementById('sp-qr-canvas2');if(!cv)return;const a=document.createElement('a');a.href=cv.toDataURL('image/png');a.download='qr-portfolio.png';a.click();showToast('QR téléchargé','var(--green)',1500); },
   loadProfileTab(){ const cfg=SiteConfig.get(); const set=(id,v)=>{const el=document.getElementById(id);if(el&&v!==undefined)el.value=v;}; set('sp-f-bio',cfg.bio||''); set('sp-f-domain',cfg.customDomain?cfg.customDomain.replace('https://',''):''); },
   saveProfile(){
     const cfg=SiteConfig.get();
@@ -718,7 +718,7 @@ const BubbleWidget = {
     const domain=document.getElementById('sp-f-domain')?.value.trim();
     if(bio!==undefined)cfg.bio=bio;
     if(domain!==undefined)cfg.customDomain=domain?'https://'+domain.replace('https://',''):'';
-    SiteConfig.save(cfg); this.refresh(); showToast('Profil sauvegardé ✓','#2e9a63');
+    SiteConfig.save(cfg); this.refresh(); showToast('Profil sauvegardé ✓','var(--green)');
   },
   async backupNow(){
     const btn=document.getElementById('sp-bk-btn2');
@@ -732,13 +732,13 @@ const BubbleWidget = {
     const ts=localStorage.getItem('souanpt_last_backup');
     const bkt=document.getElementById('sp-bk-time2'); if(bkt&&ts)bkt.textContent='À l\'instant';
     if(btn){btn.textContent='↑ Sauver';btn.disabled=false;}
-    showToast(result ? 'Backup effectué ✓' : 'Sauvegarde impossible — réessaie plus tard',result ? '#2e9a63' : '#c0392b');
+    showToast(result ? 'Backup effectué ✓' : 'Sauvegarde impossible — réessaie plus tard',result ? 'var(--green)' : '#c0392b');
   },
   exportJSON(){
     const data=JSON.stringify({auth:{user:Auth.user()},config:SiteConfig.get()},null,2);
     const blob=new Blob([data],{type:'application/json'});
     const url=URL.createObjectURL(blob); const a=document.createElement('a');
-    a.href=url;a.download='souanpt-hub-export.json';a.click();URL.revokeObjectURL(url);showToast('Export téléchargé','#2e9a63');
+    a.href=url;a.download='souanpt-hub-export.json';a.click();URL.revokeObjectURL(url);showToast('Export téléchargé','var(--green)');
   },
   goEditor(){ this.close(); showPage('editor'); },
 };

@@ -2490,7 +2490,7 @@ const SiteAutoPublish = {
     SiteConfig.set('autoPublishChoice',enabled ? 'on' : 'off');
     if (!enabled) { clearTimeout(this.timer); this.dirty=false; }
     this.refresh();
-    showToast?.(SiteConfig.get().autoPublish?'Synchronisation automatique activée':'Synchronisation automatique désactivée','#2e9a63',2500);
+    showToast?.(SiteConfig.get().autoPublish?'Synchronisation automatique activée':'Synchronisation automatique désactivée','var(--green)',2500);
   },
   queue() {
     const cfg=SiteConfig.get();
@@ -3068,7 +3068,7 @@ async function behanceSyncNow(silent) {
   localStorage.setItem('hub_projects', JSON.stringify(projects));
   localStorage.setItem('souanpt_last_behance_sync', Date.now().toString());
   window.renderProjects?.(); window.syncKPIs?.();
-  if (!silent) showToast(added ? `✓ ${added} projet(s) Behance importé(s)` : '✓ Behance à jour — rien de nouveau', '#2e9a63');
+  if (!silent) showToast(added ? `✓ ${added} projet(s) Behance importé(s)` : '✓ Behance à jour — rien de nouveau', 'var(--green)');
   return added;
 }
 
@@ -3289,9 +3289,16 @@ async function restoreFromGitHub() {
 /* ══════════════════════════════════════════════════════
    UTILS
 ══════════════════════════════════════════════════════ */
+/** Accent courant du tableau de bord en #RRGGBB (pour les couleurs combinées à une opacité hexadécimale). */
+function hubAccentHex() {
+  try { const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : '#C8FF00'; } catch { return '#C8FF00'; }
+}
+if (typeof window !== 'undefined') window.hubAccentHex = hubAccentHex;
 function showToast(msg, color, dur) {
   const el = document.getElementById('sm2-toast'); if (!el) return;
-  el.textContent = msg; el.style.background = color || '#1a1a1a'; el.style.color = '#fff';
+  // Succès (ancien vert #2e9a63 → var(--green)) : couleur dynamique du site, texte lisible dessus.
+  const success = /^(#2e9a63|var\(--green\))$/i.test(String(color || ''));
+  el.textContent = msg; el.style.background = success ? 'var(--accent)' : (color || '#1a1a1a'); el.style.color = success ? 'var(--on-accent,#060606)' : '#fff';
   el.classList.add('show'); clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove('show'), dur || 2500);
 }

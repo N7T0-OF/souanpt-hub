@@ -103,7 +103,7 @@
             ${slider('width', 'Largeur', 50, 100, c.width, ' %')}${slider('height', 'Hauteur', 40, 100, c.height, ' %')}
             ${slider('radius', 'Arrondis', 0, 40, c.radius, ' px')}${slider('border', 'Bordure', 0, 4, c.border, ' px')}
             ${slider('tilt', 'Inclinaison (perspective)', 0, 25, c.tilt, '°')}${slider('backdrop', 'Fond assombri', 40, 100, c.backdrop, ' %')}
-            <p class="edw-hint">Cadrage par défaut — chaque projet peut avoir le sien (fiche du projet).</p>
+            
             ${cropRow('desk', 'Ordinateur')}${cropRow('mob', 'Téléphone')}
             <button class="edw-sec-rst" id="bve-reset">↺ Réinitialiser la fenêtre</button>
           </details>
@@ -152,15 +152,15 @@
         <div class="bve-gal" id="bve-gal">${gallery.length ? gallery.map((src, i) => `
           <div class="bve-gal-it" data-i="${i}"><img src="${esc(src)}" alt="" loading="lazy">
             <div class="bve-gal-act"><button type="button" data-gup="${i}" title="Monter" ${i === 0 ? 'disabled' : ''}>↑</button><button type="button" data-gdel="${i}" title="Retirer">✕</button></div></div>`).join('')
-          : '<p class="edw-hint" style="margin:0">Aucune image. Colle les adresses de tes images (clic droit → « Copier l’adresse de l’image » sur ton projet Behance), importe des fichiers ou choisis-les sur ton haunt.gg.</p>'}</div>
+          : '<p class="edw-hint" style="margin:0">Aucune image.</p>'}</div>
         <textarea class="edw-in" id="bve-gal-urls" rows="2" placeholder="Colle une ou plusieurs adresses d'images (une par ligne), puis Entrée"></textarea>
         <div class="edw-row"><button class="edw-sec-rst" id="bve-gal-add">＋ Ajouter les adresses</button><button class="edw-sec-rst" id="bve-gal-pick">📁 Importer des fichiers</button><button class="edw-sec-rst" id="bve-gal-haunt" title="Choisir ou envoyer des images sur ton hébergement haunt.gg">👻 Depuis haunt.gg</button>
           ${gallery.length ? '<button class="edw-sec-rst" id="bve-gal-clear">✖ Tout retirer</button>' : ''}
           <input type="file" id="bve-gal-file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>
-        <p class="edw-hint">Avec des images, la fenêtre affiche le projet qui défile. Sans, elle montre la carte Behance (couverture seule : Behance ne fournit pas le contenu complet aux autres sites).</p>
+        
         <div class="edw-l" style="margin-top:12px">Lien / carte Behance ${hasBe ? `<span class="edw-hint">projet n° ${esc(e.be)}</span>` : ''}</div>
         <input class="edw-in" id="bve-code" placeholder="Adresse du projet Behance ou code d'intégration (facultatif)" value="${esc(pv.beId ? 'https://www.behance.net/embed/project/' + pv.beId : (BV().projectId(p.url) ? p.url : ''))}">
-        <p class="edw-hint" id="bve-code-msg">Seul le numéro du projet est conservé, jamais le code collé.</p>
+        <p class="edw-hint" id="bve-code-msg"></p>
         ${hasBe && !gallery.length ? `<div class="edw-row bve-tabs"><button class="edw-st${this._cropTab === 'desk' ? ' on' : ''}" data-tab="desk">🖥 Ordinateur</button><button class="edw-st${this._cropTab === 'mob' ? ' on' : ''}" data-tab="mob">▮ Téléphone</button></div>
           ${sl('zoom', 'Zoom', 1, 3, k.zoom, '×', .05)}${sl('x', 'Position X', -50, 50, k.x)}${sl('y', 'Rogner en haut', 0, 600, k.y, ' px', 4)}
           <div class="edw-row"><button class="edw-sec-rst" id="bve-crop-rst">↺ Réinitialiser le cadrage</button></div>` : ''}
@@ -238,7 +238,7 @@
             try { const it = await Haunt.upload(imgs[i]); const u = Haunt.src(it); if (u) urls.push(u); }
             catch (err) { showToast?.(imgs[i].name + ' : ' + err.message, '#c0392b', 4500); break; }
           }
-          if (urls.length) { this._setGallery(id, this._gallery(id).concat(urls), rerender); showToast?.(urls.length + ' image' + (urls.length > 1 ? 's' : '') + ' envoyée' + (urls.length > 1 ? 's' : '') + ' sur haunt.gg ✓', '#2e9a63', 2500); }
+          if (urls.length) { this._setGallery(id, this._gallery(id).concat(urls), rerender); showToast?.(urls.length + ' image' + (urls.length > 1 ? 's' : '') + ' envoyée' + (urls.length > 1 ? 's' : '') + ' sur haunt.gg ✓', 'var(--green)', 2500); }
           return;
         }
         let done = 0; const out = [];

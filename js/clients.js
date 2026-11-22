@@ -23,10 +23,10 @@
     request:  { label: 'Demande', short: 'Demandes', icon: '📥', color: '#7f9cff' },
     estimate: { label: 'Devis',   short: 'Devis',    icon: '📄', color: '#e4b24a' },
     mission:  { label: 'Mission', short: 'Missions', icon: '🚀', color: '#4a9de4' },
-    done:     { label: 'Terminé', short: 'Terminés', icon: '✅', color: '#2e9a63' },
+    done:     { label: 'Terminé', short: 'Terminés', icon: '✅', get color() { return window.hubAccentHex ? hubAccentHex() : '#2e9a63'; } },
   };
   const STATUS = {
-    active:   { label: 'Actif',    color: '#2e9a63' },
+    active:   { label: 'Actif',    get color() { return window.hubAccentHex ? hubAccentHex() : '#2e9a63'; } },
     inactive: { label: 'En pause', color: '#999' },
     archived: { label: 'Archivé',  color: '#b98a3a' },
     trashed:  { label: 'Corbeille', color: '#c0392b' },

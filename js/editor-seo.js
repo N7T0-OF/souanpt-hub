@@ -31,7 +31,7 @@
       <input class="edw-in" id="seo-img" type="url" placeholder="https://…" value="${e(s.shareImage)}">
       <div class="edw-row"><button class="edw-sec-rst" id="seo-img-haunt" type="button">👻 Choisir sur haunt.gg</button></div>
       <label class="edw-tog"><input type="checkbox" id="seo-index"${s.index ? ' checked' : ''}> Autoriser Google à indexer le site</label>
-      <p class="edw-hint">Publiés avec le site : balises de titre et de partage, données structurées (toi, tes projets, tes avis validés et leur note), une page par projet (projets/…, avec bouton contact), plan du site avec les images, robots.txt. Google affiche les étoiles d'avis à sa discrétion.</p>`;
+      `;
     EdWin.open(btn, '🔎 Référencement (SEO)', html, w => {
       const v = id => w.querySelector('#' + id);
       const save = () => {
@@ -52,7 +52,7 @@
     const links = SiteSEO.hauntLinks(cfg);
     const mode = ['auto', 'always', 'off'].includes(cfg.hauntBack) ? cfg.hauntBack : 'auto';
     const html = `
-      <p class="edw-hint" style="margin-top:0">haunt.gg est ta page de liens ; ton site en est la suite (portfolio, avis, devis). Relie-les :</p>
+      
       <div class="edw-l">Ton pseudo haunt.gg</div>
       <input class="edw-in" id="hg-user" maxlength="60" placeholder="souanpt" value="${e(String(cfg.hauntUser || '').replace(/^https?:\/\/(www\.)?haunt\.gg\//i, ''))}">
       <div class="edw-l">Bouton « ← haunt.gg » sur le site</div>
@@ -63,7 +63,7 @@
       <div class="edw-l">Liens à mettre sur ton profil haunt.gg <span class="edw-hint">tuiles Folio, Contact…</span></div>
       ${links.length ? links.map((l, i) => `<div class="hg-link"><span>${e(l.label)}</span><code>${e(l.url)}</code><button class="edw-sec-rst" type="button" data-copy="${i}">Copier</button></div>`).join('')
         : '<p class="edw-hint">Publie ton site une première fois : son adresse servira à fabriquer ces liens.</p>'}
-      <p class="edw-hint">Le « ?from=haunt » affiche le bouton retour. Les vues et clics de ces liens se lisent dans ton tableau de bord haunt.gg. Inutile de recréer ici ce que haunt.gg fait déjà (réseaux, musique, Discord) : le site se concentre sur le portfolio, les avis et les devis.</p>
+      
       <div class="edw-row"><a class="edw-sec-rst" href="https://haunt.gg/fr/dashboard" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Ouvrir haunt.gg ↗</a>
         <button class="edw-sec-rst" type="button" id="hg-keys">${typeof Haunt !== 'undefined' && Haunt.connected() ? '✓ Hébergement haunt.gg connecté' : '🔑 Connecter l\'hébergement haunt.gg'}</button></div>`;
     EdWin.open(btn, '👻 haunt.gg', html, w => {

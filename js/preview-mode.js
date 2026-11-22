@@ -100,7 +100,15 @@
         { id: 'demo-r1', author: 'Camille Martin', text: 'Très belle collaboration, le rendu correspond parfaitement à mon univers.', rating: 5, status: 'approved', project: 'Miniatures vidéo', source: 'manual', createdAt: d0 },
         { id: 'demo-r2', author: 'Atelier Nova', text: 'Communication fluide et livraison soignée.', rating: 5, status: 'pending', source: 'manual', createdAt: d0 - 3 * day },
       ],
-      hub_invoices: [], hub_estimates: [], hub_portals: [], hub_catalog: [], hub_links: [],
+      // Facturation de démonstration (3.20) : encaissées, en attente, en retard.
+      hub_invoices: (() => { const t = Date.now(); return [
+        { id: 'demo-i1', number: 'FA-2026-001', name: 'Identité visuelle — logo', client: 'Atelier Nova', price: 1200, status: 'paid', createdAt: t - 75 * day, dueAt: t - 45 * day, paidAt: t - 60 * day },
+        { id: 'demo-i2', number: 'FA-2026-002', name: 'Pack 4 miniatures YouTube', client: 'Camille Martin', price: 320, status: 'paid', createdAt: t - 9 * day, dueAt: t + 21 * day, paidAt: t - 2 * day },
+        { id: 'demo-i3', number: 'FA-2026-003', name: 'Charte graphique', client: 'Atelier Nova', price: 1200, status: 'acompte', createdAt: t - 5 * day, dueAt: t + 25 * day },
+        { id: 'demo-i4', number: 'FA-2026-004', name: 'Bannière Twitch', client: 'Camille Martin', price: 180, status: 'pending', createdAt: t - 40 * day, dueAt: t - 10 * day },
+      ]; })(),
+      hub_business: { name: 'Souanpt (démo)', siret: '000 000 000 00000', address: '1 rue de la Démo\n69000 Lyon', email: 'demo@example.com', terms: 30, ceiling: 77700, b2b: true, seq: { 2026: 4 } },
+      hub_estimates: [], hub_portals: [], hub_catalog: [], hub_links: [],
       hub_media: [], hub_files: [], hub_pricing: {}, hub_ws_runs: [],
       souanpt_site_cfg: {
         siteName: 'Portfolio démo', bio: 'Créatif · Designer · Motion', accentColor: '#C8FF00',

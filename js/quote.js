@@ -1,3 +1,7 @@
+/** Couleur d'accent du site (#RRGGBB) pour les pages vues par le client. */
+function hubPublicAccent() {
+  try { const a = (typeof SiteConfig !== 'undefined' && SiteConfig.get().accentColor) || ''; return /^#[0-9a-f]{6}$/i.test(a) ? a.toUpperCase() : ''; } catch { return ''; }
+}
 /* ══════════════════════════════════════════════════════════════════════════
    QuoteFlow — grille tarifaire privée, analyse d'une demande, estimation.
 
@@ -418,7 +422,7 @@ const QuoteUI = {
       packDiscountPct: Number(this._el('qf-pack').value) || 0,
       hourlyRate: Number(this._el('qf-rate').value) || 0,
     });
-    showToast?.('Grille tarifaire enregistrée ✓', '#2e9a63', 2000);
+    showToast?.('Grille tarifaire enregistrée ✓', 'var(--green)', 2000);
     if (this._a) this.recompute();
   },
 
@@ -557,7 +561,7 @@ const QuoteUI = {
   _copy(txt, label) {
     const box = this._el('qf-msg'); if (box) box.textContent = txt;
     navigator.clipboard?.writeText(txt)
-      .then(() => showToast?.(label + ' copié ✓ — colle-le dans ta conversation', '#2e9a63', 2600))
+      .then(() => showToast?.(label + ' copié ✓ — colle-le dans ta conversation', 'var(--green)', 2600))
       .catch(() => showToast?.('Copie refusée par le navigateur — le texte est affiché ci-dessous', '#e4b24a', 3000));
   },
   copyQuestions() {
@@ -592,6 +596,7 @@ const QuoteUI = {
     const doc = {
       owner: Cloud.user().uid,
       creatorName: (localStorage.getItem('souanpt_pseudo') || Cloud.user().displayName || 'Créateur'),
+      accent: hubPublicAccent(),   // couleur du site → la page client la reprend (déjà publique)
       projectName: (this._el('qf-project')?.value || '').trim(),
       title: e.range ? 'Estimation de ton projet' : 'Ton devis',
       currency: e.currency,
@@ -625,7 +630,7 @@ const QuoteUI = {
       const box = this._el('qf-msg');
       if (box) box.textContent = `Lien client créé :\n${url}\n\nValable ${days} jours. Il s'ouvre sans compte, et restera le même quand le projet passera en production.`;
       navigator.clipboard?.writeText(url).catch(() => {});
-      showToast?.(this._fromRequest ? 'Estimation créée sur le même lien ✓' : 'Lien créé et copié ✓', '#2e9a63', 3500);
+      showToast?.(this._fromRequest ? 'Estimation créée sur le même lien ✓' : 'Lien créé et copié ✓', 'var(--green)', 3500);
       // Notification « au mieux » : jamais attendue, jamais bloquante.
       Notify.send('estimate.published', code, { entityId: code }).catch(() => {});
       this._fromRequest = null;   // consommé
@@ -673,6 +678,7 @@ const QuoteUI = {
       await Cloud._db.collection('requests').doc(token).set({
         owner: Cloud.user().uid,
         creatorName: localStorage.getItem('souanpt_pseudo') || Cloud.user().displayName || 'Créateur',
+        accent: hubPublicAccent(),
         status: 'open', createdAt: Date.now(),
       });
       // Recense le lien canonique dès sa création (étape « demande »).
@@ -681,7 +687,7 @@ const QuoteUI = {
       const box = this._el('qf-msg');
       if (box) box.textContent = `Lien de demande créé :\n${url}\n\nEnvoie-le à ton client : il décrira son besoin et déposera ses références. Ce même lien deviendra ensuite l'estimation, puis la mission.`;
       navigator.clipboard?.writeText(url).catch(() => {});
-      showToast?.('Lien de demande créé et copié ✓', '#2e9a63', 3500);
+      showToast?.('Lien de demande créé et copié ✓', 'var(--green)', 3500);
     } catch (e) { showToast?.('✗ ' + (e.message || 'Création impossible'), '#c0392b', 4000); }
   },
 
@@ -942,7 +948,7 @@ const QuoteUI = {
       this._a.services[0].qtyFound = true;
       this.recompute();
     }
-    showToast?.('Demande importée — vérifie l\'analyse puis crée le lien', '#2e9a63', 3500);
+    showToast?.('Demande importée — vérifie l\'analyse puis crée le lien', 'var(--green)', 3500);
   },
   /* ══════════════════════════════════════════════════════════════════════
      QUESTIONS COMPLÉMENTAIRES — poser une précision sans quitter le hub.
@@ -1022,7 +1028,7 @@ const QuoteUI = {
       reminders: [], locked: false, createdAt: Date.now(),
     });
     QDialog.close();
-    showToast?.(data.internal ? 'Note interne enregistrée' : 'Question envoyée — le client la verra sur son lien', '#2e9a63', 3800);
+    showToast?.(data.internal ? 'Note interne enregistrée' : 'Question envoyée — le client la verra sur son lien', 'var(--green)', 3800);
     if (!data.internal) Notify.send('request.question_sent', token, { entityId: id }).catch(() => {});
     this.loadAcceptances();
     return true;
@@ -1038,7 +1044,7 @@ const QuoteUI = {
       if (r.length && Date.now() - Number(r[r.length - 1]) < 86400000)
         return showToast?.('Déjà relancé il y a moins de 24 h.', '#e4b24a', 3000);
       await ref.set({ reminders: [...r, Date.now()] }, { merge: true });
-      showToast?.('Relance enregistrée ✓ — pense à prévenir le client', '#2e9a63', 3000);
+      showToast?.('Relance enregistrée ✓ — pense à prévenir le client', 'var(--green)', 3000);
       this.loadAcceptances();
     } catch (e) { showToast?.('✗ ' + (e.message || 'Relance impossible'), '#c0392b', 3000); }
   },
@@ -1096,7 +1102,7 @@ const QuoteUI = {
           this.recompute();
           this._markAdded(key);
           this._renderAcc();
-          showToast?.('✓ Ajouté au devis', '#2e9a63', 2600);
+          showToast?.('✓ Ajouté au devis', 'var(--green)', 2600);
         }, this._fromRequest === token ? 0 : 350);
         QDialog.close();
         return true;
@@ -1219,7 +1225,7 @@ const QuoteUI = {
       Notify.send('mission.started', code, { entityId: code }).catch(() => {});
       QDialog.close();
       if (!silent) {
-        showToast?.('✓ Mission lancée — le client suit tout depuis le même lien', '#2e9a63', 4000);
+        showToast?.('✓ Mission lancée — le client suit tout depuis le même lien', 'var(--green)', 4000);
         if (typeof renderPortals === 'function') renderPortals();
       }
       this._acc = this._acc.filter(a => a.est.code !== code);
@@ -1330,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.20.0', "Facturation complète : numéros FA-AAAA-NNN, facture PDF aux mentions légales, échéances et relances, tableau du chiffre d’affaires, « À traiter » ; couleur du site partout (fini le vert fixe, y compris pages devis client) ; éditeur allégé."],
   ['3.19.0', "Une page Google par projet (avec bouton contact/devis), barre de l’éditeur regroupée en menus Design · Contenu · Visibilité, en-têtes sans chevauchement, une seule barre de défilement avec la barre lumineuse."],
   ['3.18.0', "Référencement Google complet (titre, partage, données structurées, avis, plan du site) avec score SEO ; site relié au profil haunt.gg (bouton retour, liens Folio/Contact) ; stats de visite retirées (lues sur haunt.gg)."],
   ['3.17.0', "Connexion haunt.gg : envoie et choisis tes images, vidéos et sons sur ton hébergement haunt.gg (galerie du projet, musique du site)."],
@@ -1579,7 +1586,7 @@ const Notify = {
         body: JSON.stringify({ action: 'retry', jobId }) });
       const j = await r.json().catch(() => ({}));
       showToast?.(r.ok ? '✓ ' + Object.entries(j.results || {}).map(([k, v]) => k + ':' + v).join(' · ') : '✗ ' + (j.error || 'échec'),
-        r.ok ? '#2e9a63' : '#c0392b', 5000);
+        r.ok ? 'var(--green)' : '#c0392b', 5000);
       this.loadJobs();
     } catch (e) { showToast?.('✗ Worker injoignable', '#c0392b', 3500); }
   },
@@ -1601,7 +1608,7 @@ const Notify = {
         const st = (j.results || {})[ch] || '—';
         const err = (j.errors || {})[ch] || '';
         if (!r.ok)            line = ['✕', '#c0392b', j.error || 'Worker en erreur'];
-        else if (st === 'sent')      line = ['✓', '#2e9a63', ch === 'internal' ? 'Fonctionnel' : 'Message envoyé'];
+        else if (st === 'sent')      line = ['✓', 'var(--green)', ch === 'internal' ? 'Fonctionnel' : 'Message envoyé'];
         else if (st === 'skipped')   line = ['—', 'var(--muted2)', err || 'Non configuré'];
         else if (st === 'failed')    line = ['✕', '#e4b24a', (err || 'Erreur fournisseur') + ' — sera retenté'];
         else if (st === 'abandoned') line = ['✕', '#c0392b', err || 'Refus définitif'];

@@ -158,7 +158,7 @@ const EdCanvas = {
     const i = blocks.findIndex(b => b.id === this.sel);
     blocks.splice(i >= 0 ? i + 1 : blocks.length, 0, c);
     this.commit(blocks); this.rerender();
-    showToast?.('Bloc collé ✓', '#2e9a63', 1600);
+    showToast?.('Bloc collé ✓', 'var(--green)', 1600);
   },
   // #bv = fenêtre Behance ouverte dans l'aperçu : ses commandes doivent répondre.
   _ui(t) { return !!(t && t.closest && t.closest('#ed-tb,.ed-rz,.ed-h,.ed-ctx,.ed-navtools,#bv')); },
@@ -403,7 +403,7 @@ body:not(.ed-on) .ed-navtools{display:none!important}
     if (a === 'dup') {
       const c = JSON.parse(JSON.stringify(blocks[i])); c.id = blockUid(c.type || 'b');
       blocks.splice(i + 1, 0, c); this.commit(blocks); this.rerender();
-      showToast?.('Bloc dupliqué ✓', '#2e9a63', 1800);
+      showToast?.('Bloc dupliqué ✓', 'var(--green)', 1800);
     } else if (a === 'hide') {
       blocks[i].visibility.public = bHidden(blocks[i]);   // masqué ⇄ public
       this.commit(blocks);
@@ -766,7 +766,7 @@ function edMigrationNotice() {
     if (gifs) parts.push(gifs + ' GIF');
     setTimeout(() => showToast?.(
       '✓ Portfolio & Profil Links migrés dans l\'Éditeur — ' + parts.join(' · ') + ' · 0 donnée perdue',
-      '#2e9a63', 6000), 1200);
+      'var(--green)', 6000), 1200);
   } catch (e) {}
 }
 document.addEventListener('DOMContentLoaded', edMigrationNotice);
@@ -936,13 +936,13 @@ function edWinBrand() {
     <input class="edw-in" id="brand-icon" type="url" placeholder="https://…/favicon.png" value="${_eesc(c.favicon || '')}"><input type="file" id="brand-icon-file" accept="image/*">
     <div class="edw-l">Effet du nom sur le site</div>
     <select class="edw-in" id="brand-effect"><option value="none">Aucun</option><option value="glow">Lueur</option><option value="gradient">Dégradé</option><option value="float">Flottement doux</option></select>
-    <p class="edw-hint">Le logo et l'icône importés sont publics. Les animations respectent la préférence de mouvement réduit.</p><button class="edw-ok" id="brand-save">Enregistrer</button>`, w => {
+    <button class="edw-ok" id="brand-save">Enregistrer</button>`, w => {
     w.querySelector('#brand-effect').value = c.titleEffect || 'none';
     w.querySelector('#brand-mode').value = c.brandMode || 'auto';
     [['brand-logo-file','brand-logo'],['brand-icon-file','brand-icon']].forEach(([fileId,urlId]) => {
       w.querySelector('#'+fileId).onchange = async e => {
         const input = w.querySelector('#'+urlId); input.placeholder = 'Import en cours…';
-        try { input.value = await edUploadSiteAsset(e.target.files[0], 'image'); showToast?.('Image envoyée dans le site public ✓','#2e9a63',2500); }
+        try { input.value = await edUploadSiteAsset(e.target.files[0], 'image'); showToast?.('Image envoyée dans le site public ✓','var(--green)',2500); }
         catch(err) { showToast?.(err.message,'#c0392b',4000); }
         input.placeholder = 'https://…';
       };
@@ -963,11 +963,11 @@ function edWinAudio() {
   EdWin.open(null, '🔊 Son du site', `
     <div class="edw-l">Musique de fond</div><input class="edw-in" id="audio-music" type="url" placeholder="https://…/musique.mp3" value="${_eesc(c.backgroundMusic || '')}"><input type="file" id="audio-music-file" accept="audio/*"> <button class="edw-sec-rst" data-haunt="audio-music" type="button">👻 Choisir sur haunt.gg</button>
     <div class="edw-l">Son de clic (optionnel)</div><input class="edw-in" id="audio-click" type="url" placeholder="https://…/clic.mp3" value="${_eesc(c.clickSound || '')}"><input type="file" id="audio-click-file" accept="audio/*"> <button class="edw-sec-rst" data-haunt="audio-click" type="button">👻 Choisir sur haunt.gg</button>
-    <p class="edw-hint">Le visiteur active le son avec 🔇 près du badge Souanpt HUB. La musique démarre en fondu, tourne en boucle et se coupe sur connexion lente ou économie de données.</p><button class="edw-ok" id="audio-save">Enregistrer</button>`, w => {
+    <button class="edw-ok" id="audio-save">Enregistrer</button>`, w => {
     [['audio-music-file','audio-music'],['audio-click-file','audio-click']].forEach(([fileId,urlId]) => {
       w.querySelector('#'+fileId).onchange = async e => {
         const input = w.querySelector('#'+urlId); input.placeholder = 'Import en cours…';
-        try { input.value = await edUploadSiteAsset(e.target.files[0], 'audio'); showToast?.('Audio envoyé dans le site public ✓','#2e9a63',2500); }
+        try { input.value = await edUploadSiteAsset(e.target.files[0], 'audio'); showToast?.('Audio envoyé dans le site public ✓','var(--green)',2500); }
         catch(err) { showToast?.(err.message,'#c0392b',4000); }
         input.placeholder = 'https://…';
       };
@@ -1014,7 +1014,7 @@ function edWinAmbiance(btn) {
     <label class="edw-tog"><input type="checkbox" id="amb-grain"${S.grain ? ' checked' : ''}> Grain animé sur le fond</label>
     <label class="edw-tog"><input type="checkbox" id="amb-corner-on"${S.corner.on ? ' checked' : ''}> Badge en bas à gauche</label>
     <input class="edw-in" id="amb-corner-text" maxlength="40" placeholder="📍 FR · disponible" value="${_eesc(S.corner.text)}">
-    <p class="edw-hint">Tout est désactivé par défaut. Le mouvement réduit du visiteur est respecté (pas de particules ni d'animation). Sur téléphone : pas de curseur, moins de particules.</p>`;
+    `;
   EdWin.open(btn, '🌌 Ambiance du site', html, w => {
     const v = id => w.querySelector('#' + id);
     const read = () => ({
@@ -1125,7 +1125,7 @@ function edWinFx(btn) {
     ${tg.map(([k, n]) => `<label class="edw-tog"><input type="checkbox" data-f="${k}"${fx[k] ? ' checked' : ''}> ${n}</label>`).join('')}
     <div class="edw-l">Défilement</div>
     <label class="edw-tog"><input type="checkbox" id="edw-wheel"${c.smoothWheel ? ' checked' : ''}> Défilement fluide à la molette</label>
-    <p class="edw-hint">S'applique au site publié et à l'aperçu. Le pavé tactile et la préférence de mouvement réduit sont respectés.</p>
+    
     <div class="edw-l" id="edw-int-l" style="${fx.tilt ? '' : 'display:none'}">Intensité 3D — <b id="edw-int-v">${fx.intensity || 7}</b>°</div>
     <input type="range" id="edw-int" min="3" max="16" value="${fx.intensity || 7}" style="${fx.tilt ? '' : 'display:none'};width:100%">`;
   EdWin.open(btn, '⚡ Animations & effets', html, w => {
@@ -1288,7 +1288,7 @@ function edStatsPanel() {
       <input class="edw-in" id="ed-st-api-path" placeholder="chemin JSON (views)">
       <button class="edw-sec-rst" id="ed-st-api-add">＋ API</button>
     </div>
-    <p class="edw-hint">✎ modifie un chiffre (type, libellé, préfixe/suffixe) · ↑↓ change l'ordre · ✕ le retire.</p>
+    
   </div>`;
 }
 
@@ -1364,7 +1364,7 @@ function edSocialsPanel() {
     <div class="edw-l">Présentation sur le site</div>
     <div class="edw-row">${STYLES.map(([v, l]) =>
       `<button class="edw-st${style === v ? ' on' : ''}" data-soc-style="${v}">${l}</button>`).join('')}</div>
-    <p class="edw-hint">◌ masque un réseau partout · ☑ Contact l'ajoute à la zone « Me contacter » · aucun réseau vide n'est publié.</p>
+    
   </div>`;
 }
 
@@ -1400,7 +1400,7 @@ function edWinSections(btn) {
   };
 
   EdWin.open(btn, '☰ Sections', `<div id="edw-sec-list">${draw()}</div>
-    <p class="edw-hint" style="margin-top:10px">Une section sans contenu (aucun texte « À propos », aucun projet…) ne s'affiche pas, même visible.</p>`, w => {
+    `, w => {
     const list = w.querySelector('#edw-sec-list');
     // Redessine SANS refermer la fenêtre (l'ordre et les icônes changent).
     const redraw = () => { list.innerHTML = draw(); bind(); };
@@ -1511,7 +1511,7 @@ function edWinSections(btn) {
         if (f('suffix') !== undefined) next.suffix = f('suffix');
         stWrite(items => { items[i] = { ...items[i], ...next }; return items; });
         _edKpiEdit = null; redraw();
-        showToast?.('Chiffre mis à jour ✓', '#2e9a63', 1600);
+        showToast?.('Chiffre mis à jour ✓', 'var(--green)', 1600);
       });
 
       /* ── Réseaux : ordre, visibilité, édition, duplication, ajout, style ── */
@@ -1559,7 +1559,7 @@ function edWinSections(btn) {
         localStorage.setItem('hub_links', JSON.stringify(ls));
         SiteAutoPublish.queue();
         _socEdit = null; redraw();
-        showToast?.('Réseau mis à jour ✓', '#2e9a63', 1600);
+        showToast?.('Réseau mis à jour ✓', 'var(--green)', 1600);
       });
       list.querySelectorAll('[data-soc-dup]').forEach(b => b.onclick = () => {
         const ls = getLinks(), i = ls.findIndex(x => String(x.id) === String(b.dataset.socDup));
@@ -1568,7 +1568,7 @@ function edWinSections(btn) {
         localStorage.setItem('hub_links', JSON.stringify(ls));
         edSet('blocks', placeBlocks(getBlocks(SiteConfig.get())));   // réconcilie → bloc du doublon
         redraw();
-        showToast?.('Réseau dupliqué ✓', '#2e9a63', 1500);
+        showToast?.('Réseau dupliqué ✓', 'var(--green)', 1500);
       });
       list.querySelectorAll('[data-soc-rm]').forEach(b => b.onclick = () => {
         const id = String(b.dataset.socRm);
@@ -1592,7 +1592,7 @@ function edWinSections(btn) {
         _socEdit = null; redraw();
         setTimeout(() => list.querySelector('#sa-h')?.focus(), 20);
         showToast?.(d.platform ? 'Plateforme reconnue : ' + socialById(d.platform).label
-                               : 'Lien personnalisé — vérifie l\'adresse', '#2e9a63', 2400);
+                               : 'Lien personnalisé — vérifie l\'adresse', 'var(--green)', 2400);
       });
       const socAddGo = () => {
         const h = String(list.querySelector('#sa-h')?.value || '').trim();
@@ -1606,7 +1606,7 @@ function edWinSections(btn) {
         localStorage.setItem('hub_links', JSON.stringify(ls));
         edSet('blocks', placeBlocks(getBlocks(SiteConfig.get())));       // réconcilie → bloc Lien créé
         _socAdd = null; _socPrefill = ''; redraw();
-        showToast?.(p.icon + ' ' + p.label + ' ajouté ✓', '#2e9a63', 2000);
+        showToast?.(p.icon + ' ' + p.label + ' ajouté ✓', 'var(--green)', 2000);
       };
       list.querySelector('#sa-ok')?.addEventListener('click', socAddGo);
       const sah = list.querySelector('#sa-h');
@@ -1663,9 +1663,7 @@ function edWinBanner(anchor) {
     <label class="edw-tog"><input type="checkbox" id="bn-blank"${hl.blank === false ? '' : ' checked'}> Ouvrir dans un nouvel onglet</label>` : ''}
     <div class="edw-l">Bannière</div>
     <button class="edw-sec-rst" id="bn-vis">${shown ? '🙈 Masquer la bannière' : '👁 Afficher la bannière'}</button>
-    <p class="edw-hint">${c.layoutStyle === 'bento'
-      ? 'Thème Bento : la bannière n\'y figure pas (la carte Profil garde son dégradé). Passe en <b>Barre flottante</b> ou <b>Latérale</b> pour l\'image.'
-      : 'L\'image reçoit un voile sombre automatique : le titre reste lisible sur n\'importe quelle photo.'}</p>`;
+    ${c.layoutStyle === 'bento' ? '<p class="edw-hint">Pas de bannière en thème Bento : passe en <b>Barre flottante</b> ou <b>Latérale</b>.</p>' : ''}`;
   };
   const w = EdWin.open(anchor, '🖼 Bannière principale', `<div id="bn-body">${draw()}</div>`, root => {
     const body = root.querySelector('#bn-body');
@@ -1699,13 +1697,13 @@ function edWinBanner(anchor) {
                 HubImages._cache.set(stored.path, d);
                 SiteConfig.set('heroFile', stored.path);
                 edSet('heroImage', thumb);
-                showToast?.('GIF animé conservé ✓', '#2e9a63', 2000); redraw(); return;
+                showToast?.('GIF animé conservé ✓', 'var(--green)', 2000); redraw(); return;
               }
             } catch (error) { console.warn('[bannière GIF]', error); }
           }
           try {
             SiteConfig.set('heroFile', ''); edSet('heroImage', d);
-            showToast?.(gif ? 'GIF animé conservé ✓' : 'Image de bannière importée ✓', '#2e9a63', 2000); redraw();
+            showToast?.(gif ? 'GIF animé conservé ✓' : 'Image de bannière importée ✓', 'var(--green)', 2000); redraw();
           } catch (error) { showToast?.('Image trop volumineuse : connecte GitHub puis réessaie', '#c0392b', 4000); }
         });
         e.target.value = '';
@@ -1807,7 +1805,7 @@ function edWinEdit(blockId) {
       || (id === 'email' && !saved && c.email ? { id: 'email', on: true, value: c.email } : null);
     const variants = [['boutons', 'Boutons'], ['liste', 'Liste compacte'], ['cartes', 'Cartes'],
                       ['icones', 'Icônes seules'], ['barre', 'Barre horizontale']];
-    html = `<p class="edw-hint" style="margin-bottom:8px">Coche uniquement ce que tu veux rendre public. Une valeur décochée n'apparaît nulle part sur le site.</p>`
+    html = `<p class="edw-hint" style="margin-bottom:8px">Seules les lignes cochées sont publiées.</p>`
       + CONTACT_ORDER.map(id => {
           const k = CONTACT_KINDS[id], m = cur(id) || {};
           return `<div class="edw-ct" data-id="${id}">
@@ -1929,7 +1927,7 @@ function edWinEdit(blockId) {
     }
     if (b.type === 'project' && window.EdBehance) EdBehance.bindProject(w, String(bRef(b)));
     const ok = w.querySelector('#edw-save');
-    if (ok) ok.onclick = () => { save(w); SiteAutoPublish.queue(); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', '#2e9a63', 1500); };
+    if (ok) ok.onclick = () => { save(w); SiteAutoPublish.queue(); EdWin.close(); edRefreshPreview(); showToast?.('Modifié ✓', 'var(--green)', 1500); };
   });
 }
 /* ── Catalogue de tags et affectation aux projets ── */
@@ -2054,7 +2052,7 @@ function edAddProject() {
       if (typeof syncKPIs === 'function') syncKPIs();
       edRefreshPreview();
       SiteAutoPublish.queue();
-      showToast?.('Projet « ' + title + ' » ajouté ✓', '#2e9a63', 2200);
+      showToast?.('Projet « ' + title + ' » ajouté ✓', 'var(--green)', 2200);
       // T4 : couverture complète → dépôt privé, miniature conservée ici
       if (!p.coverFile && window.HubImages) {
         HubImages.offloadProject(p.id).then(q => {
@@ -2076,7 +2074,7 @@ function edPushBlock(raw) {
 function edCreateText() {
   edPushBlock({ id: blockUid('text'), type: 'text', props: { title: '', text: 'Nouveau texte — double-clic pour modifier' }, w: 2, h: 1 });
   EdWin.close();
-  showToast?.('Bloc texte ajouté ✓', '#2e9a63', 1800);
+  showToast?.('Bloc texte ajouté ✓', 'var(--green)', 1800);
 }
 function edCreateSocial(pid) {
   const p = socialById(pid);
@@ -2093,7 +2091,7 @@ function edCreateSocial(pid) {
       localStorage.setItem('hub_links', JSON.stringify(links));
       EdCanvas.commit(placeBlocks(getBlocks(SiteConfig.get())));   // réconcilie → bloc lien créé
       EdCanvas.rerender(); EdWin.close();
-      showToast?.('Bloc ' + p.label + ' ajouté ✓', '#2e9a63', 2000);
+      showToast?.('Bloc ' + p.label + ' ajouté ✓', 'var(--green)', 2000);
     };
     w.querySelector('#soc-ok').onclick = go;
     inp.onkeydown = e => { if (e.key === 'Enter') go(); };

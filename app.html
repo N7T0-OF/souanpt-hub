@@ -30,12 +30,12 @@
   --accent-glow:color-mix(in srgb,var(--accent) 25%,transparent);
   --accent-hover:color-mix(in srgb,var(--accent) 85%,#fff);
   --gold:#c9922a; --gold-l:#e4b24a;
-  --green:#2e9a63; /* sémantique : succès / payé / actif — ne suit pas l'accent */ --red:#c0392b; --blue:#2d7dd2;
+  --green:var(--accent); /* 3.20 : le « succès » prend la couleur dynamique du site (plus de vert fixe) */ --red:#c0392b; --blue:#2d7dd2;
   --text:#f0ece4; --muted:#444; --muted2:#666; --muted3:#888;
   --border:rgba(255,255,255,.07); --border2:rgba(255,255,255,.11);
   --sb-w:220px; --r:8px;
   --gold-dim:rgba(201,146,42,.12); --gold-border:rgba(201,146,42,.25); --gold-glow:rgba(201,146,42,.2);
-  --green-dim:rgba(46,154,99,.1); --red-dim:rgba(192,57,43,.1); --blue-dim:rgba(45,125,210,.1);
+  --green-dim:color-mix(in srgb,var(--green) 10%,transparent); --red-dim:rgba(192,57,43,.1); --blue-dim:rgba(45,125,210,.1);
   --surface:var(--s1); --surface2:var(--s2);
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -282,7 +282,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 
 /* ── INVOICES ── */
 .fac-row{
-  display:grid;grid-template-columns:2fr 1fr 80px 80px 70px 24px;
+  display:grid;grid-template-columns:2fr 1fr 80px 80px 84px 96px;
   gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);font-size:10px;
 }
 /* Sous ~760 px, la tableau se replie sur deux colonnes au lieu d'écraser les
@@ -290,6 +290,32 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 @media(max-width:760px){.fac-row{grid-template-columns:1fr auto;gap:4px 12px}
   .fac-row>div:nth-child(5),.fac-row>div:nth-child(6){justify-self:end}}
 .fac-name{font-weight:600}
+.fac-num{font-size:8px;font-weight:700;color:var(--muted2);letter-spacing:.04em;margin-right:4px}.fac-rem{font-size:8px;color:var(--gold-l)}
+.fac-date small{display:block;font-size:8px;color:var(--muted2)}
+.fac-act{display:flex;gap:2px;justify-content:flex-end}.fac-act button{background:none;border:1px solid transparent;border-radius:6px;cursor:pointer;color:var(--muted2);font-size:12px;width:22px;height:22px;padding:0}
+.fac-act button:hover{border-color:var(--border);color:var(--text);background:var(--s2)}
+.ov-todo-l{display:flex;flex-direction:column;gap:6px}
+.ov-todo-i{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:9px;background:var(--s2);color:var(--text);font-family:inherit;text-align:left;cursor:pointer;transition:border-color .15s}
+.ov-todo-i:hover{border-color:var(--accent)}.ov-todo-i.bad{border-color:color-mix(in srgb,var(--red) 45%,transparent)}
+.ov-todo-ic{font-size:15px}.ov-todo-t{flex:1;display:flex;flex-direction:column}.ov-todo-t b{font-size:11px}.ov-todo-t small{font-size:9px;color:var(--muted2)}.ov-todo-go{color:var(--muted2)}
+.biz-dash{padding:14px;margin-bottom:14px}.biz-dash:empty{display:none}
+#page-facturation .biz-kpis{display:none} /* 3.20 : fusionné dans le tableau de bord du CA */
+.biz-d-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.biz-d-kpis>div{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.biz-d-kpis span{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);font-weight:700}.biz-d-kpis b{font-size:17px;font-family:'Syne',sans-serif}
+.biz-d-kpis small{font-size:9px;color:var(--muted2)}.biz-d-kpis .is-late b{color:var(--red)}
+.biz-d-chart{display:flex;align-items:flex-end;gap:6px;height:110px;padding:4px 0 0}
+.biz-d-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
+.biz-d-col i{display:block;width:100%;max-width:26px;min-height:2px;border-radius:4px 4px 0 0;background:var(--accent);opacity:.85}
+.biz-d-col:hover i{opacity:1}.biz-d-col span{font-size:8px;color:var(--muted2);text-transform:capitalize}
+.biz-d-ceil{margin-top:12px}.biz-d-ceil-h{display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-bottom:5px}
+.biz-d-bar{height:6px;border-radius:6px;background:var(--s3);overflow:hidden}.biz-d-bar i{display:block;height:100%;background:var(--accent)}
+.biz-d-warn{margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--gold-l)}
+@media(max-width:760px){.biz-d-kpis{grid-template-columns:1fr 1fr}}
+#biz-modal{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+#biz-modal .biz-card{width:min(520px,100%);max-height:90vh;overflow:auto;background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:14px 16px;box-shadow:0 20px 60px #000a}
+.biz-card-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px}.biz-card-f{display:flex;justify-content:flex-end;margin-top:12px}
+.biz-f{display:flex;flex-direction:column;gap:4px;margin-bottom:9px;font-size:9px;color:var(--muted2);flex:1}.biz-row{display:flex;gap:10px}
 .fac-client{color:var(--muted2)}
 .fac-price{font-family:'Syne',sans-serif;font-weight:700;color:var(--gold-l)}
 .fac-date{color:var(--muted2)}
@@ -364,7 +390,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
   transition:all .3s;flex-shrink:0;
 }
 .pipeline-step.active{border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 5%,transparent)}
-.pipeline-step.done{border-color:rgba(46,154,99,.4);background:rgba(46,154,99,.05)}
+.pipeline-step.done{border-color:color-mix(in srgb,var(--green) 40%,transparent);background:color-mix(in srgb,var(--green) 5%,transparent)}
 .pipeline-step.error{border-color:rgba(192,57,43,.4);background:rgba(192,57,43,.05)}
 .ps-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);transition:background .3s}
 .pipeline-step.active .ps-dot{background:var(--accent);animation:pulse 1s infinite}
@@ -1593,6 +1619,9 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><a class="btn btn-ghost" style="font-size:10px" href="https://haunt.gg/fr/dashboard" target="_blank" rel="noopener noreferrer">Ouvrir haunt.gg ↗</a><button class="btn btn-ghost" style="font-size:10px" onclick="showPage('editor');setTimeout(function(){window.edWinHaunt&&edWinHaunt()},600)">🔗 Liens à mettre sur haunt.gg</button></div>
       </div>
 
+      <!-- À traiter : factures en retard, échéances, avis, demandes (js/business.js) -->
+      <div class="an-card" id="ov-todo"></div>
+
       <!-- Ligne 4 : activité récente -->
       <div class="an-card"><div class="an-card-h"><span>Activité récente</span></div><div id="ov-activity"></div></div>
 
@@ -1795,6 +1824,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
     <div class="page" id="page-facturation">
       <div class="section-header"><div class="section-title">Facturation</div><div class="section-line"></div>
         <input class="prop-input" id="inv-search" placeholder="🔍 Rechercher…" style="width:180px;font-size:10px" oninput="_invPage=1;renderInvoices()">
+        <button class="btn btn-ghost" style="font-size:10px" onclick="Biz.openSettings()" title="Nom, SIRET, adresse, mentions, délai de paiement">⚙ Mes infos</button>
         <button class="btn btn-ghost" style="font-size:10px" onclick="exportInvoicesCSV()" title="Exporter en CSV (Excel)">⬇ CSV</button>
         <button class="btn btn-accent" style="font-size:10px" onclick="toggleForm('add-inv-form')">+ Prestation</button>
       </div>
@@ -1804,6 +1834,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
         <div class="kpi-card" style="--c:var(--gold-l)"><div class="kpi-label">En attente</div><div class="kpi-val" style="color:var(--gold-l)" id="fac-pending-count">0</div></div>
         <div class="kpi-card k2"><div class="kpi-label">Clients</div><div class="kpi-val" id="fac-clients-count">0</div></div>
       </div>
+      <div class="gc biz-dash" id="biz-dash"></div>
       <div class="form-box" id="add-inv-form">
         <div class="biz-form">
           <div><div class="prop-label">Prestation</div><input class="prop-input" id="inv-name" placeholder="Logo design" list="dl-catalog" oninput="invSuggestPrice()"></div>
@@ -2405,6 +2436,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
 <script src="js/site-ambiance.js"></script>
 <script src="js/site-seo.js"></script>
 <script src="js/haunt.js"></script>
+<script src="js/business.js"></script>
 <script src="js/editor-seo.js"></script>
 <script src="js/editor-toolbar.js"></script>
 <script src="js/core.js"></script>
@@ -2468,7 +2500,7 @@ function notifsSave() {
     events[i.dataset.nt][i.dataset.ch] = i.checked;
   });
   Notify.set({ url: (document.getElementById('nt-url').value || '').trim(), events });
-  showToast('Préférences de notification enregistrées ✓', '#2e9a63', 2500);
+  showToast('Préférences de notification enregistrées ✓', 'var(--green)', 2500);
 }
 
 /* Ferme le panneau de notifications au clic extérieur (même logique que les
@@ -2536,7 +2568,7 @@ async function accSavePseudo() {
     await Cloud.saveProfile(Cloud.user().uid, { pseudo });
     _myProfile = { ...(_myProfile || {}), pseudo };
     localStorage.setItem('souanpt_pseudo', pseudo);
-    renderCompte(); say('✓ Pseudo mis à jour', '#2e9a63');
+    renderCompte(); say('✓ Pseudo mis à jour', 'var(--green)');
   } catch (e) { say('✗ ' + (e.message || 'Erreur'), '#c0392b'); }
 }
 async function accSaveDisplay() {
@@ -2546,7 +2578,7 @@ async function accSaveDisplay() {
   try {
     await Cloud.saveProfile(Cloud.user().uid, { name });
     _myProfile = { ...(_myProfile || {}), name };
-    renderCompte(); say('✓ Nom affiché mis à jour', '#2e9a63');
+    renderCompte(); say('✓ Nom affiché mis à jour', 'var(--green)');
   } catch (e) { say('✗ ' + (e.message || 'Erreur'), '#c0392b'); }
 }
 
@@ -2604,7 +2636,7 @@ async function intBackupNow() {
     if (r.deleted) msg += ' · ' + r.deleted + ' obsolète(s) supprimé(s)';
     msg += ' sur ton repo privé';
   }
-  showToast(msg, '#2e9a63', 3200);
+  showToast(msg, 'var(--green)', 3200);
 }
 /** TIRAGE CIBLÉ — récupère depuis GitHub ce qui a changé ailleurs (3 voies) :
     on ne touche jamais à ce qui a bougé sur CE dispositivo. */
@@ -2616,19 +2648,19 @@ async function intPullNow() {
   if (!r || r.error) { showToast('✗ Impossible de lire le dépôt GitHub', '#c0392b', 3500); return; }
   if (r.none) { showToast('Aucune sauvegarde GitHub pour l\'instant — utilise « ↑ Sauvegarder maintenant »', '#e4b24a', 4500); return; }
   if ((r.pulled && r.pulled.length) || (r.conflicts && r.conflicts.length)) return; // boot() a déjà affiché
-  showToast('✓ Déjà à jour : ton hub correspond à ta sauvegarde GitHub', '#2e9a63', 3000);
+  showToast('✓ Déjà à jour : ton hub correspond à ta sauvegarde GitHub', 'var(--green)', 3000);
 }
 function saveIntLink(kind) {
   const inp = document.getElementById('int-' + kind + '-inp');
   const v = (inp?.value || '').trim();
   SiteConfig.set(kind + 'Link', v);
   renderIntegrations();
-  showToast(v ? '✓ Lien ' + (kind === 'paypal' ? 'PayPal' : 'Stripe') + ' enregistré — prérempli dans tes portails clients' : 'Lien retiré', '#2e9a63', 2800);
+  showToast(v ? '✓ Lien ' + (kind === 'paypal' ? 'PayPal' : 'Stripe') + ' enregistré — prérempli dans tes portails clients' : 'Lien retiré', 'var(--green)', 2800);
 }
 function saveImgQuality() {
   const v = document.getElementById('set-img-quality')?.value || 'balanced';
   localStorage.setItem('hub_img_quality', v);
-  showToast('Qualité : ' + (v==='max'?'Maximum':v==='eco'?'Économie stockage':'Équilibré') + ' ✓', '#2e9a63', 2000);
+  showToast('Qualité : ' + (v==='max'?'Maximum':v==='eco'?'Économie stockage':'Équilibré') + ' ✓', 'var(--green)', 2000);
 }
 function settingsSaveGeneral() {
   const cfg = SiteConfig.get();
@@ -2637,18 +2669,18 @@ function settingsSaveGeneral() {
   if (name) cfg.siteName = name;
   if (bio !== undefined) cfg.bio = bio;
   SiteConfig.save(cfg);
-  showToast('Sauvegardé ✓','#2e9a63');
+  showToast('Sauvegardé ✓','var(--green)');
 }
 function settingsSaveBehance() {
   const user = (document.getElementById('set-behance-user')?.value.trim() || '').replace('@','');
   if (user) SiteConfig.set('behance', user);
   renderBehancePage();
-  showToast('Behance @' + user + ' sauvegardé','#2e9a63');
+  showToast('Behance @' + user + ' sauvegardé','var(--green)');
 }
 function settingsSaveDomain() {
   const d = document.getElementById('set-custom-domain')?.value.trim();
   if (d) SiteConfig.set('customDomain', 'https://' + d.replace('https://',''));
-  showToast('Domaine sauvegardé','#2e9a63');
+  showToast('Domaine sauvegardé','var(--green)');
 }
 /* ═══ EXPORT / IMPORT COMPLET DU HUB — filet de sécurité + base migration Firebase ═══ */
 /* La liste des collections n'est plus en dur ici : elle vit dans
@@ -2673,7 +2705,7 @@ function exportDataFull() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'souanpt-hub-' + (Auth.user()?.login || 'export') + '-' + new Date().toISOString().slice(0,10) + '.json';
   a.click(); URL.revokeObjectURL(a.href);
-  showToast('✓ Sauvegarde complète téléchargée','#2e9a63',2500);
+  showToast('✓ Sauvegarde complète téléchargée','var(--green)',2500);
 }
 function importDataFull() {
   const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
@@ -2698,7 +2730,7 @@ function importDataFull() {
         // recharge tout l'affichage
         renderProjects(); renderLinks(); renderClients(); renderInvoices(); renderReviews();
         renderMedia(); renderCatalog(); refreshInvDatalists(); renderPortals(); syncKPIs();
-        showToast('✓ Hub restauré','#2e9a63',2500);
+        showToast('✓ Hub restauré','var(--green)',2500);
       } catch { showToast('Fichier invalide','#c0392b'); }
     };
     r.readAsText(f);
@@ -2720,7 +2752,7 @@ async function restoreV1() {
     reloadAllData();
     renderBehancePage?.(); edLoad?.();
     const cloud = window.Cloud && Cloud.enabled && Cloud.user();
-    showToast('✓ Données restaurées depuis GitHub !' + (cloud ? ' Synchronisation cloud en cours…' : ''), '#2e9a63', 4500);
+    showToast('✓ Données restaurées depuis GitHub !' + (cloud ? ' Synchronisation cloud en cours…' : ''), 'var(--green)', 4500);
   } catch (e) {
     showToast('✗ ' + (e.message || 'Aucune sauvegarde trouvée'), '#c0392b', 4000);
   }
@@ -2831,7 +2863,7 @@ function cropApply() {
   const cl = document.getElementById('np-cover-clear'); if (cl) cl.style.display = '';
   cropCancel();
   document.getElementById('add-project-form')?.classList.add('visible');
-  showToast('Couverture recadrée ✓', '#2e9a63', 1800);
+  showToast('Couverture recadrée ✓', 'var(--green)', 1800);
 }
 document.addEventListener('DOMContentLoaded', () => {
   const fr = document.getElementById('crop-frame'); if (!fr) return;
@@ -2879,7 +2911,7 @@ function addProject() {
     SiteAutoPublish.queue();
     const target = wasEdit ? _editingId : newId;      // avant reset (qui efface _editingId)
     resetProjectForm(); renderProjects(); syncKPIs();
-    showToast(wasEdit ? 'Projet mis à jour ✓' : 'Projet ajouté ✓','#2e9a63');
+    showToast(wasEdit ? 'Projet mis à jour ✓' : 'Projet ajouté ✓','var(--green)');
     // T4 : la couverture quitte le navigateur dès qu'on est connecté (1 commit,
     // miniature conservée). Silencieux si échec → le base64 reste en local.
     if (target && window.HubImages) {
@@ -2900,7 +2932,7 @@ async function optimizeAllCovers() {
   // Une couverture déjà sortie sur GitHub (coverFile) n'a plus rien à compresser
   // ici : sa miniature est déjà légère, et son plein format est sur le dépôt.
   const targets = projs.filter(p => p.cover && p.cover.startsWith('data:') && !p.coverFile);
-  if (!targets.length) { showToast('Aucune couverture à optimiser (les liens Behance/URL ne pèsent rien) ✓','#2e9a63',3000); return; }
+  if (!targets.length) { showToast('Aucune couverture à optimiser (les liens Behance/URL ne pèsent rien) ✓','var(--green)',3000); return; }
   const btn = document.getElementById('opt-btn'); if (btn) { btn.disabled = true; btn.textContent = '⟳ Optimisation…'; }
   let before = 0, after = 0, done = 0;
   for (const p of targets) {
@@ -2913,7 +2945,7 @@ async function optimizeAllCovers() {
   const savedKo = Math.max(0, Math.round((before - after) * 0.75 / 1024));
   renderProjects(); renderBehancePage?.(); syncKPIs();
   if (btn) { btn.disabled = false; btn.textContent = '🗜 Optimiser'; }
-  showToast(`✓ ${done} couverture(s) optimisée(s) — ${savedKo} Ko économisés`, '#2e9a63', 4000);
+  showToast(`✓ ${done} couverture(s) optimisée(s) — ${savedKo} Ko économisés`, 'var(--green)', 4000);
 }
 
 /* ═══ T4 — SORTIE DES IMAGES DU NAVIGATEUR (miniature locale + plein format
@@ -2928,7 +2960,7 @@ async function offloadImages() {
     return;
   }
   const before = HubImages.stats();
-  if (!before.heavy) { say('Aucune image lourde dans le navigateur ✓'); showToast('Rien à sortir — le navigateur est léger ✓','#2e9a63',3000); return; }
+  if (!before.heavy) { say('Aucune image lourde dans le navigateur ✓'); showToast('Rien à sortir — le navigateur est léger ✓','var(--green)',3000); return; }
   const savedLabel = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '⟳ ' + before.heavy + ' image(s)…'; }
   try {
@@ -2937,7 +2969,7 @@ async function offloadImages() {
     const ko = Math.max(0, Math.round(r.freed / 1024));
     say(`${r.moved} image(s) sortie(s) · ${ko} Ko libérés${r.failed ? ' · ' + r.failed + ' en échec' : ''}`);
     if (r.moved) {
-      showToast(`✓ ${r.moved} image(s) sur GitHub — ${ko} Ko libérés du navigateur`, '#2e9a63', 5000);
+      showToast(`✓ ${r.moved} image(s) sur GitHub — ${ko} Ko libérés du navigateur`, 'var(--green)', 5000);
       renderProjects(); renderBehancePage?.(); syncKPIs();
     }
   } catch (e) {
@@ -3004,7 +3036,7 @@ function moveProject(from, to) {
   projs.splice(to, 0, moved);
   localStorage.setItem('hub_projects', JSON.stringify(projs));
   renderProjects();
-  showToast('Ordre mis à jour ✓ — publie pour l\'appliquer au site', '#2e9a63', 2000);
+  showToast('Ordre mis à jour ✓ — publie pour l\'appliquer au site', 'var(--green)', 2000);
 }
 
 /* ═══ BEHANCE PAGE ═══ */
@@ -3087,7 +3119,7 @@ function addClient() {
   CP.viewClient(newClient.id);
   // L'affichage local ne doit pas dépendre d'une publication distante.
   try { SiteAutoPublish.queue(); } catch (e) { console.warn('[client] publication automatique',e); }
-  showToast('Client ajouté ✓','#2e9a63',1800);
+  showToast('Client ajouté ✓','var(--green)',1800);
 }
 function deleteClient(id) { localStorage.setItem('hub_clients', JSON.stringify(JSON.parse(localStorage.getItem('hub_clients')||'[]').filter(c=>c.id!==id))); CP.invalidateSearch?.(); CP._paint?.(); SiteAutoPublish.queue(); }
 function renderClients() {
@@ -3109,7 +3141,7 @@ function renderClients() {
   if(sub){ let withP=0; try{ const links=(window.CP&&CP._links)||[];
     withP=new Set(links.map(l=>(l.clientName||'').trim().toLowerCase()).filter(Boolean)).size; }catch{}
     sub.textContent=cl.length+' fiche'+(cl.length>1?'s':'')+(withP?' · '+withP+' avec projet':''); }
-  const cols=['rgba(201,146,42,.12)','rgba(46,154,99,.1)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
+  const cols=['rgba(201,146,42,.12)','color-mix(in srgb,var(--green) 10%,transparent)','rgba(45,125,210,.1)','rgba(192,57,43,.1)'];
   const tcols=['var(--gold-l)','var(--green)','var(--blue)','var(--red)'];
   if(!cl.length){ct.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-title">Aucun client</div><div class="empty-sub">Ajoute ton premier client — il sera proposé dans Facturation et Portails</div></div>';return;}
   const sorted=cl.filter(c=>CP.matchesClient(c)).sort((a,b)=>CP.sortMode==='az' ? String(a.name||'').localeCompare(String(b.name||''),'fr') : (Number(b.createdAt)||0)-(Number(a.createdAt)||0));
@@ -3165,6 +3197,8 @@ function addInvoice() {
   const price=parseFloat(document.getElementById('inv-price')?.value)||0;
   const inv=getInvoices();
   const newInv={ id:Date.now().toString(), name, client, price, status:'pending', createdAt:Date.now() };
+  // 3.20 : numéro continu FA-AAAA-NNN et échéance selon le délai de paiement (js/business.js)
+  if (window.Biz) { newInv.number = Biz.nextNumber(newInv.createdAt); newInv.dueAt = newInv.createdAt + Biz.get().terms * 86400000; }
   inv.push(newInv);
   localStorage.setItem('hub_invoices', JSON.stringify(inv));
   // Dossier client : si ce nom n'a qu'UN seul projet, la facture s'y rattache
@@ -3185,7 +3219,7 @@ function addInvoice() {
       cls.push({ id:Date.now().toString()+'c', name:client, type:'', status:'active', progress:0, revenue:0, createdAt:Date.now() });
       localStorage.setItem('hub_clients', JSON.stringify(cls));
       renderClients();
-      showToast('Client « '+client+' » créé automatiquement ✓','#2e9a63',2500);
+      showToast('Client « '+client+' » créé automatiquement ✓','var(--green)',2500);
     }
   }
   _invPage=1;
@@ -3206,6 +3240,7 @@ function toggleInvStatus(id) {
   const i=inv.find(x=>x.id===id); if(!i) return;
   const idx=INV_CYCLE.indexOf(i.status||'pending');
   i.status=INV_CYCLE[(idx+1)%INV_CYCLE.length];
+  if (i.status==='paid') i.paidAt=Date.now(); else delete i.paidAt;   // encaissement daté (CA du mois)
   localStorage.setItem('hub_invoices', JSON.stringify(inv));
   renderInvoices(); syncKPIs();
 }
@@ -3225,10 +3260,12 @@ function renderInvoices() {
   } else {
     ct.innerHTML=slice.map(i=>{
       const st=INV_STATUS[i.status]||INV_STATUS.pending;
-      const late=(i.status==='pending'||i.status==='acompte') && (Date.now()-(i.createdAt||0))>14*86400000;
-      return `<div class="fac-row"><div class="fac-name">${esc(i.name)}${late?' <span style="color:var(--red);font-size:8px;font-weight:700">· EN RETARD</span>':''}</div><div class="fac-client">${esc(i.client||'—')}</div><div class="fac-price">${(i.price||0).toLocaleString('fr')} €</div><div class="fac-date">${new Date(i.createdAt).toLocaleDateString('fr-FR')}</div><div class="fac-status ${st.cls}" onclick="toggleInvStatus('${i.id}')" style="cursor:pointer" title="Cliquer : En attente → Acompte → Payée → Annulée">${st.label}</div><button onclick="deleteInv('${i.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted2)">✕</button></div>`;
+      const late=window.Biz ? Biz.isLate(i) : ((i.status==='pending'||i.status==='acompte') && (Date.now()-(i.createdAt||0))>14*86400000);
+      const due=window.Biz ? Biz.dueAt(i) : 0;
+      return `<div class="fac-row"><div class="fac-name">${i.number?'<span class="fac-num">'+esc(i.number)+'</span> ':''}${esc(i.name)}${late?' <span style="color:var(--red);font-size:8px;font-weight:700">· EN RETARD</span>':''}${i.reminders?' <span class="fac-rem" title="Dernière relance le '+new Date(i.remindedAt).toLocaleDateString('fr-FR')+'">relancée ×'+i.reminders+'</span>':''}</div><div class="fac-client">${esc(i.client||'—')}</div><div class="fac-price">${(i.price||0).toLocaleString('fr')} €</div><div class="fac-date" title="Échéance : ${due?new Date(due).toLocaleDateString('fr-FR'):'—'}">${new Date(i.createdAt).toLocaleDateString('fr-FR')}${due&&i.status!=='paid'&&i.status!=='cancelled'?'<small>éch. '+new Date(due).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})+'</small>':''}</div><div class="fac-status ${st.cls}" onclick="toggleInvStatus('${i.id}')" style="cursor:pointer" title="Cliquer : En attente → Acompte → Payée → Annulée">${st.label}</div><div class="fac-act"><button onclick="Biz.print('${i.id}')" title="Facture PDF (imprimer)" aria-label="Facture PDF">🧾</button>${(i.status==='pending'||i.status==='acompte')?`<button onclick="Biz.remind('${i.id}')" title="${late?'Relancer le client (e-mail pré-rédigé)':'Envoyer un rappel'}" aria-label="Relancer">✉</button>`:''}<button onclick="Biz.duplicate('${i.id}')" title="Dupliquer" aria-label="Dupliquer">⧉</button><button onclick="if(confirm('Supprimer cette prestation ?'))deleteInv('${i.id}')" title="Supprimer" aria-label="Supprimer">✕</button></div></div>`;
     }).join('');
   }
+  window.Biz && Biz.renderDash();
   const pg=document.getElementById('inv-pagination');
   if(pg) pg.innerHTML = pages>1
     ? `<button onclick="invPage(-1)" ${_invPage<=1?'disabled':''}>←</button><span>${_invPage} / ${pages}</span><button onclick="invPage(1)" ${_invPage>=pages?'disabled':''}>→</button>`
@@ -3268,14 +3305,15 @@ function refreshInvDatalists() {
 function exportInvoicesCSV() {
   const inv=getInvoices();
   if(!inv.length){ showToast('Aucune prestation à exporter','#e4b24a',2000); return; }
-  const rows=[['Prestation','Client','Prix (EUR)','Date','Statut'],
-    ...inv.map(i=>[i.name,i.client||'',i.price||0,new Date(i.createdAt).toLocaleDateString('fr-FR'),(INV_STATUS[i.status]||INV_STATUS.pending).label])];
+  const d=t=>t?new Date(t).toLocaleDateString('fr-FR'):'';
+  const rows=[['Numéro','Prestation','Client','Prix (EUR)','Date','Échéance','Encaissée le','Statut'],
+    ...inv.map(i=>[i.number||'',i.name,i.client||'',i.price||0,d(i.createdAt),window.Biz?d(Biz.dueAt(i)):'',d(i.paidAt),(INV_STATUS[i.status]||INV_STATUS.pending).label])];
   const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download='prestations-souanpt-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
   URL.revokeObjectURL(a.href);
-  showToast('Export CSV téléchargé ✓ (compatible Excel)','#2e9a63',2500);
+  showToast('Export CSV téléchargé ✓ (compatible Excel)','var(--green)',2500);
 }
 
 function populateReviewClientSelect() {
@@ -3308,7 +3346,7 @@ function reviewAction(id, action) {
   else{const r=rv.find(r=>r.id===id);if(r)r.status=action;localStorage.setItem('hub_reviews',JSON.stringify(rv));}
   if (action==='approved' || wasApproved) SiteAutoPublish.queue();
   renderReviews();
-  if(action==='approved') showToast(SiteConfig.get().autoPublish?'Approuvé ✓ — mise à jour publique programmée':'Approuvé ✓ — clique 🚀 Publier pour l\'afficher sur le site','#2e9a63',3500);
+  if(action==='approved') showToast(SiteConfig.get().autoPublish?'Approuvé ✓ — mise à jour publique programmée':'Approuvé ✓ — clique 🚀 Publier pour l\'afficher sur le site','var(--green)',3500);
 }
 function renderReviews() {
   const rv=JSON.parse(localStorage.getItem('hub_reviews')||'[]');
@@ -3344,7 +3382,7 @@ function showQR(url, title) {
     <div style="font-size:9px;color:var(--muted2);margin:12px 0 4px;word-break:break-all">${esc(url)}</div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <a class="btn btn-ghost" style="flex:1;justify-content:center;font-size:10px" href="${esc(img)}&download=1" download="qr.png" target="_blank">↓ PNG</a>
-      <button class="btn btn-accent" style="flex:1;justify-content:center;font-size:10px" onclick="navigator.clipboard.writeText('${esc(url)}').then(()=>showToast('Lien copié ✓','#2e9a63',1200))">Copier le lien</button>
+      <button class="btn btn-accent" style="flex:1;justify-content:center;font-size:10px" onclick="navigator.clipboard.writeText('${esc(url)}').then(()=>showToast('Lien copié ✓','var(--green)',1200))">Copier le lien</button>
     </div>
     <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:10px;margin-top:8px" onclick="document.getElementById('qr-modal').remove()">Fermer</button>
   </div>`;
@@ -3398,6 +3436,7 @@ function syncKPIs() {
   const facBadge=document.getElementById('fac-badge');
   if(facBadge){facBadge.textContent=facPending||'';facBadge.style.display=facPending?'':'none';}
   set('fac-clients-count',cl.length);
+  window.Biz && Biz.renderTodo();   // badge = factures EN RETARD + carte « À traiter »
   // Storage
   const used=Object.keys(localStorage).reduce((s,k)=>s+(localStorage.getItem(k)||'').length,0);
   const bar=document.getElementById('stor-bar');
@@ -3609,10 +3648,10 @@ function portalSave() {
     (portalCloud() || (SiteConfig.get().autoPublish && Auth.ok()));
   portalCloseForm(); renderPortals();
   if (updateOnline) {
-    showToast('Portail enregistré — mise à jour du lien en cours…','#2e9a63',3500);
+    showToast('Portail enregistré — mise à jour du lien en cours…','var(--green)',3500);
     portalPublish(savedPortal.id, { automatic:true });
   } else {
-    showToast(wasEditing?'Portail mis à jour ✓ — clique « Republier » pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','#2e9a63',3500);
+    showToast(wasEditing?'Portail mis à jour ✓ — clique « Republier » pour appliquer':'Portail créé ✓ — clique « Publier » pour obtenir le lien','var(--green)',3500);
   }
 }
 function portalEdit(id) {
@@ -3672,7 +3711,7 @@ async function portalPublish(id, { automatic=false }={}) {
       p.publishedAt=Date.now(); p.url=url; p.deployVerified=true; setPortals(portals);
       if (!automatic) await navigator.clipboard.writeText(url).catch(()=>{});
       renderPortals();
-      showToast(automatic?'✓ Portail mis à jour en ligne':'✓ Portail en ligne instantanément — lien copié !','#2e9a63',3500);
+      showToast(automatic?'✓ Portail mis à jour en ligne':'✓ Portail en ligne instantanément — lien copié !','var(--green)',3500);
     } catch(e){ showToast('✗ '+e.message,'#c0392b',3500); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
     return;
   }
@@ -3685,26 +3724,26 @@ async function portalPublish(id, { automatic=false }={}) {
     p.publishedAt=Date.now(); p.url=url; p.deploySha=sha; p.deployFileSha=fileSha; p.deployVerified=built; setPortals(portals);
     if (!automatic) await navigator.clipboard.writeText(url).catch(()=>{});
     renderPortals();
-    if(built) showToast(automatic?'✓ Portail mis à jour en ligne':'✓ Portail en ligne — lien copié !','#2e9a63',3500);
+    if(built) showToast(automatic?'✓ Portail mis à jour en ligne':'✓ Portail en ligne — lien copié !','var(--green)',3500);
     else showToast(automatic?'Mise à jour envoyée — build Pages en attente':'Publication envoyée — lien copié. Vérifie le build Pages avant de partager.','#e4b24a',5000);
   } catch(e){ showToast('✗ '+e.message,'#c0392b',4000); if(btn){btn.disabled=false;setBtn('🚀 Publier');} }
 }
 async function portalVerify(id) {
-  if (portalCloud()) { showToast('✓ Portail instantané (Firestore) — actif immédiatement','#2e9a63',3000); return; }
+  if (portalCloud()) { showToast('✓ Portail instantané (Firestore) — actif immédiatement','var(--green)',3000); return; }
   showToast('Vérification…','#666',1200);
   try {
     const r=await verifyPortal(id);
     if(r.ok) {
       const portals=getPortals(), p=portals.find(x=>x.id===id);
       if(p){p.deployVerified=true;setPortals(portals);renderPortals();}
-      showToast('✓ Portail en ligne et accessible','#2e9a63',3000);
+      showToast('✓ Portail en ligne et accessible','var(--green)',3000);
     }
     else showToast((r.pending?'⏳ ':'✗ ')+r.reason, r.pending?'#e4b24a':'#c0392b', 4000);
   } catch(e){ showToast('✗ '+e.message,'#c0392b',3000); }
 }
 function portalCopy(id){
   const p=getPortals().find(x=>x.id===id); if(!p||!p.url) return;
-  navigator.clipboard.writeText(p.url).then(()=>showToast('Lien copié ✓','#2e9a63',1500));
+  navigator.clipboard.writeText(p.url).then(()=>showToast('Lien copié ✓','var(--green)',1500));
 }
 function renderPortals() {
   const portals=getPortals();
@@ -3758,7 +3797,7 @@ function saveGoat() {
   SiteConfig.set('goatcounter', code);
   const inp = document.getElementById('gc-code'); if (inp) inp.value = code;
   renderGoat();
-  showToast(code ? '✓ GoatCounter configuré — 🚀 Publie pour activer le suivi' : 'GoatCounter désactivé', code ? '#2e9a63' : '#666', 3000);
+  showToast(code ? '✓ GoatCounter configuré — 🚀 Publie pour activer le suivi' : 'GoatCounter désactivé', code ? 'var(--green)' : '#666', 3000);
   refreshRealStats(false);
 }
 function renderGoat() {
@@ -3793,7 +3832,7 @@ async function refreshRealStats(silent) {
       const st = document.getElementById('gc-status');
       if (st) st.textContent = '✓ ' + cfg.goatcounter + '.goatcounter.com — ' + s.views.toLocaleString('fr') + ' vues · ' + s.visitors.toLocaleString('fr') + ' visiteurs';
       localStorage.setItem('souanpt_stats_cache', JSON.stringify({ ...s, ts: Date.now() }));
-      if (!silent) showToast('✓ Statistiques à jour', '#2e9a63', 1800);
+      if (!silent) showToast('✓ Statistiques à jour', 'var(--green)', 1800);
     } else {
       ['kpi-views','kpi-visitors','an-views','an-visitors'].forEach(id=>set(id,'—'));
       if (!silent) showToast('Stats indisponibles — active l\'endpoint dans GoatCounter (voir aide)', '#e4b24a', 4000);
@@ -3938,7 +3977,7 @@ function finishLogin(pseudo) {
       const bub = document.getElementById('sp-bubble-trigger'); if (bub) bub.style.display = 'flex';
     }
   } catch {}
-  showToast('✓ Connecté' + (pseudo ? ' — @' + pseudo : '') + ' !', '#2e9a63', 2500);
+  showToast('✓ Connecté' + (pseudo ? ' — @' + pseudo : '') + ' !', 'var(--green)', 2500);
   // ── Synchro cloud : miroir des écritures + tirage des données Firestore ──
   if (window.Cloud && Cloud.enabled && Cloud.user()) {
     Cloud.startMirror();
@@ -4021,7 +4060,7 @@ async function saveLeaderboardOptIn() {
   if (!(window.Cloud && Cloud.enabled && Cloud.user())) { showToast('Connecte-toi avec Google pour gérer ça', '#e4b24a', 2500); return; }
   try {
     await Cloud.saveProfile(Cloud.user().uid, { public: !!on });
-    showToast(on ? 'Tu apparais dans le classement ✓' : 'Retiré du classement ✓', '#2e9a63', 2000);
+    showToast(on ? 'Tu apparais dans le classement ✓' : 'Retiré du classement ✓', 'var(--green)', 2000);
   } catch (e) { showToast('✗ ' + (e.message || 'Erreur'), '#c0392b', 2500); }
 }
 
@@ -4088,12 +4127,12 @@ async function ghDeviceFlow(codeId, btnId, msgId, isGate) {
       if (st.phase === 'pending') setMsg('En attente de la validation sur GitHub…');
     });
     ghCdStop(); ghCodeRender(codeId, '');
-    setMsg('✓ Bienvenue @' + user.login + ' !', '#2e9a63');
+    setMsg('✓ Bienvenue @' + user.login + ' !', 'var(--green)');
     if (btn) { btn.disabled = false; btn.textContent = '✓ Connecté'; }
     const hi = () => {
       GHPage.showConnected(user); GHPage.loadRepo(); GHPage.loadRuns();
       syncKPIs(); renderLoginLog();
-      showToast('✓ Connecté — @' + user.login + ' · aucun token dans ce navigateur', '#2e9a63', 4500);
+      showToast('✓ Connecté — @' + user.login + ' · aucun token dans ce navigateur', 'var(--green)', 4500);
       renderGhConnectState();
     };
     if (isGate) setTimeout(() => { gateHide(); hi(); }, 500); else hi();
@@ -4110,8 +4149,8 @@ async function ghSecureSession() {
   if (btn) { btn.disabled = true; btn.textContent = '⟳ Transfert…'; }
   try {
     const u = await GhSession.migrate();
-    showToast('✓ Connexion sécurisée — le token a quitté ce navigateur (@' + u.login + ')', '#2e9a63', 5000);
-    if (msg) { msg.style.color = '#2e9a63'; msg.textContent = '✓ Session sécurisée : plus aucun token stocké ici.'; }
+    showToast('✓ Connexion sécurisée — le token a quitté ce navigateur (@' + u.login + ')', 'var(--green)', 5000);
+    if (msg) { msg.style.color = 'var(--green)'; msg.textContent = '✓ Session sécurisée : plus aucun token stocké ici.'; }
     GHPage.showConnected(u);
   } catch (e) {
     const m = (e && e.message) || 'Transfert refusé';
@@ -4154,12 +4193,12 @@ async function gateConnect() {
   if (msg) { msg.style.color='var(--muted2)'; msg.textContent='Vérification du token…'; }
   try {
     const user = await connectGitHub(val);
-    if (msg) { msg.style.color='#2e9a63'; msg.textContent='✓ Bienvenue @' + user.login + ' !'; }
+    if (msg) { msg.style.color='var(--green)'; msg.textContent='✓ Bienvenue @' + user.login + ' !'; }
     setTimeout(() => {
       gateHide();
       GHPage.showConnected(user); GHPage.loadRepo(); GHPage.loadRuns();
       syncKPIs(); renderLoginLog(); renderGhConnectState();
-      showToast('✓ Connecté — @' + user.login, '#2e9a63');
+      showToast('✓ Connecté — @' + user.login, 'var(--green)');
     }, 600);
   } catch (e) {
     const err = e.message.includes('401') ? 'Token invalide' : e.message.includes('403') ? 'Scopes insuffisants — coche "repo"' : e.message;

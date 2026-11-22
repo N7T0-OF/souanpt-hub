@@ -104,7 +104,7 @@ const StorageUI = {
      seul, et annoncé avant de commencer. */
   async backfill() {
     const todo = HubFiles.list().filter(f => f.status !== 'trash' && !f.preview);
-    if (!todo.length) return showToast('Tous les fichiers ont déjà un aperçu ✓', '#2e9a63', 2500);
+    if (!todo.length) return showToast('Tous les fichiers ont déjà un aperçu ✓', 'var(--green)', 2500);
     const poids = todo.reduce((n, f) => n + (f.size || 0), 0);
     if (!confirm(`Fabriquer l'aperçu de ${todo.length} fichier(s) ?\n\n`
       + `Chaque fichier doit être retéléchargé (${this._size(poids)} au total), puis sa vignette est `
@@ -127,7 +127,7 @@ const StorageUI = {
     }
     if (btn) btn.textContent = '🖼 Aperçus manquants';
     showToast(`${ok} aperçu(s) créé(s)` + (ko ? ` · ${ko} sans aperçu possible` : ''),
-      ok ? '#2e9a63' : '#e4b24a', 4000);
+      ok ? 'var(--green)' : '#e4b24a', 4000);
   },
   /** Charge les vignettes visibles après le rendu (privées incluses). */
   _loadThumbs(root) {
@@ -210,7 +210,7 @@ const StorageUI = {
         showToast?.('⟳ Envoi de ' + f.name + '…', '#666', 2500);
         await HubFiles.upload(f, { visibility: 'private', sha });   // privé par défaut
         this.render();
-        showToast?.('✓ ' + f.name + ' ajouté (privé)', '#2e9a63', 2500);
+        showToast?.('✓ ' + f.name + ' ajouté (privé)', 'var(--green)', 2500);
       } catch (e) { showToast?.('✗ ' + f.name + ' — ' + (e.message || 'échec'), '#c0392b', 5000); }
     }
   },
@@ -234,7 +234,7 @@ const StorageUI = {
     if (toPublic && !confirm('Rendre « ' + (f.displayName || f.name) + ' » PUBLIC ?\n\nIl sera accessible par n\'importe qui via son lien, et publié avec ton site.')) return;
     showToast?.('⟳ Changement de visibilité…', '#666', 2000);
     try { await HubFiles.setVisibility(id, toPublic ? 'public' : 'private'); this.render();
-      showToast?.(toPublic ? '🌍 Fichier public' : '🔒 Fichier privé', '#2e9a63', 2500); }
+      showToast?.(toPublic ? '🌍 Fichier public' : '🔒 Fichier privé', 'var(--green)', 2500); }
     catch (e) { showToast?.('✗ ' + (e.message || 'échec'), '#c0392b', 4000); }
   },
   replace(id) {
@@ -243,7 +243,7 @@ const StorageUI = {
       const file = e.target.files[0]; if (!file) return;
       try { showToast?.('⟳ Remplacement…', '#666', 2500);
         await HubFiles.replace(id, file); this.render();
-        showToast?.('✓ Remplacé — le lien public et les blocs du site restent valides', '#2e9a63', 4500); }
+        showToast?.('✓ Remplacé — le lien public et les blocs du site restent valides', 'var(--green)', 4500); }
       catch (err) { showToast?.('✗ ' + (err.message || 'échec'), '#c0392b', 4000); }
     };
     inp.click();
@@ -257,7 +257,7 @@ const StorageUI = {
     this._undo('« ' + (f.displayName || f.name) + ' » mis à la corbeille',
                () => { HubFiles.restore(id); this.render(); });
   },
-  restore(id) { HubFiles.restore(id); this.render(); showToast?.('↩ Restauré', '#2e9a63', 2000); },
+  restore(id) { HubFiles.restore(id); this.render(); showToast?.('↩ Restauré', 'var(--green)', 2000); },
   async destroy(id) {
     const f = HubFiles.get(id); if (!f) return;
     const media = String(f.path || '').startsWith('media/');
@@ -306,7 +306,7 @@ const StorageUI = {
       if (action === 'public' && !confirm('Rendre ' + ids.length + ' fichier(s) PUBLIC(s) ?\n\nIls seront accessibles par n\'importe qui via leur lien.')) return;
       showToast?.('⟳ Changement de visibilité…', '#666', 2500);
       for (const id of ids) { try { await HubFiles.setVisibility(id, action); } catch (e) {} }
-      this.render(); showToast?.('✓ Visibilité mise à jour', '#2e9a63', 2500);
+      this.render(); showToast?.('✓ Visibilité mise à jour', 'var(--green)', 2500);
       return;
     }
     if (action === 'download') { for (const id of ids) await this.download(id); return; }
@@ -318,7 +318,7 @@ const StorageUI = {
     clearTimeout(this._undoT);
     box.innerHTML = `<span>${this._esc(msg)}</span><button id="st-undo-b">Annuler</button>`;
     box.style.display = 'flex';
-    box.querySelector('#st-undo-b').onclick = () => { clearTimeout(this._undoT); box.style.display = 'none'; fn(); showToast?.('↩ Annulé', '#2e9a63', 1800); };
+    box.querySelector('#st-undo-b').onclick = () => { clearTimeout(this._undoT); box.style.display = 'none'; fn(); showToast?.('↩ Annulé', 'var(--green)', 1800); };
     this._undoT = setTimeout(() => { box.style.display = 'none'; }, 7000);
   },
 
@@ -382,13 +382,13 @@ const StorageUI = {
     const l = HubFiles.list().map(x => x.id === id ? { ...x, usages: [...new Set([...(x.usages || []), 'Site public'])] } : x);
     localStorage.setItem('hub_files', JSON.stringify(l));
     this.render();
-    showToast?.('✓ Bloc ajouté à ton site — ouvre l\'Éditeur pour le placer', '#2e9a63', 4500);
+    showToast?.('✓ Bloc ajouté à ton site — ouvre l\'Éditeur pour le placer', 'var(--green)', 4500);
   },
 
   rename(id) {
     const f = HubFiles.get(id); if (!f) return;
     const n = prompt('Nouveau nom :', f.displayName || f.name);
-    if (n && n.trim()) { HubFiles.rename(id, n); this.render(); showToast?.('✓ Renommé', '#2e9a63', 1800); }
+    if (n && n.trim()) { HubFiles.rename(id, n); this.render(); showToast?.('✓ Renommé', 'var(--green)', 1800); }
   },
 
   /* ══ Raccourcis clavier ══ */

@@ -242,7 +242,7 @@ const HubSync = {
         if (res && res.pulled && res.pulled.length) {
           try { window.reloadAllData && reloadAllData(); } catch {}
           toast('☁ ' + res.pulled.length + ' collection(s) récupérée(s) depuis ton GitHub privé',
-                '#2e9a63', 3500);
+                'var(--green)', 3500);
         }
         if (res && res.conflicts && res.conflicts.length) {
           toast('⚠ ' + res.conflicts.length + ' donnée(s) modifiées sur 2 appareils : ' +

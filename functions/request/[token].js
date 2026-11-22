@@ -118,12 +118,26 @@ const QUESTIONS_DEFAULT = [
   { k: 'assets', label: 'As-tu déjà des éléments à fournir ?', type: 'bool' },
 ];
 
-function shell(title, body, status) {
+
+/** Couleur d'accent du créateur (#RRGGBB enregistré avec le document) →
+    variables CSS : accent, encre lisible dessus (contraste WCAG), teintes.
+    Valeur absente ou invalide → '' (le citron historique reste). */
+function accentVars(hex) {
+  if (!/^#[0-9a-f]{6}$/i.test(String(hex || ''))) return '';
+  const n = parseInt(hex.slice(1), 16), rgb = [n >> 16, (n >> 8) & 255, n & 255];
+  const L = rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+    .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const ink = (L + 0.05) / 0.0519 >= 1.05 / (L + 0.05) ? '#060606' : '#ffffff';
+  const t = a => 'rgba(' + rgb.join(',') + ',' + a + ')';
+  return ':root{--a:' + hex + ';--on-a:' + ink + ';--a-soft:' + t(.12) + ';--a-softer:' + t(.06) + ';--a-line:' + t(.35) + '}';
+}
+
+function shell(title, body, status, accent) {
   return new Response(`<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>${esc(title)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>${CSS}</style></head><body>${body}</body></html>`,
+<style>${CSS}${accentVars(accent)}</style></head><body>${body}</body></html>`,
     { status: status || 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
 }
 function notFound(msg) {
@@ -139,7 +153,7 @@ const CSS = `
 body{background:var(--bg);color:var(--t);font-family:'Syne',system-ui,sans-serif;min-height:100vh;padding:24px 16px 70px}
 .wrap{max-width:640px;margin:0 auto}
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-.brand .av{width:38px;height:38px;border-radius:11px;background:var(--a);color:#060606;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0}
+.brand .av{width:38px;height:38px;border-radius:11px;background:var(--a);color:var(--on-a,#060606);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0}
 .brand b{font-size:15px;font-weight:800}.brand span{display:block;font-size:11px;color:var(--m2);font-weight:400}
 h1{font-size:clamp(22px,4.6vw,30px);font-weight:800;letter-spacing:-1px;margin-bottom:8px}
 .sub{font-size:13px;color:var(--m);line-height:1.7;margin-bottom:22px}
@@ -156,7 +170,7 @@ select.inp{cursor:pointer}
 .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t);cursor:pointer;padding:4px 0}
 .hint{font-size:11px;color:var(--m2);margin-top:5px;line-height:1.5}
 .drop{border:1.5px dashed var(--b2);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:.15s;background:var(--s2)}
-.drop.over{border-color:var(--a);background:rgba(200,255,0,.06)}
+.drop.over{border-color:var(--a);background:var(--a-softer,rgba(200,255,0,.06))}
 .drop b{color:var(--a)}
 .files{margin-top:12px;display:flex;flex-direction:column;gap:8px}
 .f{display:flex;align-items:center;gap:10px;background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:9px 11px}
@@ -175,7 +189,7 @@ select.inp{cursor:pointer}
 .chip button{background:none;border:none;color:var(--m2);cursor:pointer}
 .btn{padding:13px 22px;border-radius:12px;font-size:13px;font-weight:800;font-family:inherit;border:1px solid var(--b2);background:transparent;color:var(--t);cursor:pointer;transition:.18s}
 .btn:hover{border-color:var(--a);color:var(--a)}
-.btn.p{background:var(--a);color:#060606;border-color:var(--a)}
+.btn.p{background:var(--a);color:var(--on-a,#060606);border-color:var(--a)}
 .btn.p:hover{opacity:.87}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .small{font-size:11px;padding:8px 14px}
@@ -211,7 +225,7 @@ function renderQuestions(pending, done, creator) {
       <div class="files" data-flist="${id}"></div>`;
     return `<input class="inp" id="${id}" type="text">`;
   };
-  const ask = !pending.length ? '' : `<div class="card" style="border-color:rgba(200,255,0,.35)">
+  const ask = !pending.length ? '' : `<div class="card" style="border-color:var(--a-line,rgba(200,255,0,.35))">
     <div class="sec-t">Action requise</div>
     <p class="sub" style="margin:0 0 12px">${creator} a besoin d'${pending.length > 1 ? 'précisions' : 'une précision'} pour préparer votre estimation.</p>
     ${pending.map(q => `<div data-q="${esc(q.id)}" style="margin-bottom:14px">
@@ -444,7 +458,7 @@ export async function onRequestGet(ctx) {
       <p class="foot"><a href="/">Créé avec souanpt.hub</a></p></div>${answerScript(token, pendingQ)}`;
     // ?edit=1 rebascule sur le formulaire pré-rempli.
     const url = new URL(ctx.request.url);
-    if (url.searchParams.get('edit') !== '1' || closed) return shell('Demande envoyée — souanpt.hub', body);
+    if (url.searchParams.get('edit') !== '1' || closed) return shell('Demande envoyée — souanpt.hub', body, 200, d.accent);
   }
 
   // ── Formulaire ──
@@ -686,5 +700,5 @@ export async function onRequestGet(ctx) {
 })();
 </script>`;
 
-  return shell('Votre projet — souanpt.hub', body + answerScript(token, pendingQ));
+  return shell('Votre projet — souanpt.hub', body + answerScript(token, pendingQ), 200, d.accent);
 }

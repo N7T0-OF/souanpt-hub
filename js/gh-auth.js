@@ -124,7 +124,7 @@ const GhSession = {
       // Cookie encore valide, localStorage vidé (nettoyage, autre onglet…) :
       // la session revient toute seule, sans nouveau code.
       Auth.setSession({ login: this.user.login, name: this.user.name || '', avatar_url: this.user.avatar_url || '' });
-      this._toast('✓ Session GitHub restaurée (@' + this.user.login + ')', '#2e9a63');
+      this._toast('✓ Session GitHub restaurée (@' + this.user.login + ')', 'var(--green)');
     }
   },
 

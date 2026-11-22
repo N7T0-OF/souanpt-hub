@@ -45,7 +45,7 @@
     request:  { label: 'Demande',  icon: '📥', color: '#7f9cff' },
     estimate: { label: 'Devis',    icon: '📄', color: '#e4b24a' },
     mission:  { label: 'Mission',  icon: '🚀', color: '#4a9de4' },
-    done:     { label: 'Terminé',  icon: '✅', color: '#2e9a63' },
+    done:     { label: 'Terminé',  icon: '✅', get color() { return window.hubAccentHex ? hubAccentHex() : '#2e9a63'; } },
   };
 
   const norm = s => String(s == null ? '' : s).trim().toLowerCase();

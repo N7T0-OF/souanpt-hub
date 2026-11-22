@@ -177,7 +177,7 @@ const Analytics = {
       await deployPortfolio(null, null, { requireAnalyticsManifest: true, expectedOwnerUid: uid });
       if (!Cloud.user() || Cloud.user().uid !== uid) throw new Error('Session Firebase modifiée pendant la publication.');
       await Cloud.saveProfile(uid, { analyticsEnabled: true });
-      showToast('✓ Compteur installé — collecte soumise à la configuration serveur', '#2e9a63', 5000);
+      showToast('✓ Compteur installé — collecte soumise à la configuration serveur', 'var(--green)', 5000);
     } catch (e) { showToast('✗ ' + (e.message || 'Activation impossible'), '#c0392b', 5000); }
     finally { this._activationPending = false; }
     setTimeout(() => this.refresh(), 1500);

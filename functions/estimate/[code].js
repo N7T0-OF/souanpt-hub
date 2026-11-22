@@ -30,12 +30,26 @@ function val(v) {
   return undefined;
 }
 
-function shell(title, body, code) {
+
+/** Couleur d'accent du créateur (#RRGGBB enregistré avec le document) →
+    variables CSS : accent, encre lisible dessus (contraste WCAG), teintes.
+    Valeur absente ou invalide → '' (le citron historique reste). */
+function accentVars(hex) {
+  if (!/^#[0-9a-f]{6}$/i.test(String(hex || ''))) return '';
+  const n = parseInt(hex.slice(1), 16), rgb = [n >> 16, (n >> 8) & 255, n & 255];
+  const L = rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+    .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const ink = (L + 0.05) / 0.0519 >= 1.05 / (L + 0.05) ? '#060606' : '#ffffff';
+  const t = a => 'rgba(' + rgb.join(',') + ',' + a + ')';
+  return ':root{--a:' + hex + ';--on-a:' + ink + ';--a-soft:' + t(.12) + ';--a-softer:' + t(.06) + ';--a-line:' + t(.35) + '}';
+}
+
+function shell(title, body, code, accent) {
   return new Response(`<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>${esc(title)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>${CSS}</style></head><body>${body}</body></html>`,
+<style>${CSS}${accentVars(accent)}</style></head><body>${body}</body></html>`,
     { status: code || 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
 }
 
@@ -47,7 +61,7 @@ const CSS = `
 body{background:var(--bg);color:var(--t);font-family:'Syne',system-ui,sans-serif;min-height:100vh;padding:24px 16px 60px}
 .wrap{max-width:620px;margin:0 auto}
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:26px}
-.brand .av{width:38px;height:38px;border-radius:11px;background:var(--a);color:#060606;display:flex;
+.brand .av{width:38px;height:38px;border-radius:11px;background:var(--a);color:var(--on-a,#060606);display:flex;
   align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0}
 .brand b{font-size:15px;font-weight:800}
 .brand span{display:block;font-size:11px;color:var(--m2);font-weight:400}
@@ -69,7 +83,7 @@ h1{font-size:clamp(22px,4.6vw,30px);font-weight:800;letter-spacing:-1px;margin-b
 .btn{padding:13px 22px;border-radius:12px;font-size:13px;font-weight:800;font-family:inherit;
   border:1px solid var(--b2);background:transparent;color:var(--t);cursor:pointer;transition:.18s}
 .btn:hover{border-color:var(--a);color:var(--a)}
-.btn.p{background:var(--a);color:#060606;border-color:var(--a)}
+.btn.p{background:var(--a);color:var(--on-a,#060606);border-color:var(--a)}
 .btn.p:hover{opacity:.87}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .hist{margin-top:6px}
@@ -94,7 +108,7 @@ h1{font-size:clamp(22px,4.6vw,30px);font-weight:800;letter-spacing:-1px;margin-b
 .opt{padding:12px 6px;border-radius:11px;border:1px solid var(--b2);background:var(--s2);color:var(--t);
   font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;transition:.15s}
 .opt:hover{border-color:var(--a)}
-.opt[aria-pressed="true"]{border-color:var(--a);background:rgba(200,255,0,.12);color:var(--a)}
+.opt[aria-pressed="true"]{border-color:var(--a);background:var(--a-soft,rgba(200,255,0,.12));color:var(--a)}
 .opt[aria-pressed="true"]::before{content:'✓ '}
 .opt.full{grid-column:1/-1;font-size:12px;font-weight:700}
 .inp{width:100%;background:var(--s2);border:1px solid var(--b2);border-radius:11px;padding:12px 14px;
@@ -483,5 +497,5 @@ export async function onRequestGet({ params }) {
 })();
 </script>`;
 
-  return shell(`Estimation ${d.projectName ? '· ' + d.projectName : ''} — souanpt.hub`, body);
+  return shell(`Estimation ${d.projectName ? '· ' + d.projectName : ''} — souanpt.hub`, body, 200, d.accent);
 }
