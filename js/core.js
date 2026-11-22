@@ -1301,6 +1301,28 @@ const CONTACT_KINDS = {
 };
 const CONTACT_ORDER = ['email', 'discord', 'whatsapp', 'phone', 'telegram'];
 
+/* ── Tags du site (3.28) ──
+   cfg.tagDisplay[tag en minuscules] = 'both' (défaut) | 'bar' (barre de filtres
+   seulement) | 'card' (cartes des projets seulement). L'ordre de la barre suit
+   le catalogue cfg.projectTags (réordonnable dans 🏷 Tags), puis les autres. */
+function siteTagMode(cfg, t) {
+  const m = cfg && cfg.tagDisplay && cfg.tagDisplay[String(t).trim().toLocaleLowerCase('fr')];
+  return m === 'bar' || m === 'card' ? m : 'both';
+}
+function cardTags(p, cfg, n) {
+  return (p.tags || []).filter(t => String(t).trim() && siteTagMode(cfg, t) !== 'bar').slice(0, n);
+}
+function barTags(projects, cfg) {
+  const cat = (Array.isArray(cfg.projectTags) ? cfg.projectTags : []).map(t => String(t).trim());
+  const order = new Map(cat.map((t, i) => [t.toLocaleLowerCase('fr'), i]));
+  // Orthographe affichée : celle du catalogue, sinon la PREMIÈRE rencontrée.
+  const seen = new Map();
+  projects.flatMap(p => p.tags || []).forEach(t => { const v = String(t).trim(), k = v.toLocaleLowerCase('fr'); if (k && !seen.has(k)) seen.set(k, order.has(k) ? cat[order.get(k)] : v); });
+  const all = [...seen.entries()];
+  return all.filter(([k, t]) => siteTagMode(cfg, t) !== 'card')
+    .sort((a, b) => (order.has(a[0]) ? order.get(a[0]) : 1e6) - (order.has(b[0]) ? order.get(b[0]) : 1e6))
+    .map(x => x[1]);
+}
 function renderBentoGrid(blocks, ctx) {
   const { cfg, projects, links, approved, GRADS, editor, siteLogo, titleEffect } = ctx;
   // Bento n'a pas de <section> : ce sont les BLOCS qui portent les titres. On
@@ -1345,7 +1367,7 @@ function renderBentoGrid(blocks, ctx) {
       const p = P(bRef(b)); if (!p) return '';
       const i = Math.max(0, projects.indexOf(p));
       return cell(b, `<div class="bn-cov" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(b))}/cover` : `background:${GRADS[i % 6]}`}"></div>
-        <div class="bn-pb"><div class="bn-t">${esc(p.title || 'Projet')}</div><div class="ptags">${(p.tags || []).slice(0, 2).map(t => `<span class="ptag">${esc(t)}</span>`).join('')}</div></div>`,
+        <div class="bn-pb"><div class="bn-t">${esc(p.title || 'Projet')}</div><div class="ptags">${cardTags(p, cfg, 2).map(t => `<span class="ptag">${esc(t)}</span>`).join('')}</div></div>`,
         ` data-p="${esc(String(p.id ?? ''))}" data-tags="${esc(JSON.stringify((p.tags||[]).map(t=>String(t).trim().toLocaleLowerCase('fr'))))}"${projectOpenAttr(p, cfg)}`);
     }
     if (b.type === 'reviews') {
@@ -1579,7 +1601,7 @@ function generateSite(cfg, projects, reviews, opts) {
       <div class="pt" style="${p.cover ? `background:url('${esc(p.cover)}') ${focalCss(bFocal(blkOf(p)))}/cover` : `background:${GRADS[i%6]}`}">${p.url?`<span class="go">${typeof BehanceViewer !== 'undefined' && BehanceViewer.opensInViewer(p, cfg.behancePreview) ? 'Voir le projet' : 'Voir le projet ↗'}</span>`:''}</div>
       <div class="pb">
         <div class="pn">${esc(p.title||'Projet')}</div>
-        <div class="ptags">${(p.tags||[]).slice(0,3).map(t=>`<span class="ptag">${esc(t)}</span>`).join('')}</div>
+        <div class="ptags">${cardTags(p, cfg, 3).map(t=>`<span class="ptag">${esc(t)}</span>`).join('')}</div>
         <div class="pm">${p.views?`👁 ${p.views} · `:''}${p.behance?'<span style="color:#4a8cff">Behance</span>':''}</div>
       </div>
     </article>`).join('') || `<div style="grid-column:1/-1;text-align:center;color:${mutedC};padding:40px">Aucun projet pour le moment</div>`;
@@ -1701,7 +1723,7 @@ function generateSite(cfg, projects, reviews, opts) {
   // Compat : le reste du générateur lit encore ces tables.
   const SEC_LABELS = {}; const SEC_ICONS = {};
   SEC_KEYS.forEach(k => { SEC_LABELS[k] = secTitle(k); SEC_ICONS[k] = secIcon(k); });
-  const tagList = [...new Map(projects.filter(p=>editor||!pHid(p)).flatMap(p => p.tags || []).map(t=>[String(t).trim().toLocaleLowerCase('fr'),String(t).trim()]).filter(x=>x[0])).values()];
+  const tagList = barTags(projects.filter(p=>editor||!pHid(p)), cfg);
   const tagFilters = tagList.length && secLive('projects') ? `<div class="tag-filters" role="group" aria-label="Filtrer les projets par tag"><button type="button" class="on" data-tag="" aria-pressed="true" onclick="return filterTag('')">Tout</button>${tagList.map(t=>`<button type="button" data-tag="${esc(t.toLocaleLowerCase('fr'))}" aria-pressed="false" onclick="return filterTag(this.dataset.tag)">${esc(t)}</button>`).join('')}</div>` : '';
   const secHtml = {
     about: `<section id="about" class="rev" style="max-width:760px">${secHead('about')}<p class="about-p">${esc(aboutTxt).replace(/\n/g,'<br>')}</p></section>`,

@@ -71,3 +71,9 @@ Sous le relais `/u/<pseudo>`, la page reçoit une CSP `sandbox` sans `allow-same
 ## Tests
 
 `tests/behance-viewer.test.mjs` : adresses valides et hostiles, format d'intégration, code collé, bornes des réglages, échappement du bloc de données (`</script>` dans un titre), sources d'image refusées (`javascript:`, `data:text/html`), décor sans interception des clics, contraste du texte sur cinq accents. Vérifié dans le navigateur le 20 novembre 2026 : ouverture réelle du projet 241392957, recadrage (valeurs calculées), modes Live/PNG, import d'image, export PNG, barre de repli (adresse injoignable simulée), styles perspective et incurvé, téléphone 375 px, accents citron, violet, cyan, orange, bleu.
+
+## Ajout rapide (3.28.0)
+
+`js/behance-quick.js` (`BehanceQuick`) : profil retrouvé depuis `cfg.behance` ou un lien behance.net des liens/réseaux du site (sinon demandé une fois puis retenu). Projets lus par le flux RSS public existant (`Behance.fetchProjects`), puis proposés : déjà présents (même numéro de galerie) grisés, nouveaux cochés ; tout cocher / tout décocher, filtre, option « Reprendre les tags Behance ». Optimisation : couverture `projects/max_808/` puis `808/` puis l’adresse du flux (repli automatique au chargement), titres nettoyés (entités HTML), doublons écartés. Ajout en tête du portfolio, ordre Behance conservé, tags fusionnés dans le catalogue (orthographe existante gardée). Points d’entrée : « ＋ Behance » (barre du haut), Paramètres → Behance « ＋ Choisir mes projets », ＋ Nouveau projet de l’éditeur, recherche « Ajout rapide depuis Behance ».
+
+La synchro des 30 min (`BehanceQuick.checkNew`) n’ajoute plus rien : elle complète les couvertures manquantes et publie une notification locale « 🅱 N nouveaux projets » (une seule fois par projet, `souanpt_behance_seen`) avec un bouton « Choisir ». `behanceSyncNow` reste pour compatibilité mais n’est plus appelé par l’interface.

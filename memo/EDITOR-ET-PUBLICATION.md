@@ -13,3 +13,15 @@ Avant livraison, vérifier thème flottant, latéral et Bento, les aperçus desk
 ## Barre de l'éditeur (3.19.0)
 
 Menus groupés (`js/editor-toolbar.js`, `EdMenu`) : 🎨 Design (Thème, Bannière, Identité, Effets, Ambiance, Son), 🧱 Contenu (Sections, Bloc, Tags, Fenêtre projet), 🚀 Visibilité (SEO, haunt.gg). Puis Auto-publication, ↶ ↷, Édition/Aperçu, et 💾 ↗ ⬇ en icônes seules (infobulles). La jauge de performance est un bouton compact : temps et conseils dans une fenêtre au clic (point jaune s'il y a des conseils). `EdMenu.run('chemin.fonction', withAnchor)` résout la fonction au clic et passe le bouton du menu aux fenêtres qui se positionnent. Échap ferme, flèches ↑↓ naviguent. Les raccourcis T/E/B/S restent. Même composant pour « ＋ Ajouter » de Clients & Projets. En-têtes de page : retour à la ligne propre, jamais de mot coupé ; `.sr-only` défini (il manquait). « Vérification des dossiers » repliée quand tout est cohérent.
+
+## Un seul espace d’édition (3.28.0)
+
+Le sélecteur ✎ Édition / 👁 Aperçu a disparu : l’aperçu est toujours éditable ET vivant. Simple clic sur un bloc = sélection (barre du bloc, déplacement, menu clic droit). Double-clic, Ctrl/⌘+clic ou « ↗ Ouvrir comme un visiteur » (clic droit) = geste du visiteur (fenêtre projet, lien, bouton) ; la barre du bloc se referme. Hors des blocs, les commandes publiques répondent au simple clic : filtres de tags, catégories de la barre latérale, liens d’ancre de la navigation. Un lien externe sans `target=_blank` s’ouvre dans un nouvel onglet : l’iframe ne quitte jamais le site édité. `EdCanvas.setMode` reste pour compatibilité, plus aucun bouton ne l’appelle.
+
+## Tags (3.28.0)
+
+🏷 Tags ouvre un vrai gestionnaire (`edWinTags`, fenêtre large `.edwin.xl`) : liste des tags à gauche (↑↓ = ordre de la barre de filtres du site), à droite le tag choisi : renommer (Entrée), supprimer, présentation (◫ barre de filtres et cartes, ▤ barre seule, ▣ cartes seules) et projets rangés dedans (clic sur la couverture, filtre, tout ajouter / tout retirer). Données : `cfg.projectTags` (ordre), `cfg.tagDisplay[tag en minuscules]` (`bar` / `card`, absent = les deux), `project.tags`. Site publié : `barTags()` (ordre du catalogue, sans les « cartes seules », orthographe du catalogue) alimente la barre de filtres et les catégories de la barre latérale ; `cardTags()` retire des cartes les « barre seule ». `data-tags` garde tous les tags pour que le filtre fonctionne.
+
+## Zones de dépôt (3.28.0)
+
+`js/hub-drop.js` habille tout `<input type="file">` visible (pas `hidden`, pas déjà dans une étiquette) d’une zone « Dépose un fichier ici ou clique pour parcourir » avec formats et taille max (`data-max` en Mo, `data-label`). Le dépôt remplit `input.files` puis déclenche `change` : les gestionnaires existants (envoi du logo, du favicon, de la musique, du son de clic) n’ont pas changé. Fichier refusé si hors `accept`.

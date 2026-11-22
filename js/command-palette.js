@@ -32,7 +32,7 @@
     { ic: '🗂️', t: 'Nouveau projet client', k: 'projet dossier mission creer', run: () => { page('cp'); later(() => window.CP && CP.newProject && CP.newProject(), 150); } },
     { ic: '🔗', t: 'Créer un lien de demande', k: 'demande lien brief client', run: () => { page('devis'); later(() => window.QuoteUI && QuoteUI.newRequestLink && QuoteUI.newRequestLink(), 150); } },
     { ic: '🚀', t: 'Publier le site', k: 'publier deployer mettre en ligne site', run: () => window.edDeploy && edDeploy() },
-    { ic: '↻', t: 'Synchroniser Behance', k: 'behance sync importer projets rss', run: () => window.syncBehance && syncBehance() },
+    { ic: '🅱', t: 'Ajout rapide depuis Behance', k: 'behance sync synchroniser importer projets rss ajout rapide', run: () => window.syncBehance && syncBehance() },
     { ic: '🧾', t: 'Mes infos de facturation', k: 'siret adresse mentions iban facturation reglages', run: () => { page('facturation'); later(() => window.Biz && Biz.openSettings(), 150); } },
     { ic: '🧾', t: 'Facture détaillée (plusieurs lignes)', k: 'facture lignes quantite modele devis', run: () => { page('facturation'); later(() => window.Biz && Biz.newDetailed(), 150); } },
     { ic: '📉', t: 'Ajouter une dépense', k: 'depense charge achat frais', run: () => { page('facturation'); later(() => window.Biz && Biz.openExpense && Biz.openExpense(), 150); } },

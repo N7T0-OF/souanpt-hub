@@ -847,10 +847,10 @@ function showPage(id) {
   if (typeof refreshAvail === 'function') refreshAvail();
 }
 
-async function syncBehance(){
-  showToast('↻ Sync Behance…','#666',1500);
-  try { await behanceSyncNow(false); }
-  catch(e) { showToast('✗ ' + e.message, '#c0392b', 3000); }
+/* 3.28 : « ＋ Behance » ouvre l'ajout rapide (tu coches les projets à ajouter). */
+function syncBehance(){
+  if (window.BehanceQuick) return BehanceQuick.open();
+  showToast('Ajout rapide indisponible', '#c0392b', 2500);
 }
 
 document.addEventListener('DOMContentLoaded',()=>{

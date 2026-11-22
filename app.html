@@ -738,6 +738,70 @@ html.hub-calm *,html.hub-calm *::before,html.hub-calm *::after{animation-duratio
 .lk-act button{width:20px;height:20px;border:none;border-radius:5px;background:var(--s1);color:var(--muted2);font-size:10px;cursor:pointer;padding:0}.lk-act button:hover{color:var(--text)}
 .lk-form{margin-top:6px;padding-top:12px;border-top:1px solid var(--border)}.lk-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 @media(hover:none){.lk-act{display:flex}}
+/* 3.28 : zones de dépôt (js/hub-drop.js) à la place du bouton natif « Choisir un fichier » */
+.hd-zone{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;min-height:118px;margin:6px 0 2px;padding:18px 14px;border:1.5px dashed var(--border2);border-radius:14px;background:var(--s1);color:var(--text);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.hd-zone:hover,.hd-zone.over,.hd-zone:focus-within{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 5%,var(--s1))}
+.hd-zone.over{border-style:solid}.hd-zone.has{border-style:solid;border-color:color-mix(in srgb,var(--accent) 55%,var(--border))}.hd-zone.bad{border-color:#c0392b}
+.hd-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--s3);color:var(--muted)}.hd-zone:hover .hd-ic,.hd-zone.over .hd-ic{color:var(--accent)}
+.hd-tx{display:flex;flex-direction:column;gap:4px;min-width:0;max-width:100%}.hd-tx b{font-size:11px;font-weight:700;line-height:1.35}
+.hd-sub{font-size:9px;color:var(--muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hd-zone.has .hd-sub{color:var(--text)}.hd-zone.bad .hd-sub{color:#e74c3c}
+.hd-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none;overflow:hidden}
+.edwin .hd-zone{min-height:96px;padding:14px 10px;gap:6px}.edwin .hd-ic{width:32px;height:32px}.edwin .hd-tx b{font-size:10px}
+/* 3.28 : ajout rapide depuis Behance (js/behance-quick.js) */
+#bq-modal{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:bqIn .18s ease}
+@keyframes bqIn{from{opacity:0}to{opacity:1}}
+.bq-card{width:min(860px,100%);max-height:min(88vh,860px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border2);border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden}
+.bq-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.bq-logo{width:32px;height:32px;border-radius:9px;background:#1769FF;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+.bq-ht{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.bq-ht b{font-size:13px}.bq-ht small{font-size:10px;color:var(--muted2)}
+.bq-link{background:none;border:none;padding:0;color:var(--accent);font:inherit;cursor:pointer;text-decoration:underline}
+.bq-x{width:30px;height:30px;border:1px solid var(--border);border-radius:8px;background:var(--s2);color:var(--muted2);cursor:pointer}.bq-x:hover{color:var(--text)}
+.bq-body{flex:1;overflow-y:auto;padding:14px 16px}
+.bq-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}.bq-foot:empty{display:none}.bq-foot .btn{font-size:11px}
+.bq-note{margin-right:auto;font-size:9px;color:var(--muted2)}
+.bq-ask{display:flex;flex-direction:column;gap:10px;max-width:440px;margin:10px auto;font-size:11px;color:var(--muted)}.bq-err{color:#e74c3c}
+.bq-load{display:flex;align-items:center;justify-content:center;gap:10px;min-height:180px;font-size:11px;color:var(--muted2)}
+.bq-spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--border2);border-top-color:var(--accent);animation:bqSpin .8s linear infinite}@keyframes bqSpin{to{transform:rotate(360deg)}}
+.bq-sum{font-size:11px;color:var(--muted);margin-bottom:10px}.bq-sum b{color:var(--text)}
+.bq-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px}.bq-tools .btn{font-size:10px}.bq-tools .prop-input{flex:1;min-width:120px;max-width:220px}
+.bq-opt{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);margin-left:auto;cursor:pointer}
+.bq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.bq-it{position:relative;display:flex;flex-direction:column;gap:6px;padding:6px;border:1px solid var(--border);border-radius:12px;background:var(--s2);cursor:pointer;transition:border-color .15s,opacity .15s,transform .15s}
+.bq-it:hover{border-color:var(--border2)}.bq-it.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}.bq-it:not(.on):not(.ex){opacity:.7}.bq-it.ex{opacity:.45;cursor:default}
+.bq-ck{position:absolute;opacity:0;pointer-events:none}.bq-it:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.bq-cv{position:relative;display:block;aspect-ratio:808/632;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,var(--s3),var(--s1))}.bq-cv img{width:100%;height:100%;object-fit:cover;display:block}
+.bq-tick{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:rgba(0,0,0,.55);border:1.5px solid rgba(255,255,255,.55);color:transparent}
+.bq-it.on .bq-tick{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.bq-it.ex .bq-tick{display:none}
+.bq-badge{position:absolute;top:8px;left:8px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.7);color:#fff}
+.bq-t{font-size:11px;font-weight:700;line-height:1.3;padding:0 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bq-tags{display:flex;gap:3px;flex-wrap:wrap;padding:0 2px 2px}.bq-tags i{font-style:normal;font-size:8px;padding:2px 6px;border-radius:4px;background:var(--a-soft,rgba(255,255,255,.06));color:var(--accent)}
+.bq-empty{font-size:11px;color:var(--muted2)}
+.edw-quick{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;margin-bottom:6px;padding:9px 11px;border:1px solid color-mix(in srgb,#1769FF 55%,var(--border));border-radius:9px;background:color-mix(in srgb,#1769FF 12%,var(--s2));color:var(--text);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;text-align:left}
+.edw-quick small{font-size:9px;font-weight:400;color:var(--muted2)}.edw-quick:hover{border-color:#1769FF}
+@media(max-width:600px){.bq-grid{grid-template-columns:repeat(2,1fr)}.bq-opt{margin-left:0}.bq-note{display:none}}
+/* 3.28 : raccourcis — profil, recommandations, dossiers, glisser-déposer */
+.lk-prof{padding:12px 14px;margin-bottom:14px;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));border-radius:12px;background:color-mix(in srgb,var(--accent) 4%,var(--s1))}
+.lk-prof-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}.lk-prof-h b{font-size:12px}.lk-prof-h small{font-size:9px;color:var(--muted2)}
+.lk-chips{display:flex;gap:5px;flex-wrap:wrap}.lk-chip{border:1px solid var(--border);background:var(--s2);color:var(--muted2);font-family:inherit;font-size:10px;font-weight:700;padding:5px 10px;border-radius:999px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.lk-chip:hover{border-color:var(--accent);color:var(--text)}.lk-chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.lk-chip-auto{border-style:dashed}
+.lk-reco{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;margin-top:10px}
+.lk-rc{display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:10px;background:var(--s2);position:relative}.lk-rc .lk-ic{width:26px;height:26px;font-size:13px}
+.lk-rc-b{width:24px;height:24px;flex-shrink:0;border:1px solid var(--border);border-radius:7px;background:var(--s1);color:var(--muted2);font-size:11px;cursor:pointer;padding:0}.lk-rc-b:hover{color:var(--text);border-color:var(--accent)}
+.lk-rc-add{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:800}.lk-rc-add:hover{color:var(--on-accent);filter:brightness(1.08)}
+.lk-rc-x{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;border:1px solid var(--border);background:var(--s1);color:var(--muted2);font-size:8px;cursor:pointer;padding:0;display:none}.lk-rc:hover .lk-rc-x,.lk-rc:focus-within .lk-rc-x{display:block}
+.lk-empty{font-size:10px;color:var(--muted2);margin:8px 0 0}
+.lk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.lk-tip{font-size:9px;color:var(--muted2)}
+.lk-fh{display:flex;align-items:center;gap:6px;margin-bottom:8px;min-height:24px}.lk-fname{font-size:9px;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted2);font-weight:700}
+.lk-n{font-size:9px;color:var(--muted2);background:var(--s2);border-radius:999px;padding:1px 7px}
+.lk-fold{width:20px;height:20px;border:none;background:none;color:var(--muted2);cursor:pointer;padding:0;font-size:11px;transition:transform .15s}.lk-cat.closed .lk-fold{transform:rotate(-90deg)}.lk-cat.closed .lk-grid{display:none}
+.lk-fact{margin-left:auto;display:flex;gap:2px;opacity:0;transition:opacity .15s}.lk-fh:hover .lk-fact,.lk-fh:focus-within .lk-fact{opacity:1}
+.lk-fact button{width:22px;height:22px;border:none;border-radius:6px;background:var(--s2);color:var(--muted2);font-size:10px;cursor:pointer;padding:0}.lk-fact button:hover:not(:disabled){color:var(--text)}.lk-fact button:disabled{opacity:.35;cursor:default}
+.lk-dropzone{display:none;align-items:center;justify-content:center;min-height:52px;border:1.5px dashed var(--border2);border-radius:10px;font-size:10px;color:var(--muted2)}
+.lk-grid:not(:has(.lk-it)) .lk-dropzone{display:flex}.lk-dragging .lk-cat.closed .lk-grid{display:grid}
+.lk-it{touch-action:pan-y;user-select:none;-webkit-user-select:none}.lk-dragging,.lk-dragging *{cursor:grabbing!important}
+.lk-ph{opacity:.35}.lk-ph .lk-open{border-style:dashed;border-color:var(--accent)}
+.lk-ghost{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;box-shadow:0 22px 50px rgba(0,0,0,.5);border-radius:10px;transition:none}.lk-ghost .lk-act{display:none!important}.lk-ghost .lk-open{border-color:var(--accent)}
+@media(hover:none){.lk-fact{opacity:1}.lk-rc-x{display:block}}
 /* 3.27 : Clients & Projets fusionné (js/business-nav.js) */
 .ni[hidden]{display:none!important}
 #topbar-title{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -963,6 +1027,33 @@ html.hub-calm *,html.hub-calm *::before,html.hub-calm *::after{animation-duratio
 .nt-d{font-size:9px;color:var(--muted2);margin-top:3px}
 @media(max-width:520px){.qd-ov{align-items:flex-end;padding:0}.qd{max-width:none;border-radius:16px 16px 0 0}}
 .edwin.wide{width:322px}
+/* 3.28 : gestionnaire de tags */
+.edwin.xl{width:min(660px,calc(100vw - 16px))}.edwin.xl .edwin-b{max-height:76vh}
+.tg-new{display:flex;gap:6px;margin-bottom:10px}.tg-new .edw-in{flex:1}
+.tg-btn{flex-shrink:0;border:1px solid var(--border);background:var(--s2);color:var(--text);font-family:inherit;font-size:10px;font-weight:700;padding:6px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}.tg-btn:hover{border-color:var(--accent)}
+.tg-btn-a{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.tg-del{padding:6px 8px}
+.tg-cols{display:grid;grid-template-columns:190px 1fr;gap:12px;align-items:start}
+.tg-list{display:flex;flex-direction:column;gap:3px;max-height:58vh;overflow-y:auto;padding-right:2px}
+.tg-item{display:flex;align-items:center;gap:2px;border:1px solid transparent;border-radius:8px}.tg-item.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.tg-pick{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text);font-family:inherit;font-size:11px;font-weight:600;padding:7px 8px;border-radius:8px;cursor:pointer;text-align:left}.tg-pick:hover{background:var(--s2)}
+.tg-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tg-n{font-size:9px;color:var(--muted2);background:var(--s2);border-radius:999px;padding:1px 6px}.tg-mi{font-size:10px;color:var(--muted2)}
+.tg-mv{display:flex;opacity:0;transition:opacity .15s}.tg-item:hover .tg-mv,.tg-item:focus-within .tg-mv,.tg-item.on .tg-mv{opacity:1}
+.tg-mv button{width:18px;height:20px;border:none;background:none;color:var(--muted2);font-size:10px;cursor:pointer;padding:0}.tg-mv button:hover:not(:disabled){color:var(--text)}.tg-mv button:disabled{opacity:.3;cursor:default}
+.tg-detail{min-width:0}.tg-dh{display:flex;gap:6px}.tg-dh .edw-in{font-weight:700;font-size:12px}
+.tg-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:3px;background:var(--s2);border:1px solid var(--border);border-radius:9px}
+.tg-seg button{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;color:var(--muted2);font-family:inherit;font-size:9px;font-weight:700;padding:6px 4px;border-radius:7px;cursor:pointer}.tg-seg button span{font-size:13px}
+.tg-seg button.on{background:var(--accent);color:var(--on-accent)}.tg-seg button:not(.on):hover{color:var(--text)}
+.tg-empty{font-size:10px;color:var(--muted2);margin:4px 2px;line-height:1.5}
+.tg-mh{font-size:9px;color:var(--muted2);margin:6px 0 0;line-height:1.5}
+.tg-tools{display:flex;gap:5px;margin-bottom:8px}.tg-tools .edw-in{flex:1;min-width:0}
+.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}
+.tg-p{position:relative;display:flex;flex-direction:column;gap:4px;padding:4px;border:1px solid var(--border);border-radius:9px;background:var(--s2);color:var(--text);font-family:inherit;text-align:left;cursor:pointer;transition:border-color .15s,opacity .15s}
+.tg-p:not(.on){opacity:.62}.tg-p:hover{opacity:1;border-color:var(--border2)}.tg-p.on{border-color:var(--accent);opacity:1}
+.tg-cv{display:block;aspect-ratio:16/10;border-radius:6px;overflow:hidden;background:linear-gradient(135deg,var(--s3),var(--s1))}.tg-cv img{width:100%;height:100%;object-fit:cover;display:block}
+.tg-pt{font-size:9px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px 2px}
+.tg-ck{position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;background:rgba(0,0,0,.55);color:transparent;border:1px solid rgba(255,255,255,.3)}
+.tg-p.on .tg-ck{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+@media(max-width:560px){.tg-cols{grid-template-columns:1fr}.tg-list{flex-direction:row;flex-wrap:wrap;max-height:none}.tg-item{flex:0 0 auto}.tg-mv{display:none}}
 /* ✎ Contact — une ligne par moyen */
 .edw-ct{margin-bottom:9px}
 .edw-ct .edw-tog{margin-bottom:4px}
@@ -1188,6 +1279,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
   font-family:inherit;font-size:11px;font-weight:800;cursor:pointer}
 .edw-ok:hover{opacity:.88}
 /* Bascule Édition / Aperçu du canvas */
+.edtb-hint{font-size:9px;color:var(--muted2);white-space:nowrap;padding:0 6px;cursor:help}@media(max-width:1180px){.edtb-hint{display:none}}
 .ed-modes{display:flex;background:var(--s3);border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px}
 .ed-modes button{background:none;border:none;color:var(--muted2);font-family:inherit;font-size:10px;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:all .15s}
 .ed-modes button:hover{color:var(--text)}
@@ -1713,7 +1805,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
         <div id="nt-list"></div>
       </div>
     </div>
-    <button class="btn btn-ghost" data-na="behance" onclick="syncBehance()" title="Récupérer tes projets Behance">↻ Sync Behance</button>
+    <button class="btn btn-ghost" data-na="behance" onclick="syncBehance()" title="Ajout rapide : choisis les projets Behance à ajouter">＋ Behance</button>
     <button class="btn btn-accent" data-na="publish" onclick="edDeploy()" title="Publier ton site">🚀 Publier</button>
   </div>
   <div class="scroll-area">
@@ -1813,11 +1905,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
           <span class="edtb-sep"></span>
           <button type="button" class="btn btn-ghost edtb-b edtb-i" id="ed-undo" onclick="EdCanvas.undo()" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled>↶</button>
           <button type="button" class="btn btn-ghost edtb-b edtb-i" id="ed-redo" onclick="EdCanvas.redo()" title="Rétablir (Ctrl+Maj+Z)" aria-label="Rétablir" disabled>↷</button>
-          <span class="edtb-sep"></span>
-          <div class="ed-modes">
-            <button id="ed-mode-edit" class="active" onclick="EdCanvas.setMode('edit')" title="Modifier les blocs">✎<span class="edtb-t"> Édition</span></button>
-            <button id="ed-mode-prev" onclick="EdCanvas.setMode('preview')" title="Voir le site comme un visiteur">👁<span class="edtb-t"> Aperçu</span></button>
-          </div>
+          <span class="edtb-hint" title="Un seul espace : clic = sélectionner et modifier · double-clic = ouvrir comme un visiteur (projet, lien) · filtres et menu du site restent actifs">✎ Clic modifier · double-clic ouvrir</span>
           <span class="edtb-sep"></span>
           <button type="button" class="btn btn-ghost edtb-b edtb-i" onclick="edSaveConfig()" title="Enregistrer la configuration" aria-label="Enregistrer">💾</button>
           <button type="button" class="btn btn-ghost edtb-b edtb-i" onclick="edPreviewExternal()" title="Ouvrir le site dans un nouvel onglet" aria-label="Ouvrir le site">↗</button>
@@ -2248,7 +2336,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
             </div>
             <div class="workflow-list">
               <div class="workflow-item"><div class="workflow-status ws-active"></div><div class="workflow-name">pages build and deployment — automatique</div><div class="workflow-trigger">à chaque déploiement</div></div>
-              <div class="workflow-item"><div class="workflow-status ws-idle"></div><div class="workflow-name">Sync Behance RSS (côté hub)</div><div class="workflow-trigger">toutes les 30 min</div></div>
+              <div class="workflow-item"><div class="workflow-status ws-idle"></div><div class="workflow-name">Nouveaux projets Behance annoncés (côté hub)</div><div class="workflow-trigger">toutes les 30 min</div></div>
             </div>
             <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
               <div style="font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;font-weight:700">Derniers runs</div>
@@ -2452,9 +2540,9 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
                 <div style="font-size:10px;color:var(--muted2);margin:10px 0" id="behance-status">Entre ton pseudo pour synchroniser</div>
                 <div style="display:flex;gap:8px;margin-bottom:10px">
                   <input class="prop-input" id="be-user" placeholder="tonpseudo (ex: souanpt)" style="flex:1" onkeydown="if(event.key==='Enter')beImport()">
-                  <button class="btn btn-accent" id="be-import-btn" onclick="beImport()" style="white-space:nowrap;font-size:10px">↻ Importer / Synchroniser</button>
+                  <button class="btn btn-accent" id="be-import-btn" onclick="beImport()" style="white-space:nowrap;font-size:10px">＋ Choisir mes projets</button>
                 </div>
-                <div class="hintbox">🔄 Sync <strong style="color:var(--text)">auto toutes les 30 min</strong> quand le hub est ouvert. Chaque projet arrive avec lien cliquable + couverture, dédupliqué.</div>
+                <div class="hintbox">🅱 <strong style="color:var(--text)">Ajout rapide</strong> : le hub repère tes projets publics (nom, couverture en grand format, tags) et te laisse cocher ceux à ajouter. Toutes les 30 min, les nouveaux projets sont <strong style="color:var(--text)">annoncés</strong> dans les notifications, jamais ajoutés sans ton choix.</div>
                 <div class="gc" style="padding:12px;margin-top:10px">
                   <div style="font-size:10px;font-weight:700;margin-bottom:8px">Projets importés</div>
                   <div id="behance-imported-list" style="font-size:10px;color:var(--muted2)">Aucun projet importé</div>
@@ -2570,6 +2658,8 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
 <script src="js/vendor/qrcode.min.js"></script>
 <script src="js/device-pair.js"></script>
 <script src="js/toolbox.js"></script>
+<script src="js/hub-drop.js"></script>
+<script src="js/behance-quick.js"></script>
 <script src="js/shortcuts.js"></script>
 <script src="js/business-nav.js"></script>
 <script src="js/editor-seo.js"></script>
@@ -2838,7 +2928,7 @@ function settingsSaveDomain() {
   SiteConfig.set('customDomain', d ? 'https://' + d : '');
   // Retrait explicite : seule façon de supprimer le CNAME à la prochaine publication.
   SiteConfig.set('customDomainRemoved', !d && !!had ? true : (d ? false : !!SiteConfig.get().customDomainRemoved));
-  if (window.SiteAutoPublish) SiteAutoPublish.queue();
+  if (typeof SiteAutoPublish !== 'undefined') SiteAutoPublish.queue();
   settingsRenderDomain();
   showToast(d ? 'Domaine enregistré ✓ — publié à la prochaine publication' : 'Domaine retiré — le site reviendra à son adresse GitHub Pages', 'var(--green)', 3500);
 }
@@ -2847,7 +2937,7 @@ function settingsToggleIndex(el) {
   el.classList.toggle('on', on); el.setAttribute('aria-checked', on);
   const cfg = SiteConfig.get();
   SiteConfig.set('seo', { ...(cfg.seo || {}), index: on });
-  if (window.SiteAutoPublish) SiteAutoPublish.queue();
+  if (typeof SiteAutoPublish !== 'undefined') SiteAutoPublish.queue();
   showToast(on ? 'Site visible sur Google à la prochaine publication' : 'Site masqué de Google (noindex) à la prochaine publication', 'var(--green)', 3000);
 }
 /* ═══ EXPORT / IMPORT COMPLET DU HUB — filet de sécurité + base migration Firebase ═══ */
@@ -3208,15 +3298,13 @@ function moveProject(from, to) {
 }
 
 /* ═══ BEHANCE PAGE ═══ */
-async function beImport() {
-  const u = document.getElementById('be-user')?.value.trim().replace('@','');
-  if (!u) { showToast('Entre ton pseudo Behance','#e4b24a'); return; }
-  SiteConfig.set('behance', u);
-  const btn = document.getElementById('be-import-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⟳ Import en cours…'; }
-  try { await behanceSyncNow(false); renderBehancePage(); }
-  catch(e) { showToast('✗ ' + e.message, '#c0392b', 3500); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '↻ Importer / Synchroniser'; } }
+/* 3.28 : l'import ouvre l'ajout rapide (sélection) au lieu de tout importer. */
+function beImport() {
+  const raw = document.getElementById('be-user')?.value || '';
+  const u = window.BehanceQuick ? BehanceQuick.parseUser(raw) : raw.trim().replace('@','');
+  if (raw.trim() && !u) { showToast('Pseudo ou lien Behance invalide','#e4b24a'); return; }
+  if (u) SiteConfig.set('behance', u);
+  if (window.BehanceQuick) BehanceQuick.open(u);
 }
 function renderBehancePage() {
   const cfg = SiteConfig.get();
@@ -4496,7 +4584,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Sync Behance auto (30 min max) — silencieuse
   const lastSync=parseInt(localStorage.getItem('souanpt_last_behance_sync')||'0');
   if (cfg.behance && Date.now()-lastSync > 30*60*1000) {
-    behanceSyncNow(true).then(n=>{ if(n) renderBehancePage(); }).catch(()=>{});
+    // 3.28 : annonce les nouveaux projets (notification « Choisir »), n'ajoute rien seul.
+    (window.BehanceQuick ? BehanceQuick.checkNew() : Promise.resolve(0)).then(()=>renderBehancePage()).catch(()=>{});
   }
 });
 </script>

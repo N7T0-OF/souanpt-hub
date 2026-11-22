@@ -64,6 +64,8 @@ const EdCanvas = {
     doc.addEventListener('click', e => {
       if (this.mode !== 'edit') return;
       if (this._ui(e.target)) return;
+      // 3.28 — Édition et Aperçu fusionnés : le site reste vivant pendant l'édition.
+      if (this._pass || this._visitor(e)) return;
       e.preventDefault(); e.stopPropagation();
       if (e.target.closest && e.target.closest('[data-add]')) { this.deselect(); return edAddBlock(); }
       const t = e.target.closest && e.target.closest('[data-b]');
@@ -86,6 +88,46 @@ const EdCanvas = {
     this._btns();
   },
 
+  /* ══ Geste visiteur dans l'éditeur (fusion Édition / Aperçu, 3.28) ══
+     • commandes publiques hors blocs (filtres, liens d'ancre) : clic normal ;
+     • dans un bloc : double-clic ou Ctrl/⌘+clic ouvre comme un visiteur
+       (fenêtre projet, lien, bouton) ; le simple clic sélectionne.
+     Un lien externe sans cible s'ouvre dans un nouvel onglet : l'aperçu ne
+     doit jamais quitter le site en cours d'édition. */
+  _pass: false,
+  _visitor(e) {
+    const t = e.target, act = t && t.closest && t.closest('a[href],button,[onclick],[role=button]');
+    if (!act || act.closest('[data-add]')) return false;
+    const inBlock = act.closest('[data-b]');
+    const publicCtl = !inBlock && (act.closest('.tag-filters,.sb-tags,.nl,.sb-nav,nav') || (act.matches('a[href^="#"]')));
+    if (!publicCtl && !(inBlock && (e.detail >= 2 || e.ctrlKey || e.metaKey))) return false;
+    if (inBlock) setTimeout(() => this.deselect(), 0);   // la barre du bloc ne reste pas sur la fenêtre projet
+    return this._open(act, e);
+  },
+  /** Exécute l'action d'un élément comme un visiteur. true = laisser l'événement suivre son cours. */
+  _open(act, e) {
+    const a = act.closest('a[href]');
+    if (a) {
+      const href = a.getAttribute('href') || '';
+      if (/^(javascript|data|vbscript):/i.test(href)) { e && e.preventDefault(); return true; }
+      if (/^https?:/i.test(href) && a.target !== '_blank') { e && e.preventDefault(); window.open(a.href, '_blank', 'noopener,noreferrer'); return true; }
+    }
+    return true;
+  },
+  /** Menu « Ouvrir comme un visiteur » : déclenche le premier élément actif du bloc. */
+  visit(id) {
+    const doc = this.doc; if (!doc || !id) return;
+    const el = doc.querySelector('[data-b="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); if (!el) return;
+    const act = (el.matches('a[href],[onclick]') ? el : null) || el.querySelector('a[href]:not([href="#"]),[onclick]:not([data-add])');
+    if (!act) return showToast?.('Ce bloc n’a pas de lien à ouvrir', '#666', 1600);
+    this._pass = true;
+    try {
+      const a = act.closest('a[href]');
+      if (a && /^https?:/i.test(a.getAttribute('href') || '') && a.target !== '_blank') window.open(a.href, '_blank', 'noopener,noreferrer');
+      else act.click();
+    } finally { this._pass = false; }
+  },
+
   /* ══ Menu contextuel personnalisé ══ */
   _clip: null,
   _ctx(e) {
@@ -97,8 +139,10 @@ const EdCanvas = {
     const id = el && el.getAttribute('data-b');
     if (id) this.select(id); else this.deselect();
     const b = id ? this.blocks().find(x => x.id === id) : null;
+    const hasLink = !!(el && (el.matches('a[href],[onclick]') || el.querySelector('a[href]:not([href="#"]),[onclick]:not([data-add])')));
     const items = b ? [
-      ['edit', '✎ Modifier', ''], ['dup', '⧉ Dupliquer', 'Ctrl+D'], ['copy', '⧉ Copier', 'Ctrl+C'],
+      ['edit', '✎ Modifier', ''], ...(hasLink ? [['visit', '↗ Ouvrir comme un visiteur', 'Double-clic']] : []),
+      ['dup', '⧉ Dupliquer', 'Ctrl+D'], ['copy', '⧉ Copier', 'Ctrl+C'],
       ['paste', '📋 Coller', 'Ctrl+V'], null,
       ['front', '↑ Déplacer vers l\'avant', ''], ['back', '↓ Déplacer vers l\'arrière', ''], null,
       ['lock', bLocked(b) ? '🔓 Déverrouiller' : '🔒 Verrouiller', ''],
@@ -133,6 +177,7 @@ const EdCanvas = {
     const i = blocks.findIndex(b => b.id === this.sel);
     if (a === 'copy') { if (i >= 0) { this._clip = JSON.parse(JSON.stringify(blocks[i])); showToast?.('Bloc copié', '#666', 1400); } return; }
     if (a === 'paste') { return this.paste(); }
+    if (a === 'visit') return this.visit(this.sel);
     if (a === 'undo') return this.undo();
     if (a === 'redo') return this.redo();
     if (a === 'add') return edAddBlock();
@@ -292,7 +337,7 @@ body:not(.ed-on) .ed-navtools{display:none!important}
     if (hero && !hero.querySelector(':scope>.ed-linkflag')) {
       const f = doc.createElement('div');
       f.className = 'ed-linkflag'; f.textContent = '🔗 Bannière cliquable';
-      f.title = 'Le lien s’active en Aperçu et sur le site publié';
+      f.title = 'Double-clic pour ouvrir le lien, comme un visiteur';
       hero.appendChild(f);
     }
     doc.querySelectorAll('[data-b]').forEach(el => {
@@ -928,12 +973,12 @@ function edWinBrand() {
   const c = SiteConfig.get();
   EdWin.open(null, '✳ Identité du site', `
     <div class="edw-l">Logo personnalisé du site</div>
-    <input class="edw-in" id="brand-logo" type="url" placeholder="https://…/logo.png" value="${_eesc(c.siteLogo || '')}"><input type="file" id="brand-logo-file" accept="image/*">
+    <input class="edw-in" id="brand-logo" type="url" placeholder="https://…/logo.png" value="${_eesc(c.siteLogo || '')}"><input type="file" id="brand-logo-file" accept="image/*" data-max="4" data-label="Dépose ton logo ou clique pour parcourir">
     <div class="edw-l">Affichage dans la navigation</div>
     <select class="edw-in" id="brand-mode"><option value="auto">Automatique — logo si présent, sinon nom</option><option value="image">Logo seul</option><option value="both">Logo et nom</option><option value="text">Nom seul</option></select>
     <div class="edw-l">Taille du logo (20 à 64 px)</div><input class="edw-in" id="brand-size" type="number" min="20" max="64" value="${Math.max(20,Math.min(64,Number(c.brandSize)||32))}">
     <div class="edw-l">Icône de l'onglet (favicon)</div>
-    <input class="edw-in" id="brand-icon" type="url" placeholder="https://…/favicon.png" value="${_eesc(c.favicon || '')}"><input type="file" id="brand-icon-file" accept="image/*">
+    <input class="edw-in" id="brand-icon" type="url" placeholder="https://…/favicon.png" value="${_eesc(c.favicon || '')}"><input type="file" id="brand-icon-file" accept="image/*" data-max="4" data-label="Dépose l’icône ou clique pour parcourir">
     <div class="edw-l">Effet du nom sur le site</div>
     <select class="edw-in" id="brand-effect"><option value="none">Aucun</option><option value="glow">Lueur</option><option value="gradient">Dégradé</option><option value="float">Flottement doux</option></select>
     <button class="edw-ok" id="brand-save">Enregistrer</button>`, w => {
@@ -961,8 +1006,8 @@ function edWinBrand() {
 function edWinAudio() {
   const c = SiteConfig.get();
   EdWin.open(null, '🔊 Son du site', `
-    <div class="edw-l">Musique de fond</div><input class="edw-in" id="audio-music" type="url" placeholder="https://…/musique.mp3" value="${_eesc(c.backgroundMusic || '')}"><input type="file" id="audio-music-file" accept="audio/*"> <button class="edw-sec-rst" data-haunt="audio-music" type="button">👻 Choisir sur haunt.gg</button>
-    <div class="edw-l">Son de clic (optionnel)</div><input class="edw-in" id="audio-click" type="url" placeholder="https://…/clic.mp3" value="${_eesc(c.clickSound || '')}"><input type="file" id="audio-click-file" accept="audio/*"> <button class="edw-sec-rst" data-haunt="audio-click" type="button">👻 Choisir sur haunt.gg</button>
+    <div class="edw-l">Musique de fond</div><input class="edw-in" id="audio-music" type="url" placeholder="https://…/musique.mp3" value="${_eesc(c.backgroundMusic || '')}"><input type="file" id="audio-music-file" accept="audio/*" data-max="15" data-label="Dépose ta musique ou clique pour parcourir"> <button class="edw-sec-rst" data-haunt="audio-music" type="button">👻 Choisir sur haunt.gg</button>
+    <div class="edw-l">Son de clic (optionnel)</div><input class="edw-in" id="audio-click" type="url" placeholder="https://…/clic.mp3" value="${_eesc(c.clickSound || '')}"><input type="file" id="audio-click-file" accept="audio/*" data-max="15" data-label="Dépose un son de clic ou clique pour parcourir"> <button class="edw-sec-rst" data-haunt="audio-click" type="button">👻 Choisir sur haunt.gg</button>
     <button class="edw-ok" id="audio-save">Enregistrer</button>`, w => {
     [['audio-music-file','audio-music'],['audio-click-file','audio-click']].forEach(([fileId,urlId]) => {
       w.querySelector('#'+fileId).onchange = async e => {
@@ -1898,7 +1943,7 @@ function edWinEdit(blockId) {
         w.querySelector('#hl-sec').style.display  = t === 'section' ? '' : 'none';
         w.querySelector('#hl-proj').style.display = t === 'project' ? '' : 'none';
         note.textContent = t === 'none' ? 'La bannière n’est pas cliquable.'
-          : 'Dans l’éditeur le clic sélectionne le bloc — le lien ne s’active qu’en Aperçu et sur le site publié.';
+          : 'Dans l’éditeur, le clic sélectionne le bloc ; double-clic pour ouvrir le lien comme un visiteur.';
       };
       hlT.onchange = show; show();
     }
@@ -1936,41 +1981,124 @@ function edTagCatalog() {
   const all = [...(Array.isArray(cfg.projectTags) ? cfg.projectTags : []), ...getProjects().flatMap(p => p.tags || [])];
   return [...new Map(all.map(t => [String(t).trim().toLocaleLowerCase('fr'), String(t).trim()]).filter(x => x[0])).values()];
 }
-function edWinTags() {
-  const html = `<div class="edw-l">Créer un tag</div><div class="edw-add"><input class="edw-in" id="tag-new" maxlength="40" placeholder="Ex. Motion"><button class="edw-sec-rst" id="tag-add">Ajouter</button></div><div id="tag-projects"></div>`;
-  EdWin.open(null, '🏷 Tags des projets', html, w => {
+/* ── 🏷 Tags (3.28) : un vrai gestionnaire ──
+   À gauche les tags (ordre = ordre de la barre de filtres du site, ↑↓), à
+   droite le tag choisi : renommer, supprimer, CHOISIR SA PRÉSENTATION
+   (barre de filtres + cartes, barre seule, cartes seules) et RANGER DES
+   PROJETS dedans en cliquant leurs couvertures. */
+const edTagKey = t => String(t ?? '').trim().toLocaleLowerCase('fr');
+const ED_TAG_MODES = [
+  ['both', '◫', 'Barre et cartes', 'Visible dans la barre de filtres et en étiquette sur les cartes des projets.'],
+  ['bar', '▤', 'Barre de filtres', 'Sert à filtrer les projets (barre au-dessus de la grille), sans étiquette sur les cartes.'],
+  ['card', '▣', 'Cartes seulement', 'Étiquette sur les cartes des projets, absent de la barre de filtres.'],
+];
+function edWinTags(focusTag) {
+  let cur = focusTag || null, q = '';
+  EdWin.open(null, '🏷 Tags', '<div class="tg-wrap" id="tg-wrap"></div>', w => {
+    const wrap = w.querySelector('#tg-wrap');
+    const has = (p, t) => (p.tags || []).some(x => edTagKey(x) === edTagKey(t));
+    const changed = full => { SiteAutoPublish.queue(); full ? edRefreshPreview() : edUpdatePreview(); window.renderProjects?.(); };
+    const saveProjects = ps => { try { localStorage.setItem('hub_projects', JSON.stringify(ps)); return true; } catch { showToast?.('Stockage local plein', '#c0392b', 3000); return false; } };
+    const grid = () => {
+      const ps = getProjects(), ql = edTagKey(q);
+      const list = ps.filter(p => !ql || edTagKey(p.title).includes(ql));
+      return list.length ? list.map(p => `<button type="button" class="tg-p${has(p, cur) ? ' on' : ''}" data-proj="${_eesc(p.id)}" aria-pressed="${has(p, cur)}" title="${has(p, cur) ? 'Retirer de' : 'Ajouter à'} « ${_eesc(cur)} »">
+          <span class="tg-cv">${p.cover ? `<img src="${_eesc(p.cover)}" alt="" loading="lazy">` : ''}</span><span class="tg-pt">${_eesc(p.title || 'Sans titre')}</span><span class="tg-ck" aria-hidden="true">✓</span></button>`).join('')
+        : `<p class="tg-empty">${ps.length ? 'Aucun projet ne correspond.' : 'Aucun projet pour le moment.'}</p>`;
+    };
+    const bindGrid = () => {
+      wrap.querySelectorAll('[data-proj]').forEach(b => b.onclick = () => {
+        const ps = getProjects(), p = ps.find(x => String(x.id) === b.dataset.proj); if (!p) return;
+        p.tags = has(p, cur) ? (p.tags || []).filter(x => edTagKey(x) !== edTagKey(cur)) : [...(p.tags || []), cur];
+        if (!saveProjects(ps)) return;
+        changed(); render();
+      });
+    };
     const render = () => {
-      const tags = edTagCatalog(), projects = getProjects(), box = w.querySelector('#tag-projects');
-      box.innerHTML = `<div class="edw-l" style="margin-top:16px">Tags créés</div><div class="edw-row" style="flex-wrap:wrap">${tags.map(t => `<span class="edw-tog">${_eesc(t)} <button type="button" data-remove-tag="${_eesc(t)}" title="Supprimer ce tag">×</button></span>`).join('') || '<span class="edw-hint">Aucun tag.</span>'}</div>` + (projects.length ? projects.map(p => `<div class="edw-l" style="margin-top:16px">${_eesc(p.title || 'Projet')}</div><div class="edw-row" style="flex-wrap:wrap">${tags.map(t => `<label class="edw-tog"><input type="checkbox" data-project="${_eesc(p.id)}" data-tag="${_eesc(t)}"${(p.tags || []).some(x => String(x).toLocaleLowerCase('fr') === t.toLocaleLowerCase('fr')) ? ' checked' : ''}> ${_eesc(t)}</label>`).join('') || '<span class="edw-hint">Crée un tag ci-dessus.</span>'}</div>`).join('') : '<p class="edw-hint">Ajoute d’abord un projet pour lui attribuer des tags.</p>');
-      box.querySelectorAll('[data-remove-tag]').forEach(button => button.onclick = () => {
-        const tag = button.dataset.removeTag;
+      const tags = edTagCatalog(), ps = getProjects(), cfg = SiteConfig.get();
+      if (!cur || !tags.some(t => edTagKey(t) === edTagKey(cur))) cur = tags[0] || null;
+      else cur = tags.find(t => edTagKey(t) === edTagKey(cur));
+      const n = t => ps.filter(p => has(p, t)).length;
+      const modeOf = t => siteTagMode(cfg, t), m = cur ? modeOf(cur) : 'both';
+      const icon = t => ED_TAG_MODES.find(x => x[0] === modeOf(t))[1];
+      wrap.innerHTML = `
+        <div class="tg-new"><input class="edw-in" id="tag-new" maxlength="40" placeholder="Nouveau tag (ex. Motion)"><button type="button" class="tg-btn tg-btn-a" id="tag-add">＋ Créer</button></div>
+        <div class="tg-cols">
+          <div class="tg-list" role="list">${tags.map((t, i) => `<div class="tg-item${edTagKey(t) === edTagKey(cur) ? ' on' : ''}" role="listitem">
+              <button type="button" class="tg-pick" data-pick="${_eesc(t)}" aria-current="${edTagKey(t) === edTagKey(cur)}"><span class="tg-name">${_eesc(t)}</span><span class="tg-n" title="${n(t)} projet(s)">${n(t)}</span><span class="tg-mi" title="${_eesc(ED_TAG_MODES.find(x => x[0] === modeOf(t))[2])}">${icon(t)}</span></button>
+              <span class="tg-mv"><button type="button" data-up="${i}" title="Monter (ordre de la barre)" aria-label="Monter ${_eesc(t)}"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" data-down="${i}" title="Descendre" aria-label="Descendre ${_eesc(t)}"${i === tags.length - 1 ? ' disabled' : ''}>↓</button></span></div>`).join('')
+            || '<p class="tg-empty">Aucun tag. Crée le premier ci-dessus.</p>'}</div>
+          <div class="tg-detail">${cur ? `
+            <div class="tg-dh"><input class="edw-in" id="tg-rename" maxlength="40" value="${_eesc(cur)}" aria-label="Nom du tag" title="Renommer : modifie puis Entrée"><button type="button" class="tg-btn tg-del" id="tg-del" title="Supprimer ce tag de tous les projets">🗑</button></div>
+            <div class="edw-l">Présentation sur le site</div>
+            <div class="tg-seg" role="radiogroup" aria-label="Présentation du tag">${ED_TAG_MODES.map(([k, ic, label]) => `<button type="button" role="radio" aria-checked="${m === k}" class="${m === k ? 'on' : ''}" data-mode="${k}"><span>${ic}</span>${label}</button>`).join('')}</div>
+            <p class="tg-mh">${ED_TAG_MODES.find(x => x[0] === m)[3]}</p>
+            <div class="edw-l">Projets dans « ${_eesc(cur)} » <span class="edw-hint">${n(cur)} / ${ps.length} · clique une couverture pour ajouter ou retirer</span></div>
+            <div class="tg-tools"><input class="edw-in" id="tg-q" placeholder="Filtrer les projets…" value="${_eesc(q)}"><button type="button" class="tg-btn" id="tg-all">Tout ajouter</button><button type="button" class="tg-btn" id="tg-none">Tout retirer</button></div>
+            <div class="tg-grid" id="tg-grid">${grid()}</div>` : '<p class="tg-empty">Crée un tag pour y ranger des projets et choisir comment il s’affiche.</p>'}</div>
+        </div>`;
+      const add = () => {
+        const input = wrap.querySelector('#tag-new'), name = input.value.trim().replace(/\s+/g, ' ');
+        if (!name) return;
+        const list = edTagCatalog();
+        if (list.some(t => edTagKey(t) === edTagKey(name))) { cur = name; render(); return showToast?.('Ce tag existe déjà — il est sélectionné', '#e4b24a', 2000); }
+        list.push(name); SiteConfig.set('projectTags', list); cur = name; render();
+        wrap.querySelector('#tg-q')?.focus();
+      };
+      wrap.querySelector('#tag-add').onclick = add;
+      wrap.querySelector('#tag-new').onkeydown = e => { if (e.key === 'Enter') add(); };
+      wrap.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { cur = b.dataset.pick; q = ''; render(); });
+      wrap.querySelectorAll('[data-up],[data-down]').forEach(b => b.onclick = () => {
+        const list = edTagCatalog(), i = +(b.dataset.up ?? b.dataset.down), j = b.dataset.up != null ? i - 1 : i + 1;
+        if (j < 0 || j >= list.length) return;
+        [list[i], list[j]] = [list[j], list[i]]; SiteConfig.set('projectTags', list); changed(true); render();
+      });
+      if (!cur) return;
+      const ren = wrap.querySelector('#tg-rename');
+      const doRename = () => {
+        const name = ren.value.trim().replace(/\s+/g, ' ');
+        if (!name || name === cur) { ren.value = cur; return; }
+        if (edTagCatalog().some(t => edTagKey(t) === edTagKey(name) && edTagKey(t) !== edTagKey(cur))) { ren.value = cur; return showToast?.('Un tag porte déjà ce nom', '#e4b24a', 2000); }
+        const old = cur, ps = getProjects();
+        ps.forEach(p => { if (has(p, old)) p.tags = [...new Map((p.tags || []).map(x => edTagKey(x) === edTagKey(old) ? name : x).map(x => [edTagKey(x), x])).values()]; });
+        if (!saveProjects(ps)) return;
+        SiteConfig.set('projectTags', edTagCatalog().map(t => edTagKey(t) === edTagKey(old) ? name : t));
+        const d = { ...(SiteConfig.get().tagDisplay || {}) };
+        if (d[edTagKey(old)]) { d[edTagKey(name)] = d[edTagKey(old)]; delete d[edTagKey(old)]; SiteConfig.set('tagDisplay', d); }
+        cur = name; changed(true); render(); showToast?.('Tag renommé ✓', 'var(--green)', 1500);
+      };
+      ren.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); doRename(); } if (e.key === 'Escape') { ren.value = cur; } };
+      ren.onblur = doRename;
+      wrap.querySelector('#tg-del').onclick = () => {
+        const tag = cur;
         if (!confirm('Supprimer « ' + tag + ' » de tous les projets ?')) return;
-        SiteConfig.set('projectTags', edTagCatalog().filter(t => t.toLocaleLowerCase('fr') !== tag.toLocaleLowerCase('fr')));
-        const ps = getProjects(); ps.forEach(p => p.tags = (p.tags || []).filter(t => String(t).toLocaleLowerCase('fr') !== tag.toLocaleLowerCase('fr')));
-        localStorage.setItem('hub_projects', JSON.stringify(ps)); SiteAutoPublish.queue(); edUpdatePreview(); render();
+        const ps = getProjects(); ps.forEach(p => { p.tags = (p.tags || []).filter(x => edTagKey(x) !== edTagKey(tag)); });
+        if (!saveProjects(ps)) return;
+        SiteConfig.set('projectTags', edTagCatalog().filter(t => edTagKey(t) !== edTagKey(tag)));
+        const d = { ...(SiteConfig.get().tagDisplay || {}) }; delete d[edTagKey(tag)]; SiteConfig.set('tagDisplay', d);
+        cur = null; changed(true); render();
+      };
+      wrap.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+        const d = { ...(SiteConfig.get().tagDisplay || {}) };
+        if (b.dataset.mode === 'both') delete d[edTagKey(cur)]; else d[edTagKey(cur)] = b.dataset.mode;
+        SiteConfig.set('tagDisplay', d); changed(true); render();
       });
-      box.querySelectorAll('input[data-project]').forEach(input => input.onchange = () => {
-        const ps = getProjects(), project = ps.find(p => String(p.id) === input.dataset.project);
-        if (!project) return;
-        const tag = input.dataset.tag;
-        project.tags = input.checked ? [...new Set([...(project.tags || []), tag])]
-          : (project.tags || []).filter(t => String(t).toLocaleLowerCase('fr') !== tag.toLocaleLowerCase('fr'));
-        localStorage.setItem('hub_projects', JSON.stringify(ps));
-        SiteAutoPublish.queue();
-        edUpdatePreview();
-      });
+      const qi = wrap.querySelector('#tg-q');
+      qi.oninput = () => { q = qi.value; wrap.querySelector('#tg-grid').innerHTML = grid(); bindGrid(); };
+      const bulk = on => {
+        const ql = edTagKey(q), ps = getProjects();
+        ps.filter(p => !ql || edTagKey(p.title).includes(ql)).forEach(p => {
+          if (on && !has(p, cur)) p.tags = [...(p.tags || []), cur];
+          if (!on) p.tags = (p.tags || []).filter(x => edTagKey(x) !== edTagKey(cur));
+        });
+        if (saveProjects(ps)) { changed(); render(); }
+      };
+      wrap.querySelector('#tg-all').onclick = () => bulk(true);
+      wrap.querySelector('#tg-none').onclick = () => bulk(false);
+      bindGrid();
     };
-    const add = () => {
-      const input = w.querySelector('#tag-new'), name = input.value.trim().replace(/\s+/g, ' ');
-      if (!name) return;
-      const tags = edTagCatalog();
-      if (tags.some(t => t.toLocaleLowerCase('fr') === name.toLocaleLowerCase('fr'))) return showToast?.('Ce tag existe déjà', '#e4b24a', 2000);
-      tags.push(name); SiteConfig.set('projectTags', tags); input.value = ''; render();
-    };
-    w.querySelector('#tag-add').onclick = add;
-    w.querySelector('#tag-new').onkeydown = e => { if (e.key === 'Enter') add(); };
     render();
-  });
+  }, 'xl');
 }
 window.edWinTags = edWinTags;
 
@@ -1978,6 +2106,7 @@ window.edWinTags = edWinTags;
 function edAddProject() {
   const projs = getProjects();
   const html = `
+    <button type="button" class="edw-quick" id="ap-behance">🅱 Ajout rapide depuis Behance <small>coche tes projets, ajoutés en une fois</small></button>
     <div class="edw-l">Couverture</div>
     <div class="edw-drop" id="ap-drop">
       <input type="file" id="ap-file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" hidden>
@@ -1998,6 +2127,7 @@ function edAddProject() {
       <select class="edw-in" id="ap-dup"><option value="">— choisir —</option>${projs.map(p => `<option value="${_eesc(p.id)}">${_eesc(p.title || 'Sans titre')}</option>`).join('')}</select>` : ''}
     <button class="edw-ok" id="ap-ok">Créer le projet</button>`;
   EdWin.open(null, '＋ Nouveau projet', html, w => {
+    w.querySelector('#ap-behance').onclick = () => { EdWin.close(); window.BehanceQuick && BehanceQuick.open(); };
     let cover = '', coverFile = '';
     const dz = w.querySelector('#ap-dz'), prev = w.querySelector('#ap-prev'),
           info = w.querySelector('#ap-info'), drop = w.querySelector('#ap-drop'), file = w.querySelector('#ap-file');

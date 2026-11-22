@@ -1336,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.28.0', "Ajout rapide depuis Behance (tu coches les projets), gestionnaire de tags (projets, présentation barre ou cartes), éditeur en un seul espace (double-clic = ouvrir), dossiers et recommandations selon ton profil dans Outils, zones de dépôt de fichiers."],
   ['3.27.0', "Business plus clair : Projets, Demandes & Devis et Portails réunis dans « Clients & Projets » (onglets, une seule entrée) ; la connexion du téléphone par QR code est activée."],
   ['3.26.0', "Raccourcis vers les projets open source (outils sans envoi, bibliothèques d’interface) dans Outils et la recherche : par défaut, masquables, et tes propres raccourcis."],
   ['3.25.0', "Page Outils (image : compresser, convertir, filigrane, sans métadonnées ; palette de couleurs ; contraste ; QR) — rien n’est envoyé. Raccourcis clavier : G puis une lettre, / pour chercher, ? pour l’aide."],
@@ -1538,6 +1539,7 @@ const Notify = {
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
           ${['facturation', 'avis', 'devis', 'cp'].includes(n.page) ? `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.markRead('${esc(n.id)}');Notify.toggleInbox();showPage('${n.page}')">Ouvrir</button>` : ''}
+          ${n.action === 'behance-quick' ? `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.markRead('${esc(n.id)}');Notify.toggleInbox();window.BehanceQuick&&BehanceQuick.open()">Choisir</button>` : ''}
           ${n.link ? `<a class="btn btn-ghost" style="font-size:9px;padding:3px 7px" href="${esc(n.link)}" target="_blank" rel="noopener" onclick="Notify.markRead('${esc(n.id)}')">Voir la release</a>` : ''}
           ${n.workspaceId ? `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.open('${esc(n.id)}','${esc(n.workspaceId)}')">Ouvrir</button>` : ''}
           ${n.readAt ? '' : `<button class="btn btn-ghost" style="font-size:9px;padding:3px 7px" onclick="Notify.markRead('${esc(n.id)}')" title="Marquer comme lu">✓</button>`}

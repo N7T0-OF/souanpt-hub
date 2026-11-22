@@ -26,3 +26,12 @@ Demande du propriétaire : ne pas refaire les outils que ces sites proposent dé
 - Stockage `hub_shortcuts` `{ hidden: [ids], custom: [...] }` (registre `HubData`, sauvegarde GitHub privée, `sync: null`). Adresses **https uniquement**, sans identifiants, 300 caractères max (`Toolbox.safeUrl`, revalidées à l'affichage et à l'ouverture) ; ouverture `noopener,noreferrer`.
 - Aucune icône chargée depuis ces sites (pastille locale : emoji ou initiale) → aucune requête vers un tiers tant qu'on ne clique pas.
 - Recherche globale (Ctrl/⌘K) : groupe « Raccourcis ».
+
+## Dossiers, profil et glisser-déposer (3.28.0)
+
+- `hub_shortcuts` gagne `folders: [{ id, name, closed, items: [ids] }]`, `profile: [ids]` (absent = détection automatique) et `recoHidden`. Sans `folders`, les raccourcis sont rangés par leur catégorie (`cat`) ; dès qu’on déplace ou crée un dossier, l’ordre complet est enregistré. Un raccourci nouveau ou rétabli qui n’est dans aucun dossier rejoint celui de sa catégorie (créé au besoin).
+- `Toolbox.links` : `folders()`, `addFolder(nom)` (même nom = même dossier), `renameFolder`, `removeFolder` (les raccourcis passent dans le dossier voisin, rien n’est perdu), `toggleFolder`, `moveFolder`, `move(id, dossier, position)`. `all()` suit l’ordre des dossiers ; les anciens appels (`add`, `remove`, `restore`, `hiddenCount`, `open`) restent valides.
+- Glisser-déposer : maintenir un raccourci puis le glisser (souris : au-delà de 6 px ; tactile : appui de 260 ms, sinon le défilement reste normal). La carte décolle et suit le pointeur, une place fantôme montre l’arrivée, un dossier replié s’ouvre pendant le geste, un dossier vide affiche « Dépose un raccourci ici ». Même geste que les projets dans l’éditeur du site.
+- Profil : graphiste, photographe, vidéaste, 3D, motion, UI/UX, illustration, son. Détecté dans le métier du référencement (`cfg.seo.jobTitle`), la bio, le slogan et les tags des projets ; ajustable par les pastilles, « ↺ Auto » revient à la détection. `SiteConfig` est un `const` : il se lit sans `window.`.
+- Recommandations (`Links.catalog`, 27 outils gratuits, presque tous open source, https) : jusqu’à 6 selon le profil, sans ce qui est déjà présent (comparaison par domaine) ni ce qui a été écarté (✕). « ＋ » ajoute dans le dossier du profil (Graphisme, Photo, Vidéo, 3D…).
+- Tests : `tests/hub-v328.test.mjs`.
