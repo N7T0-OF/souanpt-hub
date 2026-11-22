@@ -9,4 +9,4 @@
 - Les correspondances approximatives à l'import imposent désormais un choix humain explicite avant l'écriture ; l'import automatique se limite aux noms exacts. Les actions groupées présentes sont volontairement limitées aux dossiers privés. Le panneau de suggestions est un diagnostic local ; l'association automatique ambiguë reste exclue pour éviter les faux rattachements.
 - La release par tag exige aussi un déploiement Cloudflare valide du même SHA ; ne pas l'annoncer avant satisfaction de ce prérequis.
 
-- 3.21.0 (22 novembre 2026) : commit sur `claude/site-only-pwa` et poussé sur cette branche uniquement, **non fusionné dans `main` et non déployé** (ni GitHub Pages ni Cloudflare), à la demande du propriétaire (« pas de déploiement en production sans autorisation explicite »). Production = 3.20.0 (`f51df3f`).
+- 3.21.0 puis 3.22.0 (22 novembre 2026) : commits sur `claude/site-only-pwa`, poussés sur cette branche uniquement, **non fusionnés dans `main` et non déployés** (ni GitHub Pages ni Cloudflare), à la demande du propriétaire (« pas de déploiement en production sans autorisation explicite »). Production = 3.20.0 (`f51df3f`).

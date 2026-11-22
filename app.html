@@ -428,7 +428,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .pipeline-arrow{color:var(--muted);font-size:14px;padding:0 3px;align-self:center;flex-shrink:0}
 
 /* ── SETTINGS ── */
-.settings-grid{display:grid;grid-template-columns:200px 1fr;gap:18px}
+.settings-grid{display:grid;grid-template-columns:200px minmax(0,1fr);gap:18px}
+/* 3.22 : sur téléphone / tablette, le menu des paramètres devient une rangée d’onglets défilante */
+@media(max-width:820px){.settings-grid{grid-template-columns:minmax(0,1fr);gap:12px}.settings-grid .settings-nav{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:4px;scrollbar-width:none}.settings-grid .settings-nav::-webkit-scrollbar{display:none}.settings-grid .settings-nav-item{white-space:nowrap;flex-shrink:0}}
 .settings-nav{display:flex;flex-direction:column;gap:2px}
 .settings-nav-item{
   padding:9px 14px;border-radius:6px;font-size:11px;color:var(--muted2);
@@ -683,6 +685,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;disp
 .cmdk-empty{padding:22px;text-align:center;color:var(--muted2);font-size:12px}
 .cmdk-foot{display:flex;gap:14px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--border);font-size:9px;color:var(--muted2)}
 @media(max-width:600px){#cmdk{padding-top:8vh}.cmdk-foot{display:none}}
+.sys-ver{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.sys-ver>div{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column}
+.sys-ver b{font-size:18px;font-family:'Syne',sans-serif}.sys-ver span{font-size:9px;color:var(--muted2)}.sys-new{color:var(--accent)}
+.sys-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.sys-sub{font-size:10px;color:var(--muted2);margin:4px 0 8px}
+.sys-notes{margin-top:10px;font-size:10px}.sys-notes summary{cursor:pointer;color:var(--muted2)}.sys-notes div{padding:5px 0;border-bottom:1px solid var(--border);line-height:1.5}.sys-notes b{color:var(--accent);margin-right:4px}
+.sys-bars{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}.sys-bar{display:grid;grid-template-columns:110px 1fr 64px;gap:8px;align-items:center;font-size:10px}
+.sys-bar em{font-style:normal;color:var(--muted2);font-size:8px}.sys-bar i{height:6px;background:var(--s3);border-radius:6px;overflow:hidden}.sys-bar i b{display:block;height:100%;background:var(--accent)}.sys-bar small{text-align:right;color:var(--muted2)}
+.sys-kv{display:flex;justify-content:space-between;font-size:10px;padding:5px 0;border-bottom:1px solid var(--border)}.sys-kv span{color:var(--muted2)}
+.sys-diag{white-space:pre-wrap;font:10px/1.6 'DM Mono',monospace;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--muted2);margin:0}
+.sys-keys{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:10px;color:var(--muted2)}.sys-keys kbd{font:600 9px system-ui;padding:1px 5px;border:1px solid var(--border2);border-radius:4px;background:var(--s2);color:var(--text)}
+#hub-update{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:1250;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border:1px solid var(--accent);border-radius:12px;background:var(--s1);box-shadow:0 12px 40px #000a;font-size:11px;max-width:calc(100vw - 24px)}
+#hub-update .btn{font-size:10px}
+html.hub-calm *,html.hub-calm *::before,html.hub-calm *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+@media(max-width:600px){.sys-ver{grid-template-columns:1fr}.sys-bar{grid-template-columns:90px 1fr 54px}}
 #hp-modal{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
 #hp-modal .hp-card{width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border2);border-radius:12px;box-shadow:0 20px 60px #000a}
 #hp-modal .hp-head,#hp-modal .hp-foot{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:12px}
@@ -2181,12 +2196,13 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
       <div class="settings-grid">
         <div class="settings-nav">
           <div class="settings-nav-item active" onclick="settingsTab('compte',this)">👤 Compte</div>
-          <div class="settings-nav-item" onclick="settingsTab('general',this)">Général</div>
+          <div class="settings-nav-item" onclick="settingsTab('general',this)">⚙️ Général</div>
           <div class="settings-nav-item" onclick="settingsTab('integrations',this)">🔗 Intégrations</div>
           <div class="settings-nav-item" onclick="settingsTab('notifs',this)">🔔 Notifications</div>
           <div class="settings-nav-item" onclick="settingsTab('soutien',this)">❤️ Soutenir</div>
-          <div class="settings-nav-item" onclick="settingsTab('domain',this)">Domaine</div>
-          <div class="settings-nav-item" onclick="settingsTab('privacy',this)">Confidentialité</div>
+          <div class="settings-nav-item" onclick="settingsTab('domain',this)">🌐 Domaine</div>
+          <div class="settings-nav-item" onclick="settingsTab('privacy',this)">🔒 Confidentialité</div>
+          <div class="settings-nav-item" onclick="settingsTab('system',this)">🖥 Système</div>
         </div>
         <div class="settings-content">
           <div id="set-tab-compte" class="set-tab">
@@ -2270,7 +2286,11 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
                   <option value="eco">Économie stockage — 700px, plus léger</option>
                 </select>
               </div>
-              <div class="hintbox">S'applique aux prochaines couvertures importées. Pour recompresser celles déjà en place avec ce réglage : <strong style="color:var(--accent);cursor:pointer" onclick="showPage('storage')">Stockage → Optimiser les images →</strong></div>
+              <div class="sys-sub">Prochaines couvertures importées. <button type="button" class="biz-link" onclick="showPage('storage')">Recompresser l'existant</button></div>
+            </div>
+            <div class="setting-group">
+              <div class="setting-group-title">Préférences</div>
+              <div id="sys-prefs"></div>
             </div>
           </div>
           <div id="set-tab-notifs" class="set-tab" style="display:none">
@@ -2435,30 +2455,20 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
           <div id="set-tab-domain" class="set-tab" style="display:none">
             <div class="setting-group">
               <div class="setting-group-title">Domaine personnalisé</div>
-              <div class="prop-row"><div class="prop-label">Domaine</div><input class="prop-input" id="set-custom-domain" placeholder="monsite.fr"></div>
-              <button class="btn btn-ghost" style="font-size:10px;margin-top:8px" onclick="settingsSaveDomain()">Sauvegarder</button>
+              <div class="prop-row"><div class="prop-label">Domaine</div><input class="prop-input" id="set-custom-domain" placeholder="monsite.fr" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter')settingsSaveDomain()"></div>
+              <div class="sys-sub" id="set-domain-help"></div>
+              <div class="sys-row"><button class="btn btn-accent" style="font-size:10px" onclick="settingsSaveDomain()">Enregistrer</button><button class="btn btn-ghost" style="font-size:10px" onclick="document.getElementById('set-custom-domain').value='';settingsSaveDomain()">Retirer le domaine</button></div>
             </div>
           </div>
           <div id="set-tab-privacy" class="set-tab" style="display:none">
             <div class="setting-group">
               <div class="setting-group-title">Confidentialité</div>
-              <div class="setting-row"><div class="setting-info"><div class="setting-name">Portfolio public</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+              <div class="setting-row"><div class="setting-info"><div class="setting-name">Visible sur Google</div><div class="setting-desc">Indexation du site publié (lien canonique, plan du site). Prend effet à la prochaine publication.</div></div><div class="toggle on" id="tog-seo-index" role="switch" tabindex="0" aria-checked="true" onclick="settingsToggleIndex(this)" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();this.click()}"></div></div>
               <div class="setting-row"><div class="setting-info"><div class="setting-name">Apparaître dans le <a href="classement.html" target="_blank" style="color:var(--accent3)">Classement 🏆</a></div><div class="setting-desc">Optionnel — décoche pour te retirer du classement public</div></div><div class="toggle on" id="tog-leaderboard" onclick="this.classList.toggle('on');saveLeaderboardOptIn()"></div></div>
             </div>
-            <div class="setting-group">
-              <div class="setting-group-title">Sauvegarde complète du Hub</div>
-              <div class="hintbox" style="margin-bottom:10px">Exporte <strong style="color:var(--text)">toutes tes données</strong> (projets, clients, factures, avis, portails, paramètres) dans un seul fichier. C'est ta sauvegarde — et le point de départ de la future migration vers le cloud (Firebase). Le token GitHub n'est jamais inclus.</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="btn btn-accent" style="font-size:10px" onclick="exportDataFull()">⬇ Exporter mon Hub</button>
-                <button class="btn btn-ghost" style="font-size:10px" onclick="importDataFull()">⬆ Importer</button>
-                <button class="btn btn-ghost" style="font-size:10px" onclick="restoreV1()">☁ Restaurer mes données V1 (GitHub)</button>
-              </div>
-              <div class="hintbox">💡 <strong style="color:var(--text)">Tes données V1 ne sont pas perdues</strong> : elles sont dans ta sauvegarde GitHub privée (<code>ton-compte-hub-data</code>). Connecte GitHub (token) puis clique « Restaurer » — projets, clients, factures et avis reviennent, et se synchronisent ensuite dans le cloud automatiquement.</div>
-            </div>
-            <div class="setting-group">
-              <div class="setting-group-title">Compte</div>
-              <button class="btn btn-ghost" style="font-size:10px;color:var(--red);border-color:rgba(192,57,43,.25)" onclick="hubSignOut()">Se déconnecter</button>
-            </div>
+          </div>
+          <div id="set-tab-system" class="set-tab" style="display:none">
+            <div id="sys-panel"></div>
           </div>
         </div>
       </div>
@@ -2485,6 +2495,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
 <script src="js/business.js"></script>
 <script src="js/command-palette.js"></script>
 <script src="js/mobile-nav.js"></script>
+<script src="js/system.js"></script>
 <script src="js/editor-seo.js"></script>
 <script src="js/editor-toolbar.js"></script>
 <script src="js/core.js"></script>
@@ -2517,6 +2528,10 @@ function settingsTab(name, el) {
   if (tab) tab.style.display = '';
   if (el) el.classList.add('active');
   if (name === 'compte') renderCompte();
+  if (name === 'general') window.HubSystem && HubSystem.renderPrefs();
+  if (name === 'system') window.HubSystem && HubSystem.renderSystem();
+  if (name === 'domain') settingsRenderDomain();
+  if (name === 'privacy') { const t = document.getElementById('tog-seo-index'); const on = !(SiteConfig.get().seo && SiteConfig.get().seo.index === false); if (t) { t.classList.toggle('on', on); t.setAttribute('aria-checked', on); } }
   if (name === 'notifs') { renderNotifs(); Notify.loadJobs(); }
   if (name === 'integrations') {
     renderIntegrations(); renderBehancePage?.(); renderLoginLog?.();
@@ -2725,10 +2740,39 @@ function settingsSaveBehance() {
   renderBehancePage();
   showToast('Behance @' + user + ' sauvegardé','var(--green)');
 }
+/* 3.22 : le domaine est réellement publié (fichier CNAME + adresse canonique), voir deployPortfolio. */
+function hubCleanDomain(v) {
+  const d = String(v || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/\.$/, '');
+  return /^(?=.{3,253}$)(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/.test(d) && !/(^|\.)github\.io$/.test(d) ? d : '';
+}
+function settingsRenderDomain() {
+  const cur = hubCleanDomain(SiteConfig.get().customDomain);
+  const i = document.getElementById('set-custom-domain'); if (i) i.value = cur;
+  const owner = (typeof Auth !== 'undefined' && Auth.owner && Auth.owner()) || 'ton-compte';
+  const h = document.getElementById('set-domain-help');
+  if (h) h.innerHTML = cur
+    ? 'Publié à la prochaine publication (fichier <code>CNAME</code>). Chez ton registrar : enregistrement <code>CNAME</code> de <code>' + esc(cur.startsWith('www.') ? 'www' : cur) + '</code> vers <code>' + esc(String(owner).toLowerCase()) + '.github.io</code>' + (cur.startsWith('www.') ? '' : ' (ou les 4 adresses A de GitHub Pages pour un domaine nu)') + '.'
+    : 'Aucun : le site reste sur son adresse GitHub Pages.';
+}
 function settingsSaveDomain() {
-  const d = document.getElementById('set-custom-domain')?.value.trim();
-  if (d) SiteConfig.set('customDomain', 'https://' + d.replace('https://',''));
-  showToast('Domaine sauvegardé','var(--green)');
+  const raw = document.getElementById('set-custom-domain')?.value.trim() || '';
+  const d = hubCleanDomain(raw);
+  if (raw && !d) return showToast('Domaine invalide (ex. monsite.fr ou www.monsite.fr)', '#c0392b', 3000);
+  const had = hubCleanDomain(SiteConfig.get().customDomain);
+  SiteConfig.set('customDomain', d ? 'https://' + d : '');
+  // Retrait explicite : seule façon de supprimer le CNAME à la prochaine publication.
+  SiteConfig.set('customDomainRemoved', !d && !!had ? true : (d ? false : !!SiteConfig.get().customDomainRemoved));
+  if (window.SiteAutoPublish) SiteAutoPublish.queue();
+  settingsRenderDomain();
+  showToast(d ? 'Domaine enregistré ✓ — publié à la prochaine publication' : 'Domaine retiré — le site reviendra à son adresse GitHub Pages', 'var(--green)', 3500);
+}
+function settingsToggleIndex(el) {
+  const on = !el.classList.contains('on');
+  el.classList.toggle('on', on); el.setAttribute('aria-checked', on);
+  const cfg = SiteConfig.get();
+  SiteConfig.set('seo', { ...(cfg.seo || {}), index: on });
+  if (window.SiteAutoPublish) SiteAutoPublish.queue();
+  showToast(on ? 'Site visible sur Google à la prochaine publication' : 'Site masqué de Google (noindex) à la prochaine publication', 'var(--green)', 3000);
 }
 /* ═══ EXPORT / IMPORT COMPLET DU HUB — filet de sécurité + base migration Firebase ═══ */
 /* La liste des collections n'est plus en dur ici : elle vit dans
@@ -3935,7 +3979,7 @@ const PreviewMode = {
     if (!this.sandbox() || typeof generateSite !== 'function') return;
     this.closeNew();
     const wrap = document.createElement('div'); wrap.id = 'pv-new';
-    wrap.innerHTML = '<div class="pv-new-bar"><span>✨ Nouveautés 3.16 — ambiance (écran d’entrée, braises, curseur, machine à écrire, grain) · la fenêtre projet défile</span>'
+    wrap.innerHTML = '<div class="pv-new-bar"><span>✨ Démo du site publié : ambiance, fenêtre projet qui défile, bouton retour haunt.gg</span>'
       + '<button type="button" data-reopen>↻ Rouvrir le projet</button><button type="button" data-close>✕ Fermer la démo</button></div>';
     const f = document.createElement('iframe'); f.title = 'Site de démonstration';
     wrap.appendChild(f); document.body.appendChild(wrap);

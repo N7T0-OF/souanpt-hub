@@ -2356,9 +2356,15 @@ async function deployPortfolio(onLog, onStep, options = {}) {
   // lastDeploy is local bookkeeping. Publishing it made every repeat publish
   // produce a different tree and an unnecessary GitHub Pages build.
   const { lastDeploy: _previousDeploy, ...publicCfg } = cfg;
+  /* 3.22 : domaine personnalisé (Paramètres → Domaine) réellement publié —
+     fichier CNAME + adresse canonique. Valeur invalide → ignorée. */
+  const customDomain = (() => {
+    const d = String(publicCfg.customDomain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/\.$/, '');
+    return /^(?=.{3,253}$)(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/.test(d) && !/(^|\.)github\.io$/.test(d) ? d : '';
+  })();
   const cfgToUse = { ...publicCfg, ownerUid: publisherUid || '', repo: owner + '/' + repoName,
     // Adresse publique pour le lien canonique, le plan du site et les aperçus.
-    siteUrl: publicCfg.siteUrl || `https://${owner.toLowerCase()}.github.io/${repoName}/` };
+    siteUrl: customDomain ? `https://${customDomain}/` : (publicCfg.siteUrl || `https://${owner.toLowerCase()}.github.io/${repoName}/`) };
   /* Les images vivent sur GitHub (media/) : localStorage ne garde qu'une
      miniature. Avant de générer, on remet le PLEIN FORMAT en mémoire — sinon
      le site publié recevrait les miniatures. Le manifeste JSON public reste
@@ -2402,15 +2408,22 @@ async function deployPortfolio(onLog, onStep, options = {}) {
       .map(e => ({ path: 'projets/' + e.name + '/index.html', delete: true }));
   } catch { /* 404 : aucune page projet publiée jusqu'ici */ }
   if (seoFiles.length) onLog?.(`  → SEO : ${keepDirs.size} page(s) projet, plan du site${staleProjectPages.length ? `, ${staleProjectPages.length} ancienne(s) page(s) retirée(s)` : ''}`);
+  // Domaine personnalisé : CNAME posé, ou retiré s'il n'est plus réglé.
+  const cnameFiles = [];
+  if (customDomain) { cnameFiles.push({ path: 'CNAME', content: customDomain + '\n' }); onLog?.('  → domaine : ' + customDomain); }
+  // Retrait seulement si l'utilisateur a RETIRÉ le domaine dans le hub : un CNAME
+  // posé directement sur GitHub (sans passer par le hub) n'est jamais supprimé.
+  else if (publicCfg.customDomainRemoved) { try { if (await GH.fileSha(token, owner, repoName, 'CNAME')) { cnameFiles.push({ path: 'CNAME', delete: true }); onLog?.('  → domaine personnalisé retiré'); } } catch {} }
   const commitSha = await GH.commitFiles(token, owner, repoName, [
     { path: 'index.html',       content: siteHTML },
     { path: 'projects.json',    content: JSON.stringify({ version: 1, projects: publicFeed.projects }, null, 2) },
     { path: 'site-config.json', content: JSON.stringify(siteManifest, null, 2) },
     { path: '.nojekyll',        content: '' },
     // SEO : plan du site (avec images des projets) et robots.txt.
-    ...seoFiles, ...staleProjectPages,
+    ...seoFiles, ...staleProjectPages, ...cnameFiles,
   ], 'deploy: ' + new Date().toISOString().slice(0,16).replace('T',' '));
   onLog?.('  → commit ' + commitSha.slice(0, 7) + ' (index.html + config)'); onStep?.('commit', 'done');
+  if (publicCfg.customDomainRemoved) { try { SiteConfig.set('customDomainRemoved', false); } catch {} }
 
   onStep?.('pages', 'active'); onLog?.('Vérification GitHub Pages…');
   const pages = await GH.pagesInfo(token, owner, repoName);
