@@ -5,23 +5,27 @@ import os from 'node:os';
 import path from 'node:path';
 import { pagesConfig, writePagesConfig } from '../scripts/write-pages-config.mjs';
 
-test('Pages config binds HUB_PAIR and is written NEXT TO the published folder, never inside', () => {
+test('Pages config binds HUB_PAIR and is written at the repo root (with functions/), never inside the published folder', () => {
   const tpl = fs.readFileSync(new URL('../cloudflare/pages.wrangler.toml', import.meta.url), 'utf8');
   assert.match(tpl, /name = "souanpthub"/);
   assert.match(tpl, /\[\[kv_namespaces\]\]\s*binding = "HUB_PAIR"\s*id = "[0-9a-f]{32}"/);
-  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'pages-cfg-'));
-  const dist = path.join(parent, 'souanpt-cloudflare-abc');
-  fs.mkdirSync(dist); fs.writeFileSync(path.join(dist, 'build-info.json'), '{}');
-  const r = writePagesConfig(dist);
-  assert.equal(r.file, path.join(parent, 'wrangler.toml'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pages-cfg-'));
+  const repo = path.join(tmp, 'repo'); fs.mkdirSync(path.join(repo, 'functions'), { recursive: true });
+  const dist = path.join(tmp, 'out', 'souanpt-cloudflare-abc');
+  fs.mkdirSync(dist, { recursive: true }); fs.writeFileSync(path.join(dist, 'build-info.json'), '{}');
+  const r = writePagesConfig(dist, repo);
+  assert.equal(r.file, path.join(repo, 'wrangler.toml'), 'next to functions/: Wrangler deploys them with the site');
   assert.equal(fs.existsSync(path.join(dist, 'wrangler.toml')), false, 'not served with the site');
-  assert.match(fs.readFileSync(r.file, 'utf8'), /pages_build_output_dir = "souanpt-cloudflare-abc"/);
-  assert.throws(() => pagesConfig(path.join(parent, 'bad name;rm')), /inattendu/);
-  assert.throws(() => writePagesConfig(path.join(parent, 'missing')), /introuvable/);
-  fs.rmSync(parent, { recursive: true, force: true });
+  assert.match(fs.readFileSync(r.file, 'utf8'), /pages_build_output_dir = "\.\.\/out\/souanpt-cloudflare-abc"/);
+  assert.throws(() => writePagesConfig(dist, path.join(tmp, 'out')), /functions/, 'never deploy without the relay (22/11/2026 regression)');
+  assert.throws(() => pagesConfig(path.join(tmp, 'bad name;rm'), repo), /inattendu/);
+  assert.throws(() => writePagesConfig(path.join(tmp, 'missing'), repo), /introuvable/);
+  fs.rmSync(tmp, { recursive: true, force: true });
+  assert.match(fs.readFileSync(new URL('../.gitignore', import.meta.url), 'utf8'), /^\/wrangler\.toml\r?$/m, 'generated config never committed');
   const wf = fs.readFileSync(new URL('../.github/workflows/deploy-cloudflare.yml', import.meta.url), 'utf8');
   assert.match(wf, /node scripts\/write-pages-config\.mjs "\$out"/, 'the GitHub workflow keeps the binding too');
-  assert.match(wf, /workingDirectory: \$\{\{ runner\.temp \}\}\r?\n\s+command: pages deploy souanpt-cloudflare-\$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(wf, /workingDirectory:/, 'run from the checkout root, where functions/ lives');
+  assert.match(wf, /command: pages deploy \$\{\{ steps\.package\.outputs\.directory \}\} --project-name=souanpthub/);
 });
 
 test('Business merged: one « Clients & Projets » entry with Projets / Demandes & Devis / Portails tabs', () => {
