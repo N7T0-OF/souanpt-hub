@@ -36,7 +36,7 @@
 
   const css = `
 #sh-btn{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:860;display:flex;align-items:center;gap:2px;
-  background:#C8FF00;color:#060606;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.45);font:700 13px/1 system-ui,-apple-system,'Segoe UI',sans-serif}
+  background:var(--accent,#C8FF00);color:var(--on-accent,#060606);border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.45);font:700 13px/1 system-ui,-apple-system,'Segoe UI',sans-serif}
 #sh-btn button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;min-height:44px}
 #sh-btn .sh-go{padding:0 6px 0 16px;display:flex;align-items:center;gap:8px}
 #sh-btn .sh-x{width:40px;font-size:16px;opacity:.65}
@@ -47,8 +47,8 @@
 #sh-sheet h2{font-size:16px;margin:0 0 10px}
 #sh-sheet ol{margin:0 0 16px 20px;padding:0}
 #sh-sheet li{margin:6px 0}
-#sh-sheet b{color:#C8FF00}
-#sh-sheet .sh-ok{width:100%;min-height:44px;border:none;border-radius:10px;background:#C8FF00;color:#060606;font:700 14px system-ui,sans-serif;cursor:pointer}
+#sh-sheet b{color:var(--accent,#C8FF00)}
+#sh-sheet .sh-ok{width:100%;min-height:44px;border:none;border-radius:10px;background:var(--accent,#C8FF00);color:var(--on-accent,#060606);font:700 14px system-ui,sans-serif;cursor:pointer}
 @media print{#sh-btn{display:none}}`;
 
   function hide() { document.getElementById('sh-btn')?.remove(); }

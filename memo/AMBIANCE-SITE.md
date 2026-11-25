@@ -26,3 +26,7 @@ Inspirée de la page profil haunt.gg du propriétaire (écran d'entrée, fond an
 ## Reste à faire
 
 Grandes tuiles-liens en image (comme « Shop / Contact / Folio » sur haunt.gg) : il faut d'abord une image par lien dans l'éditeur de liens.
+
+## Barre classique masquée sur téléphone (3.29.1)
+
+Safari iOS et certains navigateurs Android ignorent `scrollbar-width` / `::-webkit-scrollbar` pour le défilement de la page elle-même : l’indicateur natif restait visible à côté de la barre lumineuse. Avec la barre lumineuse, sur écran tactile (`(hover:none) and (pointer:coarse)`), `html` est figé et c’est `body` qui défile (`overflow-y:auto`, barre masquée, `scroll-behavior` et `scroll-padding-top` hérités de `html`) : ces navigateurs respectent le masquage sur un élément. La barre lumineuse suit le défilement de `body` (`scroller()`), la fenêtre projet bloque aussi `body`. Ordinateur : inchangé. Effet secondaire assumé : sur téléphone, la barre d’adresse ne se replie plus au défilement quand la barre lumineuse est active.

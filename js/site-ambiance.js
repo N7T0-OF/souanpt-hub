@@ -56,6 +56,10 @@
     // Barre lumineuse active → la barre de défilement classique de la page est
     // masquée (sinon deux barres). Le défilement reste intact (molette, tactile, clavier).
     if (s.progress) out += 'html{scrollbar-width:none!important;-ms-overflow-style:none}html::-webkit-scrollbar,body::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}\n';
+    // Téléphones et tablettes : Safari iOS et certains navigateurs Android ignorent ces
+    // règles pour le défilement de la PAGE (indicateur natif toujours visible). Ils les
+    // respectent sur un élément : sur écran tactile, c'est donc <body> qui défile.
+    if (s.progress) out += '@media (hover:none) and (pointer:coarse){html{height:100%;overflow:hidden!important}body{height:100%;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:none;scrollbar-width:none!important;scroll-behavior:inherit;scroll-padding-top:inherit}body::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}}\n';
     if (s.progress) out += '#amb-prog{position:fixed;right:6px;top:50%;transform:translateY(-50%);width:4px;height:min(220px,40vh);border-radius:4px;background:rgba(128,128,128,.22);z-index:190;pointer-events:none}\n#amb-prog i{display:block;width:100%;height:0;border-radius:4px;background:var(--a);box-shadow:0 0 10px var(--a)}\n';
     if (s.corner.on) out += '#amb-corner{position:fixed;left:14px;bottom:14px;z-index:190;padding:6px 11px;border-radius:999px;font:600 11px system-ui,sans-serif;color:var(--t);background:color-mix(in srgb,var(--bg) 70%,transparent);border:1px solid var(--b);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:none}\n';
     if (s.typewriter.on) out += '.amb-tw::after{content:"";display:inline-block;width:2px;height:1em;margin-left:3px;vertical-align:-2px;background:var(--a);animation:amb-caret 1s steps(1) infinite}\n@keyframes amb-caret{50%{opacity:0}}\n';
@@ -153,9 +157,12 @@
     /* Barre de défilement verticale (côté droit) */
     var prog = document.getElementById('amb-prog');
     if (prog) {
-      var bar = prog.firstChild, ticking = false;
-      var upd = function () { ticking = false; var h = docEl.scrollHeight - innerHeight; bar.style.height = (h > 0 ? Math.min(100, scrollY / h * 100) : 0) + '%'; };
-      addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(upd); } }, { passive: true });
+      var bar = prog.firstChild, ticking = false, body = document.body;
+      // Sur écran tactile la page défile dans <body> (voir css) : on suit le bon élément.
+      var scroller = function () { return body.scrollHeight > body.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(body).overflowY) ? body : (document.scrollingElement || docEl); };
+      var upd = function () { ticking = false; var el = scroller(), h = el.scrollHeight - el.clientHeight, y = el === body ? body.scrollTop : (window.scrollY || el.scrollTop); bar.style.height = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%'; };
+      var onScroll = function () { if (!ticking) { ticking = true; requestAnimationFrame(upd); } };
+      addEventListener('scroll', onScroll, { passive: true }); body.addEventListener('scroll', onScroll, { passive: true });
       upd();
     }
 

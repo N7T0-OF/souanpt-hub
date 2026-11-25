@@ -876,7 +876,7 @@ const SiteConfig = {
     fx: { tilt: false, intensity: 7, shine: false, lift: false, glow: false, mouseglow: false },
   }),
   get()    { try { return { ...SiteConfig.defaults(), ...JSON.parse(localStorage.getItem(SiteConfig._K) || '{}') }; } catch { return SiteConfig.defaults(); } },
-  save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); },
+  save(d)  { localStorage.setItem(SiteConfig._K, JSON.stringify(d)); try { HubAccent.sync(); } catch {} },   // 3.29.1 : le tableau de bord suit l'accent
   set(k,v) { const d = SiteConfig.get(); d[k] = v; SiteConfig.save(d); },
 };
 
@@ -1445,16 +1445,34 @@ function accentTokens(hex) {
     doux, bordures, halos, couche d'édition) suivent via color-mix, et le
     texte posé sur l'accent est recalculé pour rester lisible. */
 const HubAccent = {
+  /** Variante lisible sur le fond sombre du tableau de bord (contraste ≥ 3:1 avec #080808) :
+      un accent très sombre est éclairci ici, le site publié garde sa couleur exacte. */
+  readable(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim()); if (!m) return null;
+    const n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    const lum = (x, y, z) => 0.2126 * lin(x) + 0.7152 * lin(y) + 0.0722 * lin(z);
+    let t = 0, R = r, G = g, B = b;
+    while (lum(R, G, B) < 0.11 && t < 1) { t = Math.min(1, t + 0.05); R = Math.round(r + (255 - r) * t); G = Math.round(g + (255 - g) * t); B = Math.round(b + (255 - b) * t); }
+    return '#' + [R, G, B].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+  },
   apply(hex) {
-    if (!/^#[0-9a-f]{6}$/i.test(String(hex || ''))) return false;
+    const h = this.readable(hex); if (!h) return false;
     const s = document.documentElement.style;
-    s.setProperty('--accent', hex);
-    s.setProperty('--on-accent', accentTokens(hex).ink);
+    s.setProperty('--accent', h);
+    s.setProperty('--on-accent', accentTokens(h).ink);
     return true;
   },
   reset() { const s = document.documentElement.style; s.removeProperty('--accent'); s.removeProperty('--on-accent'); },
+  /** Couleur d'accent du site (🎨 Thème, Palette, synchro) → tout le tableau de bord. */
+  sync() { try { const a = SiteConfig.get().accentColor; if (!this.apply(a)) this.reset(); } catch {} },
 };
 if (typeof window !== 'undefined') window.HubAccent = HubAccent;
+// Au chargement, et quand un autre onglet ou la synchro change la configuration.
+if (typeof document !== 'undefined' && document.documentElement && document.getElementById('hub-sidebar')) {
+  HubAccent.sync();
+  window.addEventListener('storage', e => { if (!e.key || e.key === SiteConfig._K) HubAccent.sync(); });
+}
 
 function generateSite(cfg, projects, reviews, opts) {
   const editor = !!(opts && opts.editor);

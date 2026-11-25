@@ -322,7 +322,7 @@
       applyCfg(); root.hidden = false;
       root.classList.add('bv-enter');
       requestAnimationFrame(function () { requestAnimationFrame(function () { root.classList.remove('bv-enter'); }); });
-      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden'; document.body.style.overflow = 'hidden';
       load();
       setTimeout(function () { var x = $('.bv-x'); if (x) x.focus(); }, 30);
       return false;
@@ -332,7 +332,7 @@
       root.classList.add('bv-enter');
       closing = setTimeout(function () {
         root.hidden = true; clearFrame(); cur = null; state.hidden = true;
-        document.documentElement.style.overflow = '';
+        document.documentElement.style.overflow = ''; document.body.style.overflow = '';
         if (lastFocus && lastFocus.focus) try { lastFocus.focus(); } catch (e) {}
       }, root.classList.contains('bv-fx-anim') ? 380 : 0);
     }

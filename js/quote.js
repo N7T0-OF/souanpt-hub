@@ -1336,6 +1336,7 @@ const NOTIFY_EVENTS = [
    À chaque release : prépendre une ligne ici (et rien d'autre).
 ══════════════════════════════════════════════════════════════════════════ */
 const HUB_VERSIONS = [
+  ['3.29.1', "La couleur d’accent du thème colore tout le tableau de bord (et reste lisible). Sur téléphone, le site n’affiche plus la barre de défilement classique quand la barre lumineuse est activée."],
   ['3.29.0', "Téléphone : barre d’onglets flottante en bas (une icône par section), onglets de section en haut, édition rapide du site sans aperçu (liens, projets, tags, musique, profil). Tablette : barre latérale en rail d’icônes."],
   ['3.28.0', "Ajout rapide depuis Behance (tu coches les projets), gestionnaire de tags (projets, présentation barre ou cartes), éditeur en un seul espace (double-clic = ouvrir), dossiers et recommandations selon ton profil dans Outils, zones de dépôt de fichiers."],
   ['3.27.0', "Business plus clair : Projets, Demandes & Devis et Portails réunis dans « Clients & Projets » (onglets, une seule entrée) ; la connexion du téléphone par QR code est activée."],
