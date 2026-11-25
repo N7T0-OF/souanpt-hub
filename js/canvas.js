@@ -1986,12 +1986,20 @@ function edTagCatalog() {
    droite le tag choisi : renommer, supprimer, CHOISIR SA PRÉSENTATION
    (barre de filtres + cartes, barre seule, cartes seules) et RANGER DES
    PROJETS dedans en cliquant leurs couvertures. */
-const edTagKey = t => String(t ?? '').trim().toLocaleLowerCase('fr');
+const edTagKey = t => String(t ?? '').normalize('NFC').trim().toLocaleLowerCase('fr');
 const ED_TAG_MODES = [
   ['both', '◫', 'Barre et cartes', 'Visible dans la barre de filtres et en étiquette sur les cartes des projets.'],
   ['bar', '▤', 'Barre de filtres', 'Sert à filtrer les projets (barre au-dessus de la grille), sans étiquette sur les cartes.'],
   ['card', '▣', 'Cartes seulement', 'Étiquette sur les cartes des projets, absent de la barre de filtres.'],
 ];
+/** Où en est le site en ligne ? Sans publication automatique, un changement de
+    tag n'apparaît sur le site publié qu'après 🚀 Publier (l'aperçu, lui, suit tout de suite). */
+function edTagPubNote() {
+  const c = SiteConfig.get(), live = !!(c.lastDeploy && c.lastDeploy.url);
+  if (live && c.autoPublish) return '<p class="tg-pub ok">✓ Publication automatique : le site en ligne suit dans quelques secondes.</p>';
+  return '<p class="tg-pub">' + (live ? 'Déjà visible dans l’aperçu. Sur le site en ligne : après publication.' : 'Visible dans l’aperçu. Publie ton site pour l’appliquer en ligne.')
+    + ' <button type="button" class="tg-btn tg-btn-a" onclick="EdWin.close();edDeploy()">🚀 Publier</button></p>';
+}
 function edWinTags(focusTag) {
   let cur = focusTag || null, q = '';
   EdWin.open(null, '🏷 Tags', '<div class="tg-wrap" id="tg-wrap"></div>', w => {
@@ -2033,6 +2041,7 @@ function edWinTags(focusTag) {
             <div class="edw-l">Présentation sur le site</div>
             <div class="tg-seg" role="radiogroup" aria-label="Présentation du tag">${ED_TAG_MODES.map(([k, ic, label]) => `<button type="button" role="radio" aria-checked="${m === k}" class="${m === k ? 'on' : ''}" data-mode="${k}"><span>${ic}</span>${label}</button>`).join('')}</div>
             <p class="tg-mh">${ED_TAG_MODES.find(x => x[0] === m)[3]}</p>
+            ${edTagPubNote()}
             <div class="edw-l">Projets dans « ${_eesc(cur)} » <span class="edw-hint">${n(cur)} / ${ps.length} · clique une couverture pour ajouter ou retirer</span></div>
             <div class="tg-tools"><input class="edw-in" id="tg-q" placeholder="Filtrer les projets…" value="${_eesc(q)}"><button type="button" class="tg-btn" id="tg-all">Tout ajouter</button><button type="button" class="tg-btn" id="tg-none">Tout retirer</button></div>
             <div class="tg-grid" id="tg-grid">${grid()}</div>` : '<p class="tg-empty">Crée un tag pour y ranger des projets et choisir comment il s’affiche.</p>'}</div>

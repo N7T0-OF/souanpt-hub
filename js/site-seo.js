@@ -148,7 +148,8 @@
     const s = sanitize(cfg), path = projectPath(p);
     const name = txt(cfg.siteName, 60) || 'Portfolio';
     const title = txt(p.title, 120) || 'Projet';
-    const tags = (Array.isArray(p.tags) ? p.tags : []).map(t => txt(t, 30)).filter(Boolean).slice(0, 8);
+    // « Barre de filtres seulement » : un critère de tri, pas une étiquette du projet (3.29.2).
+    const tags = (Array.isArray(p.tags) ? p.tags : []).filter(t => typeof siteTagMode !== 'function' || siteTagMode(cfg, t) !== 'bar').map(t => txt(t, 30)).filter(Boolean).slice(0, 8);
     const sub = txt(p.sub || p.text, 300);
     const desc = txt(sub || [title, tags.length ? '(' + tags.join(', ') + ')' : '', 'par ' + name + (s.jobTitle ? ', ' + s.jobTitle : '') + '.'].filter(Boolean).join(' '), 170);
     const url = s.siteUrl ? s.siteUrl + path : '';

@@ -136,7 +136,7 @@ test('Behance quick-add: profile found, projects proposed (new vs already added)
   assert.deepEqual(plain(cfg.projectTags), ['Logo', 'Print', 'Motion'], 'tag catalogue merged (SiteConfig read without window.)');
   assert.equal(B.apply([items[1]], {}), 0, 'never twice');
   const app = read('app.html'), ui = read('js/ui.js');
-  assert.match(app, /BehanceQuick\.checkNew\(\)/, 'the 30-min sync only announces new projects');
+  assert.doesNotMatch(app, /BehanceQuick\.checkNew\(\)/, '3.29.2: Behance removed profile feeds — no automatic sync any more');
   assert.doesNotMatch(app, /behanceSyncNow\(true\)/);
   assert.match(ui, /function syncBehance\(\)\{\s*if \(window\.BehanceQuick\) return BehanceQuick\.open\(\);/);
   assert.match(read('js/quote.js'), /n\.action === 'behance-quick'/, 'the notification opens the picker');

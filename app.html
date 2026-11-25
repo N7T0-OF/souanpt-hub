@@ -770,10 +770,18 @@ html.hub-calm *,html.hub-calm *::before,html.hub-calm *::after{animation-duratio
 .bq-it:hover{border-color:var(--border2)}.bq-it.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}.bq-it:not(.on):not(.ex){opacity:.7}.bq-it.ex{opacity:.45;cursor:default}
 .bq-ck{position:absolute;opacity:0;pointer-events:none}.bq-it:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 .bq-cv{position:relative;display:block;aspect-ratio:808/632;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,var(--s3),var(--s1))}.bq-cv img{width:100%;height:100%;object-fit:cover;display:block}
-.bq-tick{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:rgba(0,0,0,.55);border:1.5px solid rgba(255,255,255,.55);color:transparent}
+.bq-tick{position:absolute;top:14px;left:14px;z-index:2;width:26px;height:26px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;background:rgba(0,0,0,.55);border:1.5px solid rgba(255,255,255,.55);color:transparent;cursor:pointer}
 .bq-it.on .bq-tick{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}.bq-it.ex .bq-tick{display:none}
 .bq-badge{position:absolute;top:8px;left:8px;font-size:9px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.7);color:#fff}
-.bq-t{font-size:11px;font-weight:700;line-height:1.3;padding:0 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bq-t{width:100%;font:700 11px/1.3 inherit;font-family:inherit;color:var(--text);background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 5px}.bq-t:hover:not(:disabled),.bq-t:focus{border-color:var(--border2);background:var(--s1);outline:none}
+.bq-cvh{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;color:var(--muted)}.bq-cvh small{font-size:8px;font-weight:400;color:var(--muted2)}
+.bq-it:not(.ex) .bq-cv{cursor:pointer;border:1.5px dashed transparent}.bq-it:not(.ex) .bq-cv:hover,.bq-cv.over{border-color:var(--accent)}
+.bq-lk{font-size:9px;color:var(--muted2);padding:0 5px 3px}.bq-lk:hover{color:var(--accent)}
+.bq-paste{width:100%;font-family:inherit;resize:vertical;min-height:120px}
+.bq-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.bq-row .btn{font-size:10px;text-decoration:none}
+.bq-tip{font-size:9px;color:var(--muted2);margin:0}.bq-warn{color:var(--gold-l);margin-bottom:8px}
+.bq-ask{max-width:560px}
+.tg-pub{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:9px;color:var(--gold-l);margin:6px 0 0;padding:6px 8px;border:1px solid color-mix(in srgb,var(--gold-l) 30%,transparent);border-radius:8px}.tg-pub.ok{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
 .bq-tags{display:flex;gap:3px;flex-wrap:wrap;padding:0 2px 2px}.bq-tags i{font-style:normal;font-size:8px;padding:2px 6px;border-radius:4px;background:var(--a-soft,rgba(255,255,255,.06));color:var(--accent)}
 .bq-empty{font-size:11px;color:var(--muted2)}
 .edw-quick{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;margin-bottom:6px;padding:9px 11px;border:1px solid color-mix(in srgb,#1769FF 55%,var(--border));border-radius:9px;background:color-mix(in srgb,#1769FF 12%,var(--s2));color:var(--text);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;text-align:left}
@@ -2421,7 +2429,7 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
             </div>
             <div class="workflow-list">
               <div class="workflow-item"><div class="workflow-status ws-active"></div><div class="workflow-name">pages build and deployment — automatique</div><div class="workflow-trigger">à chaque déploiement</div></div>
-              <div class="workflow-item"><div class="workflow-status ws-idle"></div><div class="workflow-name">Nouveaux projets Behance annoncés (côté hub)</div><div class="workflow-trigger">toutes les 30 min</div></div>
+              <div class="workflow-item"><div class="workflow-status ws-idle"></div><div class="workflow-name">Ajout rapide Behance par liens (oEmbed officiel)</div><div class="workflow-trigger">toutes les 30 min</div></div>
             </div>
             <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
               <div style="font-size:8px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;font-weight:700">Derniers runs</div>
@@ -2624,10 +2632,10 @@ button.edperf .edperf-track span{display:block;height:100%;background:var(--gree
               <div class="int-body">
                 <div style="font-size:10px;color:var(--muted2);margin:10px 0" id="behance-status">Entre ton pseudo pour synchroniser</div>
                 <div style="display:flex;gap:8px;margin-bottom:10px">
-                  <input class="prop-input" id="be-user" placeholder="tonpseudo (ex: souanpt)" style="flex:1" onkeydown="if(event.key==='Enter')beImport()">
+                  <input class="prop-input" id="be-user" placeholder="ton pseudo Behance (behance.net/…)" style="flex:1" onkeydown="if(event.key==='Enter')beImport()">
                   <button class="btn btn-accent" id="be-import-btn" onclick="beImport()" style="white-space:nowrap;font-size:10px">＋ Choisir mes projets</button>
                 </div>
-                <div class="hintbox">🅱 <strong style="color:var(--text)">Ajout rapide</strong> : le hub repère tes projets publics (nom, couverture en grand format, tags) et te laisse cocher ceux à ajouter. Toutes les 30 min, les nouveaux projets sont <strong style="color:var(--text)">annoncés</strong> dans les notifications, jamais ajoutés sans ton choix.</div>
+                <div class="hintbox">🅱 <strong style="color:var(--text)">Ajout rapide</strong> : colle les liens de tes projets (plusieurs d’un coup), le hub retrouve leur nom avec l’oEmbed officiel de Behance, écarte les doublons, puis tu coches et tu ajoutes une couverture si tu veux. Behance a supprimé le flux de ses profils : la liste automatique n’est plus possible.</div>
                 <div class="gc" style="padding:12px;margin-top:10px">
                   <div style="font-size:10px;font-weight:700;margin-bottom:8px">Projets importés</div>
                   <div id="behance-imported-list" style="font-size:10px;color:var(--muted2)">Aucun projet importé</div>
@@ -4671,8 +4679,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Sync Behance auto (30 min max) — silencieuse
   const lastSync=parseInt(localStorage.getItem('souanpt_last_behance_sync')||'0');
   if (cfg.behance && Date.now()-lastSync > 30*60*1000) {
-    // 3.28 : annonce les nouveaux projets (notification « Choisir »), n'ajoute rien seul.
-    (window.BehanceQuick ? BehanceQuick.checkNew() : Promise.resolve(0)).then(()=>renderBehancePage()).catch(()=>{});
+    // 3.29.2 : Behance a supprimé le flux RSS des profils — plus de synchro automatique.
+    renderBehancePage();
   }
 });
 </script>

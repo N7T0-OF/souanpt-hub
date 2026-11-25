@@ -29,3 +29,7 @@ Le sélecteur ✎ Édition / 👁 Aperçu a disparu : l’aperçu est toujours �
 ## Édition rapide sur téléphone (3.29.0)
 
 Sous 820 px, `edRefreshPreview` ne génère plus l’aperçu (`EdLite.active()`) : l’iframe avec tout le site, ses images et ses effets pesait trop en mémoire sur un téléphone. `js/editor-lite.js` (`EdLite`) affiche à la place une page façon Linktree, en sections repliables : 🔗 Liens (ajout avec détection de la plateforme, modification, ↑↓ = ordre des blocs Lien, retrait avec son bloc), 📁 Projets (＋ Nouveau projet, 🅱 Depuis Behance, liste), 🏷 Tags (créer ; toucher un tag ouvre le gestionnaire), 🎵 Musique & son (lien ou fichier, retirer la musique), ✳ Profil (nom, bio, e-mail). Mêmes données que l’éditeur complet (`hub_links` + `placeBlocks(getBlocks())`, `hub_projects`, `SiteConfig`), publication automatique selon son réglage. « Éditeur complet » le force pour la session (`sessionStorage.hub_ed_full`) ; un aperçu chargé sur grand écran est libéré (`about:blank`) en passant sur petit écran. Mise en page, thème, effets : sur ordinateur.
+
+## Tags : état de publication (3.29.2)
+
+Un réglage de tag (présentation, projets) change l’aperçu tout de suite mais le site en ligne seulement à la publication. Sans publication automatique, la fenêtre Tags le dit et propose « 🚀 Publier ». Les clés de `tagDisplay` sont normalisées (NFC) : un « Vidéo » à accent décomposé ne crée plus un tag fantôme. Les pages projet (`projets/<slug>/`) n’affichent plus les tags « barre de filtres seulement ».

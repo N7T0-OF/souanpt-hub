@@ -1306,18 +1306,18 @@ const CONTACT_ORDER = ['email', 'discord', 'whatsapp', 'phone', 'telegram'];
    seulement) | 'card' (cartes des projets seulement). L'ordre de la barre suit
    le catalogue cfg.projectTags (réordonnable dans 🏷 Tags), puis les autres. */
 function siteTagMode(cfg, t) {
-  const m = cfg && cfg.tagDisplay && cfg.tagDisplay[String(t).trim().toLocaleLowerCase('fr')];
+  const m = cfg && cfg.tagDisplay && cfg.tagDisplay[String(t).normalize('NFC').trim().toLocaleLowerCase('fr')];
   return m === 'bar' || m === 'card' ? m : 'both';
 }
 function cardTags(p, cfg, n) {
   return (p.tags || []).filter(t => String(t).trim() && siteTagMode(cfg, t) !== 'bar').slice(0, n);
 }
 function barTags(projects, cfg) {
-  const cat = (Array.isArray(cfg.projectTags) ? cfg.projectTags : []).map(t => String(t).trim());
+  const cat = (Array.isArray(cfg.projectTags) ? cfg.projectTags : []).map(t => String(t).normalize('NFC').trim());
   const order = new Map(cat.map((t, i) => [t.toLocaleLowerCase('fr'), i]));
   // Orthographe affichée : celle du catalogue, sinon la PREMIÈRE rencontrée.
   const seen = new Map();
-  projects.flatMap(p => p.tags || []).forEach(t => { const v = String(t).trim(), k = v.toLocaleLowerCase('fr'); if (k && !seen.has(k)) seen.set(k, order.has(k) ? cat[order.get(k)] : v); });
+  projects.flatMap(p => p.tags || []).forEach(t => { const v = String(t).normalize('NFC').trim(), k = v.toLocaleLowerCase('fr'); if (k && !seen.has(k)) seen.set(k, order.has(k) ? cat[order.get(k)] : v); });
   const all = [...seen.entries()];
   return all.filter(([k, t]) => siteTagMode(cfg, t) !== 'card')
     .sort((a, b) => (order.has(a[0]) ? order.get(a[0]) : 1e6) - (order.has(b[0]) ? order.get(b[0]) : 1e6))
